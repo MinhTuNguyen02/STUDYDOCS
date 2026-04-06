@@ -39,7 +39,6 @@ Bạn đã có schema SQL ở root project.
 3. Chạy:
 
 ```bash
-npx prisma db pull
 npx prisma generate
 ```
 
