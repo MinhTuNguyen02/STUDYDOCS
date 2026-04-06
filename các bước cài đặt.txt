@@ -1,0 +1,14 @@
+1. chạy Docker:
+- chạy ở thư mục gốc: docker compose up -d
+
+2. cài đặt be:
+- cd .\Studio-docx\
+- npm i
+- bỏ 2 file .env.example .env vào 
+- sinh prisma: npx prisma generate
+- chạy: npm run start:dev
+
+3. cài đặt fe:
+- cd .\frontend\
+- npm i
+- chạy: npm run dev

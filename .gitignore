@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment files (QUAN TRỌNG - chứa secret keys)
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Gemini / AI agent
+.gemini/
+.agent/

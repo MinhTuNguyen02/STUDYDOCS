@@ -1,0 +1,110 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { sellerApi } from '@/api/seller.api'
+import { FileText, Plus, Search, Filter } from 'lucide-react'
+import { formatBalance, formatDate } from '@/utils/format'
+
+export default function SellerDocumentsPage() {
+  const [documents, setDocuments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('ALL')
+
+  useEffect(() => {
+    fetchDocs()
+  }, [filter])
+
+  const fetchDocs = async () => {
+    setLoading(true)
+    try {
+      const res = await sellerApi.getMyDocuments(filter)
+      setDocuments(res.data || res)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return <span className="px-2 py-1 bg-success/10 text-success text-xs font-bold rounded">Đã duyệt</span>
+      case 'PENDING': return <span className="px-2 py-1 bg-warning/10 text-warning text-xs font-bold rounded">Chờ duyệt</span>
+      case 'REJECTED': return <span className="px-2 py-1 bg-danger/10 text-danger text-xs font-bold rounded">Từ chối</span>
+      default: return <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-bold rounded">{status}</span>
+    }
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto py-8 px-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <h1 className="text-3xl font-bold font-heading flex items-center gap-3">
+          <FileText className="w-8 h-8 text-primary" /> Quản lý tài liệu
+        </h1>
+        <Link to="/seller/documents/new" className="btn btn-primary inline-flex gap-2 whitespace-nowrap">
+          <Plus className="w-5 h-5" /> Tải lên mới
+        </Link>
+      </div>
+
+      <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-4 justify-between bg-muted/20">
+          <div className="relative max-w-sm w-full">
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input type="text" placeholder="Tìm tên tài liệu..." className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-muted-foreground" />
+            <select
+              value={filter} onChange={(e) => setFilter(e.target.value)}
+              className="px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-background font-medium"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="APPROVED">Đã duyệt</option>
+              <option value="PENDING">Chờ duyệt</option>
+              <option value="REJECTED">Bị từ chối</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-muted text-muted-foreground text-sm">
+                <th className="p-4 font-semibold">Tên tài liệu</th>
+                <th className="p-4 font-semibold">Giá bán</th>
+                <th className="p-4 font-semibold">Lượt xem</th>
+                <th className="p-4 font-semibold">Lượt tải</th>
+                <th className="p-4 font-semibold">Ngày tải lên</th>
+                <th className="p-4 font-semibold">Trạng thái</th>
+                <th className="p-4 font-semibold text-right">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {loading ? (
+                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Đang tải...</td></tr>
+              ) : documents.length === 0 ? (
+                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Chưa có tài liệu nào.</td></tr>
+              ) : documents.map((doc: any) => (
+                <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="p-4 font-medium max-w-xs truncate" title={doc.title}>{doc.title}</td>
+                  <td className="p-4 font-bold text-primary">{formatBalance(doc.price)}</td>
+                  <td className="p-4 text-muted-foreground text-sm">{doc.viewCount}</td>
+                  <td className="p-4 text-muted-foreground text-sm">{doc.downloadCount}</td>
+                  <td className="p-4 text-muted-foreground text-sm">{formatDate(doc.createdAt || doc.created_at)}</td>
+                  <td className="p-4">
+                    {getStatusBadge(doc.status)}
+                    {doc.status === 'REJECTED' && doc.rejectionReason && (
+                      <div className="text-xs text-danger mt-1">Lý do: {doc.rejectionReason}</div>
+                    )}
+                  </td>
+                  <td className="p-4 text-right">
+                    <Link to={`/documents/${doc.id}`} className="text-primary hover:underline text-sm font-semibold">Xem</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}

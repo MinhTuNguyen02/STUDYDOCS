@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.*
+!*.example
+.DS_Store
+npm-debug.log*
+prisma/dev.db
+*.log
+*.pid
+.tmp_docx_build*/

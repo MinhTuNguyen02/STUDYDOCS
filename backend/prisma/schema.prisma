@@ -1,0 +1,604 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Bảng Account ───────────────────────────────────────────────
+model accounts {
+  account_id          Int                @id @default(autoincrement())
+  email               String             @unique @db.VarChar(255)
+  password_hash       String?            @db.VarChar(255)
+  role_id             Int
+  status              account_status     @default(ACTIVE)
+  auth_provider       auth_provider      @default(LOCAL)
+  provider_account_id String?            @db.VarChar(255)
+  two_factor_secret    String?            @db.VarChar(255)
+  is_two_factor_enabled Boolean           @default(false)
+  phone_otp_code       String?            @db.VarChar(10)
+  phone_otp_expires_at DateTime?          @db.Timestamptz(6)
+  created_at          DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?          @default(now()) @db.Timestamptz(6)
+  delete_at           DateTime?          @db.Timestamptz(6)
+
+  roles              roles              @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction)
+  audit_logs         audit_logs[]
+  customer_profiles  customer_profiles?
+  staff_profiles     staff_profiles?
+  user_sessions      user_sessions[]
+}
+
+// ─── Bảng Staff_Profile ─────────────────────────────────────────
+model staff_profiles {
+  staff_id          Int       @id @default(autoincrement())
+  account_id        Int       @unique
+  phone_number      String?   @unique @db.VarChar(20)
+  full_name         String    @db.VarChar(100)
+  is_phone_verified Boolean   @default(false)
+  avatar_url        String?   @db.VarChar(255)
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  dob               DateTime? @db.Date
+  cccd              String?   @unique @db.VarChar(20)
+
+  accounts            accounts              @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+  documents           documents[]
+  policies            policies[]
+  reports             reports[]
+  withdrawal_requests withdrawal_requests[]
+  disputes            disputes[]
+}
+
+// ─── Bảng Customer_Profile ──────────────────────────────────────
+model customer_profiles {
+  customer_id              Int       @id @default(autoincrement())
+  account_id               Int       @unique
+  phone_number             String?   @unique @db.VarChar(20)
+  full_name                String    @db.VarChar(100)
+  is_phone_verified        Boolean   @default(false)
+  avatar_url               String?   @db.VarChar(255)
+  created_at               DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime? @default(now()) @db.Timestamptz(6)
+  free_downloads_remaining Int       @default(4)
+  free_downloads_reset_at  DateTime? @db.Timestamptz(6)
+
+  accounts         accounts           @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+  carts            carts?
+  documents        documents[]
+  download_history download_history[]
+  order_items      order_items[]
+  orders           orders[]
+  reviews          reviews[]
+  reports          reports[]
+  user_packages    user_packages[]
+  wallets          wallets[]
+  wishlists        wishlists[]
+  withdrawal_requests withdrawal_requests[]
+  disputes         disputes[]
+}
+
+// ─── Bảng Roles ─────────────────────────────────────────────────
+model roles {
+  role_id     Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50)
+  description String?   @db.VarChar(255)
+
+  accounts accounts[]
+}
+
+// ─── Bảng User_sessions ─────────────────────────────────────────
+model user_sessions {
+  session_id    String   @id @db.VarChar(255)
+  account_id    Int
+  refresh_token String   @unique @db.VarChar(500)
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?
+  is_revoked    Boolean  @default(false)
+  expires_at    DateTime @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Bảng Documents ─────────────────────────────────────────────
+model documents {
+  document_id    Int              @id @default(autoincrement())
+  seller_id      Int
+  category_id    Int
+  title          String           @db.VarChar(255)
+  description    String?
+  price          Decimal          @db.Decimal(10, 2)
+  page_count     Int
+  status         document_status  @default(PENDING)
+  rejection_reason String?
+  file_url       String           @db.VarChar(255)
+  preview_url    String?          @db.VarChar(255)
+  file_size      Int?
+  file_extension String           @db.VarChar(10)
+  file_hash      String           @db.VarChar(64)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  average_rating Decimal          @default(0) @db.Decimal(3, 2)
+  slug           String?          @unique @db.VarChar(255)
+  published_at   DateTime?        @db.Timestamptz(6)
+  staff_id       Int?
+  updated_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  view_count     Int              @default(0)
+  download_count Int              @default(0)
+  delete_at      DateTime?        @db.Timestamptz(6)
+
+  staff_profiles    staff_profiles?    @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  categories        categories         @relation(fields: [category_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles  @relation(fields: [seller_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+
+  cart_items        cart_items[]
+  document_tags     document_tags[]
+  download_history  download_history[]
+  order_items       order_items[]
+  reports           reports[]
+  reviews           reviews[]
+  wishlists         wishlists[]
+
+  @@index([seller_id], map: "idx_documents_seller_id")
+  @@index([category_id], map: "idx_documents_category_id")
+}
+
+// ─── Bảng Orders ────────────────────────────────────────────────
+model orders {
+  order_id     Int          @id @default(autoincrement())
+  buyer_id     Int
+  total_amount Decimal      @db.Decimal(10, 2)
+  status       order_status
+  created_at   DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime     @default(now()) @db.Timestamptz(6)
+
+  customer_profiles customer_profiles @relation(fields: [buyer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  order_items       order_items[]
+  payments          payments[]
+
+  @@index([buyer_id], map: "idx_orders_buyer_id")
+  @@index([created_at], map: "idx_orders_created_at")
+}
+
+// ─── Bảng Orders_items ──────────────────────────────────────────
+model order_items {
+  order_item_id  Int              @id @default(autoincrement())
+  order_id       Int
+  document_id    Int
+  seller_id      Int
+  commission_fee Decimal          @db.Decimal(10, 2)
+  seller_earning Decimal          @db.Decimal(10, 2)
+  status         order_item_status
+  hold_until     DateTime?        @db.Timestamptz(6)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  unit_price     Decimal          @db.Decimal(10, 2)
+  updated_at     DateTime         @default(now()) @db.Timestamptz(6)
+
+  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  orders            orders            @relation(fields: [order_id], references: [order_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles @relation(fields: [seller_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  reviews           reviews?
+  download_history  download_history[]
+  disputes          disputes[]
+
+  @@unique([order_id, document_id])
+  @@index([seller_id], map: "idx_order_items_seller_id")
+  @@index([hold_until], map: "idx_order_items_hold_until")
+  @@index([seller_id, hold_until], map: "idx_order_items_seller_hold_until")
+}
+
+// ─── Bảng Categories ────────────────────────────────────────────
+model categories {
+  category_id Int        @id @default(autoincrement())
+  name        String     @db.VarChar(100)
+  parent_id   Int?
+  slug        String     @unique @db.VarChar(150)
+  delete_at   DateTime?  @db.Timestamptz(6)
+
+  categories       categories?  @relation("categoriesTocategories", fields: [parent_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
+  other_categories categories[] @relation("categoriesTocategories")
+  documents        documents[]
+}
+
+// ─── Bảng Tags ──────────────────────────────────────────────────
+model tags {
+  tag_id   Int    @id @default(autoincrement())
+  tag_name String @db.VarChar(50)
+  slug     String @unique @db.VarChar(100)
+
+  document_tags document_tags[]
+}
+
+// ─── Bảng Document_Tags ─────────────────────────────────────────
+model document_tags {
+  document_id Int
+  tag_id      Int
+
+  documents documents @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  tags      tags      @relation(fields: [tag_id], references: [tag_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([document_id, tag_id])
+}
+
+// ─── Bảng Download_History ──────────────────────────────────────
+model download_history {
+  id              Int           @id @default(autoincrement())
+  customer_id     Int
+  document_id     Int
+  order_item_id   Int?
+  user_package_id Int?
+  download_type   download_type
+  download_at     DateTime      @default(now()) @db.Timestamptz(6)
+  ip_address      String?       @db.VarChar(45)
+
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  order_items       order_items?      @relation(fields: [order_item_id], references: [order_item_id], onDelete: NoAction, onUpdate: NoAction)
+  user_packages     user_packages?    @relation(fields: [user_package_id], references: [user_package_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([customer_id], map: "idx_download_history_customer_id")
+  @@index([document_id], map: "idx_download_history_document_id")
+}
+
+// ─── Bảng Reviews ───────────────────────────────────────────────
+model reviews {
+  review_id     Int       @id @default(autoincrement())
+  order_item_id Int       @unique
+  rating        Int       @db.SmallInt
+  comment       String?
+  buyer_id      Int
+  seller_reply  String?
+  replied_at    DateTime? @db.Timestamptz(6)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+  document_id   Int
+
+  customer_profiles customer_profiles @relation(fields: [buyer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  order_items       order_items       @relation(fields: [order_item_id], references: [order_item_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([order_item_id], map: "idx_reviews_order_item_id")
+  @@index([document_id], map: "idx_reviews_document_id")
+}
+
+// ─── Bảng Carts ─────────────────────────────────────────────────
+model carts {
+  cart_id     Int       @id @default(autoincrement())
+  customer_id Int       @unique
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  cart_items        cart_items[]
+}
+
+// ─── Bảng Cart_Items ────────────────────────────────────────────
+model cart_items {
+  cart_item_id Int       @id @default(autoincrement())
+  cart_id      Int
+  document_id  Int
+  add_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  carts     carts     @relation(fields: [cart_id], references: [cart_id], onDelete: NoAction, onUpdate: NoAction)
+  documents documents @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([cart_id, document_id])
+}
+
+// ─── Bảng Wishlists ─────────────────────────────────────────────
+model wishlists {
+  customer_id Int
+  document_id Int
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([customer_id, document_id])
+}
+
+// ─── Bảng Wallets ───────────────────────────────────────────────
+model wallets {
+  wallet_id       Int         @id @default(autoincrement())
+  customer_id     Int?
+  wallet_type     wallet_type
+  balance         Decimal     @default(0) @db.Decimal(12, 2)
+  pending_balance Decimal     @default(0) @db.Decimal(12, 2)
+
+  customer_profiles customer_profiles? @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  payments          payments[]
+  ledger_entries    ledger_entries[]
+
+  @@unique([customer_id, wallet_type])
+}
+
+// ─── Bảng ledger_transactions ───────────────────────────────────
+model ledger_transactions {
+  id             Int                        @id @default(autoincrement())
+  type           ledger_transaction_type
+  reference_type String?                    @db.VarChar(50)
+  reference_id   Int?
+  status         ledger_transaction_status
+  created_at     DateTime                   @default(now()) @db.Timestamptz(6)
+  description    String?
+
+  ledger_entries ledger_entries[]
+}
+
+// ─── Bảng ledger_entries ────────────────────────────────────────
+model ledger_entries {
+  id              Int      @id @default(autoincrement())
+  transaction_id  Int
+  wallet_id       Int
+  debit_amount    Decimal  @db.Decimal(12, 2)
+  credit_amount   Decimal  @db.Decimal(12, 2)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  ledger_transactions ledger_transactions @relation(fields: [transaction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  wallets             wallets             @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([wallet_id], map: "idx_ledger_entries_wallet_id")
+}
+
+// ─── Bảng Payments ──────────────────────────────────────────────
+model payments {
+  payment_id       Int              @id @default(autoincrement())
+  provider         payment_provider
+  purpose          payment_purpose
+  order_id         Int?
+  wallet_id        Int?
+  amount           Decimal          @db.Decimal(10, 2)
+  status           payment_status
+  provider_txn_id  String?          @unique @db.VarChar(100)
+  request_payload  Json?
+  callback_payload Json?
+  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
+
+  orders  orders?  @relation(fields: [order_id], references: [order_id], onDelete: NoAction, onUpdate: NoAction)
+  wallets wallets? @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([order_id], map: "idx_payments_order_id")
+}
+
+// ─── Bảng Withdrawal_Requests ───────────────────────────────────
+model withdrawal_requests {
+  request_id    Int               @id @default(autoincrement())
+  customer_id   Int
+  amount        Decimal           @db.Decimal(12, 2)
+  tax_amount    Decimal           @db.Decimal(12, 2)
+  net_amount    Decimal           @db.Decimal(12, 2)
+  status        withdrawal_status
+  bank_info     Json
+  created_at    DateTime          @default(now()) @db.Timestamptz(6)
+  accountant_id Int?
+  updated_at    DateTime?         @default(now()) @db.Timestamptz(6)
+
+  staff_profiles    staff_profiles?   @relation(fields: [accountant_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([customer_id], map: "idx_withdrawal_requests_customer_id")
+  @@index([status], map: "idx_withdrawal_requests_status")
+}
+
+// ─── Bảng Reports ───────────────────────────────────────────────
+model reports {
+  report_id   Int            @id @default(autoincrement())
+  customer_id Int
+  document_id Int
+  type        String         @db.VarChar(50)
+  reason      String?
+  status      report_status  @default(PENDING)
+  staff_id    Int?
+  created_at  DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?      @default(now()) @db.Timestamptz(6)
+
+  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([document_id], map: "idx_reports_document_id")
+}
+
+// ─── Bảng Packages ──────────────────────────────────────────────
+model packages {
+  package_id     Int            @id @default(autoincrement())
+  name           String         @db.VarChar(100)
+  description    String?
+  price          Decimal        @db.Decimal(10, 2)
+  download_turns Int
+  duration_days  Int            @default(30)
+  status         package_status @default(ACTIVE)
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  delete_at      DateTime?      @db.Timestamptz(6)
+
+  user_packages user_packages[]
+}
+
+// ─── Bảng User_Packages ─────────────────────────────────────────
+model user_packages {
+  user_package_id Int                 @id @default(autoincrement())
+  customer_id     Int
+  package_id      Int
+  turns_remaining Int
+  purchased_at    DateTime            @default(now()) @db.Timestamptz(6)
+  expires_at      DateTime            @db.Timestamptz(6)
+  status          user_package_status
+
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  packages          packages          @relation(fields: [package_id], references: [package_id], onDelete: NoAction, onUpdate: NoAction)
+  download_history  download_history[]
+}
+
+// ─── Bảng Audit_logs ────────────────────────────────────────────
+model audit_logs {
+  log_id       Int      @id @default(autoincrement())
+  account_id   Int
+  action       String   @db.VarChar(100)
+  target_id    Int
+  old_value    Json?
+  new_value    Json?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  target_table String   @db.VarChar(50)
+
+  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Bảng Configs ───────────────────────────────────────────────
+model configs {
+  config_id    Int       @id @default(autoincrement())
+  config_key   String    @unique @db.VarChar(50)
+  config_value String    @db.VarChar(255)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  description  String?
+}
+
+// ─── Bảng Policies ──────────────────────────────────────────────
+model policies {
+  policy_id  Int       @id @default(autoincrement())
+  title      String    @db.VarChar(255)
+  slug       String    @unique @db.VarChar(255)
+  content    String
+  updated_at DateTime  @default(now()) @db.Timestamptz(6)
+  is_active  Boolean   @default(true)
+  updated_by Int?
+
+  staff_profiles staff_profiles? @relation(fields: [updated_by], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ─── Bảng Disputes ──────────────────────────────────────────────
+model disputes {
+  id            Int            @id @default(autoincrement())
+  order_item_id Int
+  customer_id   Int
+  reason        String         @db.VarChar(255)
+  description   String
+  status        dispute_status @default(OPEN)
+  staff_id      Int?
+  resolution    String?        @db.VarChar(50)
+  created_at    DateTime       @default(now()) @db.Timestamptz(6)
+  resolved_at   DateTime?      @db.Timestamptz(6)
+
+  order_items       order_items       @relation(fields: [order_item_id], references: [order_item_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+enum account_status {
+  ACTIVE
+  BANNED
+}
+
+enum auth_provider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+}
+
+enum document_status {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+enum download_type {
+  FREE_MONTHLY
+  PURCHASED
+  PACKAGE
+}
+
+enum order_item_status {
+  PENDING
+  PAID
+  HELD
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+enum order_status {
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  REFUNDED
+  PARTIAL_REFUNDED
+}
+
+enum package_status {
+  ACTIVE
+  INACTIVE
+}
+
+enum payment_provider {
+  VNPAY
+  MOMO
+  ZALOPAY
+  BANK_TRANSFER
+}
+
+enum payment_purpose {
+  ORDER_PAYMENT
+  WALLET_TOPUP
+  REFUND
+  PACKAGE_PURCHASE
+}
+
+enum payment_status {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum report_status {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+
+enum user_package_status {
+  ACTIVE
+  EXPIRED
+  EXHAUSTED
+}
+
+enum wallet_type {
+  PAYMENT
+  REVENUE
+  GATEWAY_POOL
+  SYSTEM_REVENUE
+}
+
+enum ledger_transaction_type {
+  PURCHASE
+  WITHDRAW
+  DEPOSIT
+  REFUND
+}
+
+enum ledger_transaction_status {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum withdrawal_status {
+  PENDING
+  PAID
+  REJECTED
+}
+
+enum dispute_status {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  REJECTED
+}

@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-primary: #6C5CE7;
+  --color-primary-hover: #5A4BD1;
+  --color-primary-light: #A29BFE;
+
+  --color-success: #00B894;
+  --color-warning: #FDCB6E;
+  --color-danger: #E17055;
+  --color-info: #74B9FF;
+
+  --color-background: #F8F9FC;
+  --color-foreground: #1A1D2E;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1A1D2E;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #1A1D2E;
+
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #EEF0F6;
+  --color-secondary-foreground: #1A1D2E;
+  --color-muted: #F1F3F8;
+  --color-muted-foreground: #6B7280;
+  --color-accent: #F1F3F8;
+  --color-accent-foreground: #1A1D2E;
+  --color-destructive: #E17055;
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: #E5E7EB;
+  --color-input: #E5E7EB;
+  --color-ring: rgba(108, 92, 231, 0.5);
+
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+
+  --radius-xl: 1rem;
+  --radius-lg: 0.75rem;
+  --radius-md: 0.5rem;
+  --radius-sm: 0.25rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-base font-medium rounded-md transition-all duration-150 cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white shadow-sm hover:bg-primary-hover hover:shadow-md hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-full {
+    @apply w-full;
+  }
+
+  .auth-page {
+    @apply min-h-screen flex items-center justify-center p-6;
+    background: linear-gradient(135deg, #F0EDFF 0%, #E8F4FD 100%);
+  }
+
+  .auth-card {
+    @apply bg-white/80 backdrop-blur-md border border-black/5 shadow-xl rounded-2xl p-8 w-full max-w-[440px];
+  }
+
+  .auth-form {
+    @apply flex flex-col gap-6;
+  }
+
+  .form-group {
+    @apply flex flex-col gap-1;
+  }
+
+  .form-group label {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .form-group input {
+    @apply px-4 py-3 border border-border rounded-md bg-muted text-foreground text-base transition-all duration-150;
+  }
+
+  .form-group input:focus {
+    @apply outline-none border-primary bg-background ring-3 ring-primary/10;
+  }
+}

@@ -1,0 +1,8 @@
+=== PHẦN 2: Documents, Cart & Checkout (e2e) > POST /checkout/wallet/topup > ✅ Tạo request nạp tiền VNPay ===
+Error: expect(received).toContain(expected) // indexOf
+
+Expected value: 403
+Received array: [201, 200]
+    at Object.<anonymous> (C:\study\Study_N4_HK2\PTHT TMDT\Studio-docx\test\02-documents-cart-checkout.e2e-spec.ts:268:26)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
