@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import QRCode from 'react-qr-code'
 import { formatBalance, formatDate } from '@/utils/format'
 import { Link } from 'react-router-dom'
+import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 
 export default function ProfilePage() {
   const { user } = useAuthStore()
@@ -36,6 +37,7 @@ export default function ProfilePage() {
   const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string, qrCode: string } | null>(null)
   const [twoFaCode, setTwoFaCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -252,9 +254,9 @@ export default function ProfilePage() {
                         className="w-full px-4 py-3 bg-muted border border-border rounded-xl focus:outline-none cursor-not-allowed"
                       />
                       {!profile?.is_phone_verified && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-warning text-xs font-bold bg-warning/10 px-2 py-1 rounded-md">
-                          <AlertTriangle className="w-3.5 h-3.5" /> Chưa xác minh
-                        </div>
+                        <button onClick={(e) => { e.preventDefault(); setShowPhoneModal(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-warning text-xs font-bold bg-warning/10 hover:bg-warning/20 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Xác minh ngay
+                        </button>
                       )}
                     </div>
                   </div>
@@ -284,7 +286,7 @@ export default function ProfilePage() {
                       <h3 className="font-bold text-lg">Lượt tải miễn phí</h3>
                     </div>
                     <div className="flex items-end gap-2 mb-2">
-                      <span className="text-4xl font-bold font-heading text-primary">{profile?.free_downloads_remaining ?? 0}</span>
+                      <span className="text-4xl font-bold font-heading text-primary">{profile?.free_downloads_remaining ?? 0}/4</span>
                       <span className="text-muted-foreground">lượt</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -583,6 +585,10 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showPhoneModal && (
+        <PhoneVerificationModal onClose={() => { setShowPhoneModal(false); fetchData(); }} />
       )}
 
     </div>

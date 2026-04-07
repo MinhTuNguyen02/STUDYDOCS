@@ -11,13 +11,15 @@ import { RegisterDto } from './dto/register.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { AuthUser } from '../../common/security/auth-user.interface';
+import { FirebaseAdminService } from './firebase.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
+    private readonly firebaseAdmin: FirebaseAdminService
   ) { }
 
   private hashRefreshToken(token: string) {
@@ -95,7 +97,8 @@ export class AuthService {
         email: account.email,
         fullName: profileName,
         status: account.status,
-        roleNames
+        roleNames,
+        isPhoneVerified: account.customer_profiles?.is_phone_verified ?? account.staff_profiles?.is_phone_verified ?? false
       }),
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken
@@ -149,7 +152,8 @@ export class AuthService {
         accountId: account.account_id,
         customerId: account.customer_profiles?.customer_id,
         fullName: account.customer_profiles?.full_name,
-        email: account.email
+        email: account.email,
+        isPhoneVerified: account.customer_profiles?.is_phone_verified ?? false
       })
     };
   }
@@ -243,16 +247,8 @@ export class AuthService {
 
     // Mode 1: Firebase Production — Frontend gửi idToken sau khi verify OTP qua Firebase SDK
     if (firebaseProjectId && firebaseProjectId !== 'placeholder' && dto.firebaseIdToken) {
-      // Import FirebaseAdminService — inject thêm nếu cần
-      // Ở đây sử dụng trực tiếp firebase-admin để verify
-      const admin = await import('firebase-admin');
-      if (!admin.apps.length) {
-        throw new BadRequestException('Firebase chua duoc cau hinh. Vui long kiem tra ENV.');
-      }
-      const decodedToken = await admin.auth().verifyIdToken(dto.firebaseIdToken);
-      if (!decodedToken.phone_number) {
-        throw new BadRequestException('Token Firebase khong chua so dien thoai.');
-      }
+      // Sửa đoạn này: Gọi firebaseAdmin thay vì import động
+      const decodedToken = await this.firebaseAdmin.verifyPhoneToken(dto.firebaseIdToken);
 
       // Xác minh thành công
       await this.prisma.customer_profiles.update({
@@ -265,6 +261,7 @@ export class AuthService {
 
       return { message: 'Xac minh OTP qua Firebase thanh cong.' };
     }
+
 
     // Mode 2: Mock OTP Verification — So sánh OTP code trong DB
     const account = await this.prisma.accounts.findUnique({
@@ -362,7 +359,8 @@ export class AuthService {
         email: account.email,
         fullName: profileName,
         status: account.status,
-        roleNames
+        roleNames,
+        isPhoneVerified: account.customer_profiles?.is_phone_verified ?? false
       }),
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken

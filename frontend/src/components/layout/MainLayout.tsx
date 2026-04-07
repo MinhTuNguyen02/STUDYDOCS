@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import TopupModal from '@/components/common/TopupModal'
+import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store } from 'lucide-react'
 import { FiFacebook, FiInstagram, FiYoutube } from 'react-icons/fi'
 
@@ -17,6 +18,15 @@ export default function MainLayout({ children }: Props) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showTopupModal, setShowTopupModal] = useState(false)
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
+
+  useEffect(() => {
+    if (user) {
+      if (user.isPhoneVerified === false) {
+        setShowPhoneModal(true);
+      }
+    }
+  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -205,6 +215,7 @@ export default function MainLayout({ children }: Props) {
       </main>
 
       {showTopupModal && <TopupModal onClose={() => setShowTopupModal(false)} />}
+      {showPhoneModal && <PhoneVerificationModal onClose={() => setShowPhoneModal(false)} />}
 
       {/* ── Footer ── */}
       <footer className="bg-primary text-white mt-auto">
