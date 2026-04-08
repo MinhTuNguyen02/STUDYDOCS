@@ -88,6 +88,12 @@ export class AuthService {
     const roleNames = [account.roles.name.toLowerCase()];
     const tokens = await this.createSessionAndTokens(account.account_id, account.email);
 
+    // Check if this customer has ever uploaded a document
+    const customerId = account.customer_profiles?.customer_id;
+    const hasUploadedDocument = customerId
+      ? (await this.prisma.documents.count({ where: { seller_id: customerId } })) > 0
+      : false;
+
     return {
       message: 'Dang nhap thanh cong.',
       user: toJsonSafe({
@@ -98,7 +104,8 @@ export class AuthService {
         fullName: profileName,
         status: account.status,
         roleNames,
-        isPhoneVerified: account.customer_profiles?.is_phone_verified ?? account.staff_profiles?.is_phone_verified ?? false
+        isPhoneVerified: account.customer_profiles?.is_phone_verified ?? account.staff_profiles?.is_phone_verified ?? false,
+        hasUploadedDocument
       }),
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken

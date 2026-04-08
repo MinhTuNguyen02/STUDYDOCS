@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateTagDto } from './dto/create-tag.dto';
@@ -11,7 +12,10 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService
+  ) { }
 
   private formatFileSize(bytes: number) {
     return `${(Number(bytes) / (1024 * 1024)).toFixed(1)} MB`;
@@ -74,21 +78,75 @@ export class AdminService {
       }
     });
 
-    return toJsonSafe(
-      docs.map((doc) => ({
-        id: doc.document_id,
-        title: doc.title,
-        sellerName: doc.customer_profiles.full_name,
-        categoryName: doc.categories.name,
-        price: doc.price,
-        submittedAt: doc.created_at,
-        status: doc.status,
-        tags: doc.document_tags.map((item) => item.tags.tag_name),
-        description: doc.description,
-        format: doc.file_extension.toUpperCase(),
-        size: this.formatFileSize(doc.file_size ?? 0)
-      }))
+    // Generate short-lived signed URLs for preview PDFs only.
+    // We NEVER expose the full file_url to staff — the watermarked preview is enough for review.
+    const mapped = await Promise.all(
+      docs.map(async (doc) => {
+        let previewSignedUrl: string | null = null;
+        const previewKey = doc.preview_url;
+        if (previewKey && !previewKey.includes('placeholder')) {
+          try {
+            previewSignedUrl = await this.storageService.getPresignedUrl(previewKey, 3600);
+          } catch { /* storage error — proceed without preview */ }
+        }
+        return {
+          id: doc.document_id,
+          title: doc.title,
+          sellerName: doc.customer_profiles.full_name,
+          categoryName: doc.categories.name,
+          price: doc.price,
+          createdAt: doc.created_at,
+          status: doc.status,
+          tags: doc.document_tags.map((item) => item.tags.tag_name),
+          description: doc.description,
+          format: doc.file_extension.toUpperCase(),
+          pageCount: doc.page_count,
+          fileExtension: doc.file_extension,
+          size: this.formatFileSize(doc.file_size ?? 0),
+          previewSignedUrl  // Signed URL for the watermarked preview PDF (1h TTL)
+        };
+      })
     );
+
+    return toJsonSafe(mapped);
+  }
+
+  /**
+   * Returns a presigned URL for the full original document file (60 min expiry).
+   * We log this access for system audit purposes.
+   */
+  async getDocumentReviewUrl(documentId: string, actor: AuthUser) {
+    const id = Number(documentId);
+    const doc = await this.prisma.documents.findUnique({ where: { document_id: id } });
+    if (!doc) throw new NotFoundException('Không tìm thấy tài liệu.');
+    if (!doc.file_url) throw new NotFoundException('Tài liệu chưa có file được lưu.');
+
+    // Generate a presigned URL valid for 60 minutes
+    const reviewUrl = await this.storageService.getPresignedUrl(doc.file_url, 3600);
+
+    // Audit log
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: actor.accountId,
+        action: 'STAFF_REVIEW_DOCUMENT',
+        target_table: 'documents',
+        target_id: doc.document_id,
+        old_value: {},
+        new_value: {
+          document_title: doc.title,
+          reviewer: actor.email,
+          reviewedAt: new Date().toISOString(),
+          urlExpiry: '60 minutes'
+        }
+      }
+    });
+
+    return {
+      reviewUrl,
+      expiresInMinutes: 60,
+      documentTitle: doc.title,
+      fileExtension: doc.file_extension
+    };
   }
 
   async approveDocument(documentId: string, actor: AuthUser) {
@@ -220,16 +278,34 @@ export class AdminService {
     return toJsonSafe(updated);
   }
 
+  async getWithdrawals() {
+    const reqs = await this.prisma.withdrawal_requests.findMany({
+      include: {
+        customer_profiles: {
+          select: {
+            full_name: true,
+            account_id: true,
+            accounts: {
+              select: { email: true }
+            }
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+    return toJsonSafe(reqs);
+  }
+
   async getUsers(search?: string) {
     const users = await this.prisma.accounts.findMany({
       where: search
         ? {
-            OR: [
-              { email: { contains: search, mode: 'insensitive' } },
-              { customer_profiles: { full_name: { contains: search, mode: 'insensitive' } } },
-              { staff_profiles: { full_name: { contains: search, mode: 'insensitive' } } }
-            ]
-          }
+          OR: [
+            { email: { contains: search, mode: 'insensitive' } },
+            { customer_profiles: { full_name: { contains: search, mode: 'insensitive' } } },
+            { staff_profiles: { full_name: { contains: search, mode: 'insensitive' } } }
+          ]
+        }
         : undefined,
       include: {
         customer_profiles: true,
@@ -430,32 +506,28 @@ export class AdminService {
   // 24. Dashboard đối soát tiền vào (cổng) vs tiền ra (ví seller)
   // 22. Endpoint đối soát (reconciliation) cho Accountant
   async getReconciliation() {
-    const systemCustomer = await this.prisma.accounts.findUnique({
-      where: { email: 'system@studydocs.vn' },
-      include: { customer_profiles: { include: { wallets: true } } }
+    const gatewayPool = await this.prisma.wallets.findFirst({
+      where: { wallet_type: 'GATEWAY_POOL' }
     });
 
-    const wallets = systemCustomer?.customer_profiles?.wallets || [];
-    const gatewayPool = wallets.find((w: any) => w.wallet_type === 'PAYMENT');
-    const systemRevenue = wallets.find((w: any) => w.wallet_type === 'REVENUE');
+    const systemRevenue = await this.prisma.wallets.findFirst({
+      where: { wallet_type: 'SYSTEM_REVENUE' }
+    });
 
-    const systemCustomerId = systemCustomer?.customer_profiles?.customer_id;
-
-    // Aggregate user balances only (exclude the system account)
+    // Aggregate user balances only (exclude SYSTEM_REVENUE and GATEWAY_POOL)
     const userWalletsAgg = await this.prisma.wallets.aggregate({
-      where: { 
+      where: {
         wallet_type: { in: ['PAYMENT', 'REVENUE'] },
-        customer_id: { not: systemCustomerId }
       },
-      _sum: { balance: true }
+      _sum: { balance: true, pending_balance: true }
     });
 
     const gatewayBalance = gatewayPool?.balance || new Prisma.Decimal(0);
     const systemBalance = systemRevenue?.balance || new Prisma.Decimal(0);
-    const userBalance = userWalletsAgg._sum.balance || new Prisma.Decimal(0);
+    const userBalance = (userWalletsAgg._sum.balance || new Prisma.Decimal(0)).plus(userWalletsAgg._sum.pending_balance || new Prisma.Decimal(0));
 
     // GATEWAY_POOL is the total fiat cash in the real bank account.
-    // It should perfectly equal all user liabilities (User Balances) + accumulated platform earnings (System Revenue).
+    // It should perfectly equal all user liabilities (User Balances + Pending) + accumulated platform earnings (System Revenue).
     const discrepancy = gatewayBalance.minus(userBalance).minus(systemBalance);
 
     return toJsonSafe({
@@ -490,23 +562,20 @@ export class AdminService {
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
-    
-    const systemCustomer = await this.prisma.accounts.findUnique({
-      where: { email: 'system@studydocs.vn' },
-      include: { customer_profiles: { include: { wallets: true } } }
-    });
 
-    const systemRevenueWallet = systemCustomer?.customer_profiles?.wallets?.find(w => w.wallet_type === 'REVENUE');
+    const systemRevenueWallet = await this.prisma.wallets.findFirst({
+      where: { wallet_type: 'SYSTEM_REVENUE' }
+    });
 
     if (!systemRevenueWallet) return [];
 
     return this.prisma.ledger_entries.findMany({
-        where: {
-            wallet_id: systemRevenueWallet.wallet_id,
-            created_at: { gte: start, lte: end }
-        },
-        include: { ledger_transactions: true },
-        orderBy: { created_at: 'asc' }
+      where: {
+        wallet_id: systemRevenueWallet.wallet_id,
+        created_at: { gte: start, lte: end }
+      },
+      include: { ledger_transactions: true },
+      orderBy: { created_at: 'asc' }
     });
   }
 }

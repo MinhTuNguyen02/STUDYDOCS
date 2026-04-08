@@ -70,6 +70,26 @@ export class CartService {
       throw new ConflictException('Không thể thêm tài liệu của chính mình vào giỏ hàng.');
     }
 
+    // Kiểm tra nếu người dùng đã sở hữu tài liệu này rồi
+    const alreadyPurchased = await this.prisma.order_items.findFirst({
+      where: {
+        document_id: dto.documentId,
+        orders: { buyer_id: user.customerId, status: 'PAID' }
+      }
+    });
+
+    if (alreadyPurchased) {
+      throw new ConflictException('Bạn đã sở hữu tài liệu này.');
+    }
+
+    const alreadyDownloaded = await this.prisma.download_history.findFirst({
+      where: { document_id: dto.documentId, customer_id: user.customerId }
+    });
+
+    if (alreadyDownloaded) {
+      throw new ConflictException('Bạn đã sở hữu tài liệu này.');
+    }
+
     const cart = await this.getOrCreateCart(user.customerId);
 
     const existingItem = await this.prisma.cart_items.findFirst({

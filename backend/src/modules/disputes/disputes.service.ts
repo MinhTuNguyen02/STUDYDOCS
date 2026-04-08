@@ -60,6 +60,21 @@ export class DisputesService {
     });
   }
 
+  async getAllDisputes() {
+    return this.prisma.disputes.findMany({
+      orderBy: { created_at: 'desc' },
+      include: {
+        order_items: { 
+          include: { 
+            documents: { select: { title: true } },
+            orders: { select: { order_id: true } }
+          }
+        },
+        customer_profiles: { select: { full_name: true } }
+      }
+    });
+  }
+
   async resolveDispute(user: AuthUser, disputeId: number, dto: { status: dispute_status; resolution: string }) {
     if (!user.staffId) throw new ForbiddenException('Chỉ dành cho Mod/Admin.');
 

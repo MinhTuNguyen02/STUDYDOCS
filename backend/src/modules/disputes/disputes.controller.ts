@@ -1,5 +1,5 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Body, Controller, Param, ParseIntPipe, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, ParseIntPipe, Post, Put, Get, UseGuards } from '@nestjs/common';
 import { DisputesService } from './disputes.service';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
@@ -21,6 +21,13 @@ export class DisputesController {
     @Body() dto: CreateDisputeDto
   ) {
     return this.disputesService.createDispute(user, dto);
+  }
+
+  @Get()
+  @UseGuards(RolesGuard)
+  @Roles('mod', 'admin')
+  getAllDisputes() {
+    return this.disputesService.getAllDisputes();
   }
 
   @Put(':id/analyze')

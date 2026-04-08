@@ -44,6 +44,18 @@ export class AdminController {
     return this.adminService.rejectDocument(id, dto, user);
   }
 
+  /** Staff-only: get a short-lived signed URL to review the full original file.
+   * All accesses are logged in audit_logs for accountability. */
+  @Get('approvals/documents/:id/review-url')
+  getDocumentReviewUrl(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.adminService.getDocumentReviewUrl(id, user);
+  }
+
+  @Get('withdrawals')
+  getWithdrawals() {
+    return this.adminService.getWithdrawals();
+  }
+
   @Get('documents')
   getDocuments(
     @Query('status') status?: string,

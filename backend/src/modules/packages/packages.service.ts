@@ -94,6 +94,11 @@ export class PackagesService {
       // Get system wallets for double-entry
       const { systemRevenue } = await this.ledger.getSystemWallets(tx);
 
+      await tx.wallets.update({
+        where: { wallet_id: systemRevenue.wallet_id },
+        data: { balance: { increment: pkg.price } }
+      });
+
       // Create package
       const userPkg = await tx.user_packages.create({
         data: {

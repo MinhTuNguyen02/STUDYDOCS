@@ -26,7 +26,12 @@ export default function LoginPage() {
         const user = JSON.parse(decodeURIComponent(userStr));
         login({ accessToken, refreshToken, user });
         toast.success('Đăng nhập thành công!');
-        navigate('/');
+        const role = user.roleNames?.[0]?.toLowerCase() || '';
+        if (['admin', 'mod', 'accountant'].includes(role)) {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
       } catch (e) {
         console.error('Failed to parse OAuth user', e);
       }
@@ -44,7 +49,12 @@ export default function LoginPage() {
         user: res.user,
       })
       toast.success('Đăng nhập thành công!')
-      navigate('/')
+      const role = res.user.roleNames?.[0]?.toLowerCase() || '';
+      if (['admin', 'mod', 'accountant'].includes(role)) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Đăng nhập thất bại')
     } finally {

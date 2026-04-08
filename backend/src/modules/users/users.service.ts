@@ -59,7 +59,11 @@ export class UsersService {
       where: { customer_id: user.customerId },
       include: {
         accounts: { include: { roles: true } },
-        wallets: true
+        wallets: true,
+        user_packages: {
+          where: { status: 'ACTIVE', expires_at: { gt: new Date() } },
+          include: { packages: true }
+        }
       }
     });
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { DocumentSearchDto } from './dto/document-search.dto';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { Prisma } from '@prisma/client';
+import { AuthUser } from '../../common/security/auth-user.interface';
 
 @Injectable()
 export class DocumentsService {
@@ -83,7 +84,7 @@ export class DocumentsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: AuthUser) {
     const documentId = Number(id);
     const document = await this.prisma.documents.findFirst({
       where: {
@@ -104,6 +105,28 @@ export class DocumentsService {
       throw new NotFoundException('Khong tim thay tai lieu.');
     }
 
+    let hasPurchased = false;
+    if (user?.customerId) {
+      if (document.customer_profiles?.customer_id === user.customerId) {
+        hasPurchased = true; // Seller themselves
+      } else {
+        const orderItem = await this.prisma.order_items.findFirst({
+          where: {
+            document_id: documentId,
+            orders: { buyer_id: user.customerId, status: 'PAID' }
+          }
+        });
+        if (orderItem) {
+          hasPurchased = true;
+        } else {
+          const download = await this.prisma.download_history.findFirst({
+            where: { document_id: documentId, customer_id: user.customerId }
+          });
+          if (download) hasPurchased = true;
+        }
+      }
+    }
+
     return toJsonSafe({
       id: document.document_id,
       title: document.title,
@@ -122,14 +145,15 @@ export class DocumentsService {
       sellerName: document.customer_profiles?.full_name,
       tags: document.document_tags.map(t => t.tags.tag_name),
       previewUrl: document.preview_url,
+      hasPurchased,
       createdAt: document.created_at,
       publishedAt: document.published_at
     });
   }
 
   async incrementViewCount(id: string) {
-    await this.prisma.documents.update({
-      where: { document_id: Number(id) },
+    await this.prisma.documents.updateMany({
+      where: { document_id: Number(id), status: 'APPROVED' },
       data: { view_count: { increment: 1 } }
     });
     return { success: true };

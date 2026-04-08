@@ -35,38 +35,69 @@ export class LibraryService {
   async listAccessibleDocuments(user: AuthUser) {
     if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong co thu vien tai lieu.');
 
+    // 1. Get documents from PAID orders
     const orderItems = await this.prisma.order_items.findMany({
       where: {
-        orders: {
-          buyer_id: user.customerId,
-          status: 'PAID'
-        }
+        orders: { buyer_id: user.customerId, status: 'PAID' },
+        documents: { delete_at: null } // Ensure document is active
       },
-      orderBy: { created_at: 'desc' },
       include: {
-        documents: {
-          include: {
-            categories: true
-          }
-        }
+        documents: { include: { categories: true } },
+        orders: true
       }
     });
 
-    return toJsonSafe(
-      orderItems.map((item) => ({
-        accessId: item.order_item_id,
-        grantedAt: item.created_at,
-        sourceType: 'ORDER_ITEM',
-        document: {
-          id: item.documents.document_id,
-          title: item.documents.title,
-          slug: item.documents.slug,
-          category: item.documents.categories.name,
-          extension: item.documents.file_extension,
-          fileUrl: item.documents.file_url
-        }
-      }))
+    // 2. Get documents from download_history (FREE, PACKAGE, etc)
+    const dlHistory = await this.prisma.download_history.findMany({
+      where: {
+        customer_id: user.customerId,
+        documents: { delete_at: null }
+      },
+      include: {
+        documents: { include: { categories: true } }
+      }
+    });
+
+    // Merge and deduplicate by document_id
+    const documentMap = new Map<number, any>();
+
+    for (const item of orderItems) {
+      if (!item.documents) continue;
+      documentMap.set(item.document_id, {
+        id: item.documents.document_id,
+        title: item.documents.title,
+        slug: item.documents.slug,
+        category: item.documents.categories?.name || 'Tài liệu',
+        fileExtension: item.documents.file_extension,
+        fileUrl: item.documents.file_url,
+        accessId: `order_${item.order_item_id}`,
+        createdAt: item.created_at,
+        sourceType: 'ORDER_ITEM'
+      });
+    }
+
+    for (const dl of dlHistory) {
+      if (!dl.documents) continue;
+      if (!documentMap.has(dl.document_id)) {
+        documentMap.set(dl.document_id, {
+          id: dl.documents.document_id,
+          title: dl.documents.title,
+          slug: dl.documents.slug,
+          category: dl.documents.categories?.name || 'Tài liệu',
+          fileExtension: dl.documents.file_extension,
+          fileUrl: dl.documents.file_url,
+          accessId: `dl_${dl.id}`,
+          createdAt: dl.download_at,
+          sourceType: dl.download_type
+        });
+      }
+    }
+
+    const mergedList = Array.from(documentMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+
+    return toJsonSafe(mergedList);
   }
 
   async createDownloadLink(user: AuthUser, documentId: string, ipAddress?: string) {

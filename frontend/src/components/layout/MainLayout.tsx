@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import TopupModal from '@/components/common/TopupModal'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
-import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store } from 'lucide-react'
+import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store, ShieldCheck, Upload } from 'lucide-react'
 import { FiFacebook, FiInstagram, FiYoutube } from 'react-icons/fi'
 
 interface Props {
@@ -19,6 +19,8 @@ export default function MainLayout({ children }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showTopupModal, setShowTopupModal] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
+
+  const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
 
   useEffect(() => {
     if (user) {
@@ -83,21 +85,30 @@ export default function MainLayout({ children }: Props) {
             <div className="hidden md:flex items-center gap-4">
               {user ? (
                 <>
-                  <Link to="/cart" className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors relative">
-                    <ShoppingCart className="w-6 h-6" />
-                    {count > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-destructive text-white w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
-                        {count}
-                      </span>
-                    )}
-                  </Link>
-                  <Link to="/wishlist" className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors" title="Danh sách yêu thích">
-                    <Heart className="w-6 h-6" />
-                  </Link>
-                  <button onClick={() => setShowTopupModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
-                    <Wallet className="w-4 h-4" />
-                    <span>Nạp tiền</span>
-                  </button>
+                  {!isStaff && (
+                    <>
+
+                      <Link to="/seller/documents/new" className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
+                        <Upload className="w-4 h-4" />
+                        <span>Tải tài liệu</span>
+                      </Link>
+                      <button onClick={() => setShowTopupModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
+                        <Wallet className="w-4 h-4" />
+                        <span>Nạp tiền</span>
+                      </button>
+                      <Link to="/cart" className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors relative">
+                        <ShoppingCart className="w-6 h-6" />
+                        {count > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-destructive text-white w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shadow-sm">
+                            {count}
+                          </span>
+                        )}
+                      </Link>
+                      <Link to="/wishlist" className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors" title="Danh sách yêu thích">
+                        <Heart className="w-6 h-6" />
+                      </Link>
+                    </>
+                  )}
 
                   {/* User Dropdown */}
                   <div className="relative group ml-2 py-2">
@@ -112,22 +123,34 @@ export default function MainLayout({ children }: Props) {
                     {/* Dropdown Menu (Hover Trigger) */}
                     <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-border rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
                       <div className="p-2 flex flex-col">
-                        <Link to="/seller/dashboard" className="flex items-center gap-3 px-3 py-2.5 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors text-sm font-semibold text-primary mb-1 border border-primary/10">
-                          <Store className="w-4 h-4" />
-                          Kênh người bán
-                        </Link>
+                        {isStaff && (
+                          <Link to="/admin" className="flex items-center gap-3 px-3 py-2.5 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors text-sm font-semibold text-primary mb-1 border border-primary/20">
+                            <ShieldCheck className="w-4 h-4" />
+                            Trang quản trị
+                          </Link>
+                        )}
+                        {!isStaff && user.hasUploadedDocument && (
+                          <Link to="/seller/dashboard" className="flex items-center gap-3 px-3 py-2.5 bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors text-sm font-semibold text-primary mb-1 border border-primary/10">
+                            <Store className="w-4 h-4" />
+                            Kênh người bán
+                          </Link>
+                        )}
                         <Link to="/profile" className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted rounded-lg transition-colors text-sm font-medium text-foreground">
                           <User className="w-4 h-4 text-muted-foreground" />
                           Trang cá nhân
                         </Link>
-                        <Link to="/orders" className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted rounded-lg transition-colors text-sm font-medium text-foreground">
-                          <Package className="w-4 h-4 text-muted-foreground" />
-                          Lịch sử mua hàng
-                        </Link>
-                        <Link to="/library" className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted rounded-lg transition-colors text-sm font-medium text-foreground">
-                          <Library className="w-4 h-4 text-muted-foreground" />
-                          Thư viện của tôi
-                        </Link>
+                        {!isStaff && (
+                          <>
+                            <Link to="/orders" className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted rounded-lg transition-colors text-sm font-medium text-foreground">
+                              <Package className="w-4 h-4 text-muted-foreground" />
+                              Lịch sử mua hàng
+                            </Link>
+                            <Link to="/library" className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted rounded-lg transition-colors text-sm font-medium text-foreground">
+                              <Library className="w-4 h-4 text-muted-foreground" />
+                              Thư viện của tôi
+                            </Link>
+                          </>
+                        )}
 
                         <div className="h-px bg-border my-1"></div>
 
@@ -185,16 +208,25 @@ export default function MainLayout({ children }: Props) {
                 <div className="border-t border-border my-2"></div>
                 {user ? (
                   <>
-                    <Link to="/cart" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors flex items-center justify-between">
-                      Giỏ hàng
-                      {count > 0 && <span className="bg-destructive text-white px-2 py-0.5 rounded-full text-xs">{count}</span>}
-                    </Link>
-                    <Link to="/library" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Thư viện của tôi</Link>
-                    <Link to="/orders" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Lịch sử đơn hàng</Link>
+                    {!isStaff && (
+                      <Link to="/cart" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors flex items-center justify-between">
+                        Giỏ hàng
+                        {count > 0 && <span className="bg-destructive text-white px-2 py-0.5 rounded-full text-xs">{count}</span>}
+                      </Link>
+                    )}
+                    {!isStaff && <Link to="/library" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Thư viện của tôi</Link>}
+                    {!isStaff && <Link to="/orders" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Lịch sử đơn hàng</Link>}
                     <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Trang cá nhân</Link>
-                    <Link to="/seller/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-primary font-bold hover:bg-primary/10 rounded-lg transition-colors flex items-center gap-2">
-                      Kênh người bán
-                    </Link>
+                    {isStaff && (
+                      <Link to="/admin" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-primary font-bold hover:bg-primary/10 rounded-lg transition-colors flex items-center gap-2">
+                        Trang quản trị
+                      </Link>
+                    )}
+                    {!isStaff && user.hasUploadedDocument && (
+                      <Link to="/seller/dashboard" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-primary font-bold hover:bg-primary/10 rounded-lg transition-colors flex items-center gap-2">
+                        Kênh người bán
+                      </Link>
+                    )}
                     <button onClick={() => { handleLogout(); setIsMenuOpen(false); }} className="px-4 py-2 flex items-center justify-start text-destructive font-medium hover:bg-accent rounded-lg transition-colors">Đăng xuất</button>
                   </>
                 ) : (

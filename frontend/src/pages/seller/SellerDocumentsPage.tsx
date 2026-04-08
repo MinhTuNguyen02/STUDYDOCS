@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { sellerApi } from '@/api/seller.api'
 import { FileText, Plus, Search, Filter } from 'lucide-react'
 import { formatBalance, formatDate } from '@/utils/format'
+import SellerLayout from '@/components/layout/SellerLayout'
 
 export default function SellerDocumentsPage() {
   const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ALL')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     fetchDocs()
@@ -27,15 +29,19 @@ export default function SellerDocumentsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'APPROVED': return <span className="px-2 py-1 bg-success/10 text-success text-xs font-bold rounded">Đã duyệt</span>
-      case 'PENDING': return <span className="px-2 py-1 bg-warning/10 text-warning text-xs font-bold rounded">Chờ duyệt</span>
-      case 'REJECTED': return <span className="px-2 py-1 bg-danger/10 text-danger text-xs font-bold rounded">Từ chối</span>
-      default: return <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-bold rounded">{status}</span>
+      case 'APPROVED': return <span className="px-2 py-1 bg-success/10 text-success text-xs font-bold rounded-md">Đã duyệt</span>
+      case 'PENDING': return <span className="px-2 py-1 bg-warning/10 text-warning text-xs font-bold rounded-md">Chờ duyệt</span>
+      case 'REJECTED': return <span className="px-2 py-1 bg-danger/10 text-danger text-xs font-bold rounded-md">Từ chối</span>
+      default: return <span className="px-2 py-1 bg-muted text-muted-foreground text-xs font-bold rounded-md">{status}</span>
     }
   }
 
+  const filtered = documents.filter(doc =>
+    !search || doc.title?.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4">
+    <SellerLayout>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <h1 className="text-3xl font-bold font-heading flex items-center gap-3">
           <FileText className="w-8 h-8 text-primary" /> Quản lý tài liệu
@@ -49,7 +55,13 @@ export default function SellerDocumentsPage() {
         <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-4 justify-between bg-muted/20">
           <div className="relative max-w-sm w-full">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input type="text" placeholder="Tìm tên tài liệu..." className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm tên tài liệu..."
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none"
+            />
           </div>
           <div className="flex items-center gap-2">
             <Filter className="w-5 h-5 text-muted-foreground" />
@@ -68,7 +80,7 @@ export default function SellerDocumentsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-muted text-muted-foreground text-sm">
+              <tr className="bg-muted text-muted-foreground text-xs uppercase tracking-wide">
                 <th className="p-4 font-semibold">Tên tài liệu</th>
                 <th className="p-4 font-semibold">Giá bán</th>
                 <th className="p-4 font-semibold">Lượt xem</th>
@@ -80,15 +92,18 @@ export default function SellerDocumentsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {loading ? (
-                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Đang tải...</td></tr>
-              ) : documents.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Chưa có tài liệu nào.</td></tr>
-              ) : documents.map((doc: any) => (
+                <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Đang tải...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={7} className="p-12 text-center text-muted-foreground">
+                  <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
+                  <p>{search ? 'Không tìm thấy tài liệu khớp.' : 'Chưa có tài liệu nào.'}</p>
+                </td></tr>
+              ) : filtered.map((doc: any) => (
                 <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 font-medium max-w-xs truncate" title={doc.title}>{doc.title}</td>
                   <td className="p-4 font-bold text-primary">{formatBalance(doc.price)}</td>
-                  <td className="p-4 text-muted-foreground text-sm">{doc.viewCount}</td>
-                  <td className="p-4 text-muted-foreground text-sm">{doc.downloadCount}</td>
+                  <td className="p-4 text-muted-foreground text-sm">{doc.viewCount ?? 0}</td>
+                  <td className="p-4 text-muted-foreground text-sm">{doc.downloadCount ?? 0}</td>
                   <td className="p-4 text-muted-foreground text-sm">{formatDate(doc.createdAt || doc.created_at)}</td>
                   <td className="p-4">
                     {getStatusBadge(doc.status)}
@@ -105,6 +120,6 @@ export default function SellerDocumentsPage() {
           </table>
         </div>
       </div>
-    </div>
+    </SellerLayout>
   )
 }

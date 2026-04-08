@@ -21,10 +21,12 @@ export default function DocumentCard({ document }: Props) {
   const isWishlisted = document.isWishlisted || wishlistIds.includes(document.id)
   const [loadingWishlist, setLoadingWishlist] = useState(false)
   const isFree = !document.price || document.price === 0
+  const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
 
   const handleDownloadFree = async (e: React.MouseEvent) => {
     e.preventDefault() // prevent Link navigation
     if (!user) return toast.error('Vui lòng đăng nhập để mua')
+    if (isStaff) return toast.error('Quản trị viên không thực hiện tải tài liệu')
     if (user.customerId && document.seller_id === user.customerId) {
       return toast.error('Không thể mua tài liệu của chính mình')
     }
@@ -47,6 +49,7 @@ export default function DocumentCard({ document }: Props) {
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault() // prevent Link navigation
     if (!user) return toast.error('Vui lòng đăng nhập để mua')
+    if (isStaff) return toast.error('Quản trị viên không mua tài liệu')
     if (user.customerId && document.seller_id === user.customerId) {
       return toast.error('Không thể mua tài liệu của chính mình')
     }
@@ -62,6 +65,7 @@ export default function DocumentCard({ document }: Props) {
   const handleToggleWishlist = async (e: React.MouseEvent) => {
     e.preventDefault()
     if (!user) return toast.error('Vui lòng đăng nhập để lưu')
+    if (isStaff) return toast.error('Quản trị viên không sử dụng tính năng này')
     setLoadingWishlist(true)
     try {
       const res = await wishlistApi.toggleWishlist(document.id)
@@ -102,7 +106,7 @@ export default function DocumentCard({ document }: Props) {
         <button
           onClick={handleToggleWishlist}
           disabled={loadingWishlist}
-          title="Thêm vào yêu thích"
+          title={isWishlisted ? "Đã yêu thích" : "Thêm vào yêu thích"}
           className="absolute top-3 left-3 bg-white/90 p-2 rounded-full shadow-sm z-10 hover:bg-white transition-colors disabled:opacity-50"
         >
           <Heart className={`w-5 h-5 transition-colors ${isWishlisted ? 'fill-red-500 text-red-500' : 'text-gray-600 hover:text-red-500'}`} />

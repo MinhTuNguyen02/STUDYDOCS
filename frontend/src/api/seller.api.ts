@@ -1,8 +1,13 @@
 import api from './client'
 
 export const sellerApi = {
-  getDashboardStats: async (month?: number, year?: number) => {
-    const res = await api.get('/seller/dashboard', { params: { month, year } })
+  getDashboardStats: async (startDate?: string, endDate?: string) => {
+    const res = await api.get('/seller/dashboard', { params: { startDate, endDate } })
+    return res.data
+  },
+
+  getMonthlyTrend: async (year?: number) => {
+    const res = await api.get('/seller/dashboard/trend', { params: { year } })
     return res.data
   },
   

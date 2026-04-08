@@ -10,6 +10,7 @@ export interface AuthUser {
   roleNames: string[]
   status: string
   isPhoneVerified?: boolean
+  hasUploadedDocument?: boolean
 }
 
 interface AuthState {

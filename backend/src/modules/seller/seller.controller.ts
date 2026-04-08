@@ -23,8 +23,13 @@ export class SellerController {
   ) {}
 
   @Get('dashboard')
-  getDashboardStats(@CurrentUser() user: AuthUser, @Query('month') month?: string, @Query('year') year?: string) {
-    return this.sellerService.getDashboardStats(user, month, year);
+  getDashboardStats(@CurrentUser() user: AuthUser, @Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
+    return this.sellerService.getDashboardStats(user, startDate, endDate);
+  }
+
+  @Get('dashboard/trend')
+  getMonthlyTrend(@CurrentUser() user: AuthUser, @Query('year') year?: string) {
+    return this.sellerService.getMonthlyTrend(user, year);
   }
 
   @Get('documents')

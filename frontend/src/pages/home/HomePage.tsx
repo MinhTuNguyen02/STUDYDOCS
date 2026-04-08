@@ -4,7 +4,6 @@ import { documentsApi } from '@/api/documents.api'
 import DocumentCard from '@/components/common/DocumentCard'
 import { ArrowRight, BookOpen, GraduationCap, Calculator, Globe, Microscope, Palette, Code, Languages, Search, Shield, Truck, Headphones, Award } from 'lucide-react'
 
-// category icon mapper helper
 const getCategoryIconAndColor = (name: string) => {
   const n = name.toLowerCase()
   if (n.includes('toán')) return { icon: Calculator, color: 'bg-blue-100 text-blue-700' }

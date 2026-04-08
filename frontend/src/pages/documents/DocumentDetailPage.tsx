@@ -4,6 +4,7 @@ import { documentsApi } from '@/api/documents.api'
 import { wishlistApi } from '@/api/cart.api'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
+import { useWishlistStore } from '@/store/wishlistStore'
 import { libraryApi } from '@/api/library.api'
 import ReviewForm from '@/components/reviews/ReviewForm'
 import SellerReplyForm from '@/components/reviews/SellerReplyForm'
@@ -16,6 +17,7 @@ export default function DocumentDetailPage() {
   const { id } = useParams()
   const { user } = useAuthStore()
   const { addToCart } = useCartStore()
+  const { wishlistIds } = useWishlistStore()
   const navigate = useNavigate()
 
   const [doc, setDoc] = useState<any>(null)
@@ -32,15 +34,12 @@ export default function DocumentDetailPage() {
         documentsApi.getDocumentById(id!),
         documentsApi.getReviews(id!).catch(() => ({ data: [] }))
       ])
-      setDoc(docRes.data || docRes)
+      const docData = docRes.data || docRes;
+      setDoc(docData)
       setReviews(revRes.data || revRes || [])
 
-      // Check if purchased
-      if (user) {
-        const libRes = await libraryApi.getMyDocuments().catch(() => ({ data: [] }))
-        const myDocs = libRes.data || libRes || []
-        setIsPurchased(myDocs.some((d: any) => (d.document?.id || d.document_id || d.id) === Number(id)))
-      }
+      // Check if purchased uses the backend provided flag
+      setIsPurchased(!!docData.hasPurchased)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Lỗi khi tải tài liệu')
     } finally {
@@ -65,6 +64,8 @@ export default function DocumentDetailPage() {
 
   const handleDownloadFree = async () => {
     if (!user) return navigate('/login')
+    const role = user.roleNames?.[0]?.toLowerCase() || '';
+    if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không tải tài liệu');
     if (isOwner) return toast.error('Bạn là chủ sở hữu, hãy xem file tại mục quản lý')
 
     setAddingToCart(true)
@@ -87,6 +88,8 @@ export default function DocumentDetailPage() {
 
   const handleAddToCart = async () => {
     if (!user) return navigate('/login')
+    const role = user.roleNames?.[0]?.toLowerCase() || '';
+    if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không mua tài liệu');
     if (isOwner) return toast.error('Không thể mua tài liệu của chính mình')
 
     setAddingToCart(true)
@@ -102,10 +105,12 @@ export default function DocumentDetailPage() {
 
   const handleToggleWishlist = async () => {
     if (!user) return navigate('/login')
+    const role = user.roleNames?.[0]?.toLowerCase() || '';
+    if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không dùng chức năng này');
     setAddingToWishlist(true)
     try {
       await wishlistApi.toggleWishlist(Number(id))
-      toast.success('Đã cập nhật danh sách yêu thích')
+      toast.success(isWishlisted ? 'Đã bỏ khỏi danh sách yêu thích' : 'Đã cập nhật danh sách yêu thích')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Lỗi khi cập nhật yêu thích')
     } finally {
@@ -118,6 +123,8 @@ export default function DocumentDetailPage() {
 
   const isFree = !doc.price || doc.price === 0
   const isOwner = user?.customerId && Number(doc.sellerId || doc.seller_id || 0) === Number(user.customerId)
+  const isWishlisted = doc.isWishlisted || wishlistIds.includes(Number(id))
+  
   const ext = doc.file_extension || doc.fileExtension || 'N/A'
   const rating = doc.rating || 0
   const reviewCount = reviews.length || doc.reviewCount || doc.reviews?.length || 0
@@ -297,20 +304,31 @@ export default function DocumentDetailPage() {
                   </div>
                 ) : (
                   <>
-                    <button
-                      onClick={isFree ? handleDownloadFree : handleAddToCart}
-                      disabled={addingToCart}
-                      className="w-full flex items-center justify-center gap-2 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-lg disabled:opacity-50"
-                    >
-                      {isFree ? <Download className="w-6 h-6" /> : <ShoppingCart className="w-6 h-6" />}
-                      {addingToCart ? (isFree ? 'Đang xử lý...' : 'Đang thêm...') : isFree ? 'Tải Xuống' : 'Thêm Giỏ Hàng'}
-                    </button>
+                    {isPurchased ? (
+                      <button
+                        onClick={handleDownloadFree} // Reuse download logic
+                        disabled={addingToCart}
+                        className="w-full flex items-center justify-center gap-2 py-4 bg-success hover:bg-success/90 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-lg disabled:opacity-50"
+                      >
+                        <Download className="w-6 h-6" />
+                        {addingToCart ? 'Đang tải...' : 'Tải Xuống (Đã sở hữu)'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={isFree ? handleDownloadFree : handleAddToCart}
+                        disabled={addingToCart}
+                        className="w-full flex items-center justify-center gap-2 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-lg disabled:opacity-50"
+                      >
+                        {isFree ? <Download className="w-6 h-6" /> : <ShoppingCart className="w-6 h-6" />}
+                        {addingToCart ? (isFree ? 'Đang xử lý...' : 'Đang thêm...') : isFree ? 'Tải Xuống' : 'Thêm Giỏ Hàng'}
+                      </button>
+                    )}
                     <button
                       onClick={handleToggleWishlist}
                       disabled={addingToWishlist}
-                      className="w-full py-4 bg-white border-2 border-primary text-primary hover:bg-primary/5 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-lg disabled:opacity-50"
+                      className={`w-full py-4 border-2 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-lg disabled:opacity-50 ${isWishlisted ? 'bg-red-50 border-red-500 text-red-500 hover:bg-red-100' : 'bg-white border-primary text-primary hover:bg-primary/5'}`}
                     >
-                      <Heart className="w-5 h-5" /> {addingToWishlist ? 'Đang xử lý...' : 'Yêu Thích'}
+                      <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current' : ''}`} /> {addingToWishlist ? 'Đang xử lý...' : isWishlisted ? 'Đã Yêu Thích' : 'Yêu Thích'}
                     </button>
                   </>
                 )}

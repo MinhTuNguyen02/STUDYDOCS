@@ -5,6 +5,7 @@ import api from '@/api/client'
 import { getPageCount } from '@/utils/fileParser'
 import { Upload, FileText, Image as ImageIcon, X, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '@/store/authStore'
 
 export default function SellerUploadPage() {
   const [file, setFile] = useState<File | null>(null)
@@ -14,6 +15,7 @@ export default function SellerUploadPage() {
   const [selectedTags, setSelectedTags] = useState<number[]>([])
   const [uploading, setUploading] = useState(false)
   const [parsingFile, setParsingFile] = useState(false)
+  const { updateUser } = useAuthStore()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function SellerUploadPage() {
     try {
       await sellerApi.uploadDocument(formData)
       toast.success('Tải lên thành công! Tài liệu đang chờ duyệt.')
+      updateUser({ hasUploadedDocument: true })
       navigate('/seller/documents')
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Tải lên thất bại')

@@ -34,6 +34,11 @@ export default function PackagesPage() {
       return navigate('/login')
     }
 
+    const role = user.roleNames?.[0]?.toLowerCase() || '';
+    if (['admin', 'mod', 'accountant'].includes(role)) {
+      return toast.error('Nhân viên quản trị không thực hiện mua gói tải.');
+    }
+
     // Check if phone verified (you can refine this condition if user state has it)
 
     if (window.confirm(`Bạn có chắc chắn muốn mua gói "${pkg.name}" với giá ${formatBalance(pkg.price)}? Tiền sẽ được trừ vào Ví Thanh toán.`)) {

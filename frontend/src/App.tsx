@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import ProtectedRoute from '@/components/guards/ProtectedRoute'
 import MainLayout from '@/components/layout/MainLayout'
+import AdminLayout from '@/components/layout/AdminLayout'
+import AdminRoute from '@/components/guards/AdminRoute'
 
 // ── Auth Pages ──
 import LoginPage from '@/pages/auth/LoginPage'
@@ -32,6 +34,24 @@ import SellerDashboardPage from '@/pages/seller/SellerDashboardPage'
 import SellerDocumentsPage from '@/pages/seller/SellerDocumentsPage'
 import SellerUploadPage from '@/pages/seller/SellerUploadPage'
 import SellerSalesPage from '@/pages/seller/SellerSalesPage'
+
+// ── Admin Pages (Phase 8) ──
+import AdminDashboardPage from '@/pages/admin/AdminDashboardPage'
+import AdminApprovalsPage from '@/pages/admin/AdminApprovalsPage'
+import AdminUsersPage from '@/pages/admin/AdminUsersPage'
+import AdminWithdrawalsPage from '@/pages/admin/AdminWithdrawalsPage'
+import AdminDocumentsPage from '@/pages/admin/AdminDocumentsPage'
+import AdminReportsPage from '@/pages/admin/AdminReportsPage'
+import AdminCategoriesPage from '@/pages/admin/AdminCategoriesPage'
+import AdminTagsPage from '@/pages/admin/AdminTagsPage'
+import AdminReconciliationPage from '@/pages/admin/AdminReconciliationPage'
+import AdminDisputesPage from '@/pages/admin/AdminDisputesPage'
+import AdminConfigsPage from '@/pages/admin/AdminConfigsPage'
+import AdminPackagesPage from '@/pages/admin/AdminPackagesPage'
+import AdminRevenuePage from '@/pages/admin/AdminRevenuePage'
+import AdminPoliciesPage from '@/pages/admin/AdminPoliciesPage'
+import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage'
+import PlaceholderAdminPage from '@/pages/admin/PlaceholderAdminPage'
 
 import { useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
@@ -112,6 +132,34 @@ function App() {
               <Route path="/seller/sales" element={<ProtectedRoute><SellerSalesPage /></ProtectedRoute>} />
             </Routes>
           </MainLayout>
+        }
+      />
+
+      {/* ── Admin App Layout (Phase 8) ── */}
+      <Route
+        path="/admin/*"
+        element={
+          <AdminRoute>
+            <AdminLayout>
+              <Routes>
+                <Route path="/" element={<AdminDashboardPage />} />
+                <Route path="/approvals" element={<AdminApprovalsPage />} />
+                <Route path="/users" element={<AdminUsersPage />} />
+                <Route path="/documents" element={<AdminDocumentsPage />} />
+                <Route path="/reports" element={<AdminReportsPage />} />
+                <Route path="/withdrawals" element={<AdminWithdrawalsPage />} />
+                <Route path="/categories" element={<AdminCategoriesPage />} />
+                <Route path="/tags" element={<AdminTagsPage />} />
+                <Route path="/disputes" element={<AdminDisputesPage />} />
+                <Route path="/reconciliation" element={<AdminReconciliationPage />} />
+                <Route path="/revenue" element={<AdminRevenuePage />} />
+                <Route path="/configs" element={<AdminConfigsPage />} />
+                <Route path="/policies" element={<AdminPoliciesPage />} />
+                <Route path="/audit-logs" element={<AdminAuditLogsPage />} />
+                <Route path="/packages" element={<AdminPackagesPage />} />
+              </Routes>
+            </AdminLayout>
+          </AdminRoute>
         }
       />
     </Routes>

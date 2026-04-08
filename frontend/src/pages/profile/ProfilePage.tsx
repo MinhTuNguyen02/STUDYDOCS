@@ -158,6 +158,11 @@ export default function ProfilePage() {
   const paymentWallet = wallets.find(w => w.wallet_type === 'PAYMENT' || w.walletType === 'PAYMENT')
   const revenueWallet = wallets.find(w => w.wallet_type === 'REVENUE' || w.walletType === 'REVENUE')
 
+  const role = profile?.accounts?.roles?.[0]?.name || user?.roleNames?.[0] || '';
+  const isStaff = ['admin', 'mod', 'accountant'].includes(role.toLowerCase());
+
+  const activePackage = profile?.user_packages?.[0];
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 grid grid-cols-1 lg:grid-cols-4 gap-8">
 
@@ -189,13 +194,15 @@ export default function ProfilePage() {
             <User className="w-5 h-5" /> Thông tin cá nhân
           </button>
 
-          <button
-            onClick={() => setActiveTab('WALLET')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'WALLET' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
-              }`}
-          >
-            <Wallet className="w-5 h-5" /> Quản lý ví tín dụng
-          </button>
+          {!isStaff && (
+            <button
+              onClick={() => setActiveTab('WALLET')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'WALLET' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
+                }`}
+            >
+              <Wallet className="w-5 h-5" /> Quản lý ví tín dụng
+            </button>
+          )}
 
           {!isGoogleLogin && (
             <button
@@ -207,13 +214,13 @@ export default function ProfilePage() {
             </button>
           )}
 
-          <button
+          {/* <button
             onClick={() => setActiveTab('2FA')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === '2FA' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
               }`}
           >
             <KeyRound className="w-5 h-5" /> Bảo mật 2 lớp (2FA)
-          </button>
+          </button> */}
         </nav>
       </div>
 
@@ -279,28 +286,54 @@ export default function ProfilePage() {
                 </form>
 
                 {/* Right side: Packages & Downloads */}
-                <div className="space-y-6">
-                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Download className="w-6 h-6 text-primary" />
-                      <h3 className="font-bold text-lg">Lượt tải miễn phí</h3>
+                {!isStaff && (
+                  <div className="space-y-6">
+                    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Download className="w-6 h-6 text-primary" />
+                        <h3 className="font-bold text-lg">Lượt tải miễn phí</h3>
+                      </div>
+                      <div className="flex items-end gap-2 mb-2">
+                        <span className="text-4xl font-bold font-heading text-primary">{profile?.free_downloads_remaining ?? 0}/4</span>
+                        <span className="text-muted-foreground">lượt</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Làm mới vào ngày {profile?.free_downloads_reset_at ? new Date(profile.free_downloads_reset_at).toLocaleDateString('vi-VN') : 'mỗi tháng'}.
+                      </p>
                     </div>
-                    <div className="flex items-end gap-2 mb-2">
-                      <span className="text-4xl font-bold font-heading text-primary">{profile?.free_downloads_remaining ?? 0}/4</span>
-                      <span className="text-muted-foreground">lượt</span>
+                    <div className="bg-muted/50 border border-border rounded-2xl p-6">
+                      <h3 className="font-bold mb-4">Quản lý Gói đăng ký</h3>
+                      {activePackage ? (
+                        <div className="space-y-4">
+                          <div className="bg-background border border-border p-4 rounded-xl">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-bold text-foreground">{activePackage.packages?.name || 'Gói tải'}</span>
+                              <span className="bg-success/10 text-success px-2 py-0.5 rounded-md text-xs font-bold">Đang kích hoạt</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Còn lại:</span>
+                              <span className="font-semibold text-primary">{activePackage.turns_remaining} lượt</span>
+                            </div>
+                            <div className="flex justify-between text-sm mt-1">
+                              <span className="text-muted-foreground">Hết hạn:</span>
+                              <span className="font-semibold">{new Date(activePackage.expires_at).toLocaleDateString('vi-VN')}</span>
+                            </div>
+                          </div>
+                          <Link to="/packages">
+                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Mua thêm gói khác</button>
+                          </Link>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground mb-4">Bạn chưa đăng ký gói lượt tải nào hoặc gói đã bị quá hạn.</p>
+                          <Link to="/packages">
+                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Tất cả gói tải</button>
+                          </Link>
+                        </>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Làm mới vào ngày {profile?.free_downloads_reset_at ? new Date(profile.free_downloads_reset_at).toLocaleDateString('vi-VN') : 'mỗi tháng'}.
-                    </p>
                   </div>
-                  <div className="bg-muted/50 border border-border rounded-2xl p-6">
-                    <h3 className="font-bold mb-2">Quản lý Gói đăng ký</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Bạn chưa đăng ký gói lượt tải nào hoặc gói đã bị quá hạn.</p>
-                    <Link to="/packages">
-                      <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Tất cả gói tải</button>
-                    </Link>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           )}

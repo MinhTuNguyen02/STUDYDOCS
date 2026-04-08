@@ -26,14 +26,25 @@ export class SellerService {
     return value.replace('.', '').trim().toUpperCase();
   }
 
-  async getDashboardStats(user: AuthUser, monthStr?: string, yearStr?: string) {
+  async getDashboardStats(user: AuthUser, startDate?: string, endDate?: string) {
     const sellerId = this.ensureSeller(user);
     const now = new Date();
-    const month = monthStr ? Number(monthStr) : now.getMonth() + 1;
-    const year = yearStr ? Number(yearStr) : now.getFullYear();
 
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    // Parse date range, default = current month
+    let start: Date;
+    let end: Date;
+
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    }
+
+    // Cap end at now – never allow future dates
+    if (end > now) end = new Date(now);
 
     const [earningsAgg, viewsAgg, downloadsAgg, ordersCount] = await Promise.all([
       this.prisma.order_items.aggregate({
@@ -41,7 +52,7 @@ export class SellerService {
         where: {
           documents: { seller_id: sellerId },
           status: { in: ['PAID', 'HELD', 'RELEASED'] },
-          created_at: { gte: startOfMonth, lte: endOfMonth }
+          created_at: { gte: start, lte: end }
         }
       }),
       this.prisma.documents.aggregate({
@@ -56,18 +67,82 @@ export class SellerService {
         where: {
           documents: { seller_id: sellerId },
           status: { in: ['PAID', 'HELD', 'RELEASED'] },
-          created_at: { gte: startOfMonth, lte: endOfMonth }
+          created_at: { gte: start, lte: end }
         }
       })
     ]);
 
+    const topDownloads = await this.prisma.documents.findMany({
+      where: { 
+        seller_id: sellerId,
+        created_at: { lte: end }  // Only include docs that existed within the period
+      },
+      orderBy: { download_count: 'desc' },
+      take: 5,
+      select: { document_id: true, title: true, download_count: true, view_count: true, price: true }
+    });
+
+    const topViews = await this.prisma.documents.findMany({
+      where: { 
+        seller_id: sellerId,
+        created_at: { lte: end }  // Only include docs that existed within the period
+      },
+      orderBy: { view_count: 'desc' },
+      take: 5,
+      select: { document_id: true, title: true, download_count: true, view_count: true, price: true }
+    });
+
     return {
-      monthStr: `${month}/${year}`,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
       totalEarnings: Number(earningsAgg._sum.seller_earning ?? 0),
       totalViews: viewsAgg._sum.view_count ?? 0,
       totalDownloads: downloadsAgg._sum.download_count ?? 0,
-      totalOrders: ordersCount
+      totalOrders: ordersCount,
+      topDownloads,
+      topViews
     };
+  }
+
+  async getMonthlyTrend(user: AuthUser, yearStr?: string) {
+    const sellerId = this.ensureSeller(user);
+    const year = yearStr ? Number(yearStr) : new Date().getFullYear();
+
+    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+    const results = await Promise.all(
+      months.map(async (m) => {
+        const start = new Date(year, m - 1, 1);
+        const end = new Date(year, m, 0, 23, 59, 59, 999);
+
+        const [earningsAgg, ordersCount] = await Promise.all([
+          this.prisma.order_items.aggregate({
+            _sum: { seller_earning: true },
+            where: {
+              documents: { seller_id: sellerId },
+              status: { in: ['PAID', 'HELD', 'RELEASED'] },
+              created_at: { gte: start, lte: end }
+            }
+          }),
+          this.prisma.order_items.count({
+            where: {
+              documents: { seller_id: sellerId },
+              status: { in: ['PAID', 'HELD', 'RELEASED'] },
+              created_at: { gte: start, lte: end }
+            }
+          })
+        ]);
+
+        return {
+          month: m,
+          label: `T${m}`,
+          earnings: Number(earningsAgg._sum.seller_earning ?? 0),
+          orders: ordersCount
+        };
+      })
+    );
+
+    return { year, data: results };
   }
 
   async listMyDocuments(user: AuthUser, status?: string) {

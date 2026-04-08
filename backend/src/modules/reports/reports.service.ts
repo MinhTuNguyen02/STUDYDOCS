@@ -62,7 +62,12 @@ export class ReportsService {
       orderBy: { created_at: 'desc' },
       include: {
         documents: { select: { title: true } },
-        customer_profiles: { select: { full_name: true } }
+        customer_profiles: { 
+          select: { 
+            full_name: true,
+            accounts: { select: { email: true } }
+          } 
+        }
       }
     });
   }
