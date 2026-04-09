@@ -9,40 +9,7 @@ import { compare, hash } from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  async findAll(query: PaginationQueryDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const skip = (page - 1) * limit;
-
-    const [total, users] = await Promise.all([
-      this.prisma.customer_profiles.count(),
-      this.prisma.customer_profiles.findMany({
-        skip,
-        take: limit,
-        orderBy: { customer_id: 'desc' },
-        include: { accounts: true }
-      })
-    ]);
-
-    return {
-      meta: {
-        page,
-        limit,
-        total
-      },
-      data: toJsonSafe(
-        users.map((user) => ({
-          id: user.customer_id,
-          fullName: user.full_name,
-          email: user.accounts.email,
-          status: user.accounts.status,
-          createdAt: user.created_at
-        }))
-      )
-    };
-  }
+  constructor(private readonly prisma: PrismaService) { }
 
   async getProfile(user: AuthUser) {
     if (!user.customerId) {
@@ -73,7 +40,7 @@ export class UsersService {
 
   async updateProfile(user: AuthUser, dto: UpdateProfileDto) {
     if (!user.customerId) throw new BadRequestException('Khong the cap nhat hobo staff tu endpoint nay.');
-    
+
     const updated = await this.prisma.customer_profiles.update({
       where: { customer_id: user.customerId },
       data: {
@@ -81,7 +48,7 @@ export class UsersService {
         avatar_url: dto.avatarUrl ?? undefined
       }
     });
-    
+
     return toJsonSafe(updated);
   }
 
@@ -95,7 +62,7 @@ export class UsersService {
     }
 
     const { currentPassword, newPassword } = dto;
-    const isMatched = account.password_hash.startsWith('$2') 
+    const isMatched = account.password_hash.startsWith('$2')
       ? await compare(currentPassword, account.password_hash)
       : account.password_hash === currentPassword;
 
@@ -110,17 +77,5 @@ export class UsersService {
     });
 
     return { message: 'Doi mat khau thanh cong.' };
-  }
-
-  async setAccountStatus(accountId: number, status: 'ACTIVE' | 'BANNED') {
-    const acc = await this.prisma.accounts.findUnique({ where: { account_id: accountId } });
-    if (!acc) throw new NotFoundException('Không tìm thấy tài khoản.');
-
-    await this.prisma.accounts.update({
-      where: { account_id: accountId },
-      data: { status }
-    });
-
-    return { message: `Đã đổi trạng thái tài khoản thành ${status}` };
   }
 }

@@ -9,6 +9,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
+import { hash } from 'bcryptjs';
 
 @Injectable()
 export class AdminService {
@@ -22,12 +23,12 @@ export class AdminService {
   }
 
   private resolveRole(roleNames: string[], hasStaffProfile: boolean, hasCustomerProfile: boolean, _documentsCount: number) {
-    // Chỉ có 4 roles: admin, mod, accountant, customer
-    if (roleNames.includes('admin')) return 'admin';
-    if (roleNames.includes('mod')) return 'mod';
-    if (roleNames.includes('accountant')) return 'accountant';
-    if (roleNames.includes('customer') || hasCustomerProfile) return 'customer';
-    return 'customer';
+    const lowerRoles = roleNames.map(r => r.toLowerCase());
+    if (lowerRoles.includes('admin')) return 'ADMIN';
+    if (lowerRoles.includes('mod')) return 'MOD';
+    if (lowerRoles.includes('accountant')) return 'ACCOUNTANT';
+    if (hasStaffProfile) return 'STAFF'; // Fallback for valid staff without a specific mod/acc role
+    return 'CUSTOMER';
   }
 
   async getDashboard() {
@@ -78,17 +79,26 @@ export class AdminService {
       }
     });
 
-    // Generate short-lived signed URLs for preview PDFs only.
-    // We NEVER expose the full file_url to staff — the watermarked preview is enough for review.
     const mapped = await Promise.all(
       docs.map(async (doc) => {
+        // ── Preview URL (30% watermarked, for buyers sample) ──
         let previewSignedUrl: string | null = null;
         const previewKey = doc.preview_url;
         if (previewKey && !previewKey.includes('placeholder')) {
           try {
             previewSignedUrl = await this.storageService.getPresignedUrl(previewKey, 3600);
-          } catch { /* storage error — proceed without preview */ }
+          } catch { /* ignore */ }
         }
+
+        // ── Review URL (100% full-page, light watermark — staff only) ──
+        let reviewSignedUrl: string | null = null;
+        const reviewKey = (doc as any).review_url;
+        if (reviewKey) {
+          try {
+            reviewSignedUrl = await this.storageService.getPresignedUrl(reviewKey, 7200); // 2h TTL
+          } catch { /* ignore */ }
+        }
+
         return {
           id: doc.document_id,
           title: doc.title,
@@ -103,7 +113,8 @@ export class AdminService {
           pageCount: doc.page_count,
           fileExtension: doc.file_extension,
           size: this.formatFileSize(doc.file_size ?? 0),
-          previewSignedUrl  // Signed URL for the watermarked preview PDF (1h TTL)
+          previewSignedUrl,
+          reviewSignedUrl  // Full-page signed URL for inline staff review (2h TTL, deleted after decision)
         };
       })
     );
@@ -161,7 +172,6 @@ export class AdminService {
           status: 'APPROVED',
           rejection_reason: null,
           published_at: new Date(),
-          // approved_by_staff_id: actor.staffId
         }
       });
 
@@ -179,6 +189,14 @@ export class AdminService {
       return doc;
     });
 
+    // Delete review file from storage + clear DB field (non-fatal)
+    const reviewKey = (existing as any).review_url;
+    if (reviewKey) {
+      await this.storageService.deleteFile(reviewKey);
+      // Clear DB field after migration is applied (use raw SQL as Prisma type not yet regenerated)
+      await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
+    }
+
     return toJsonSafe(updated);
   }
 
@@ -193,7 +211,6 @@ export class AdminService {
         data: {
           status: 'REJECTED',
           rejection_reason: dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.',
-          // approved_by_staff_id: actor.staffId
         }
       });
 
@@ -210,6 +227,13 @@ export class AdminService {
 
       return doc;
     });
+
+    // Delete review file from storage (non-fatal)
+    const reviewKey = (existing as any).review_url;
+    if (reviewKey) {
+      await this.storageService.deleteFile(reviewKey);
+      await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
+    }
 
     return toJsonSafe(updated);
   }
@@ -323,7 +347,7 @@ export class AdminService {
       this.prisma.documents.groupBy({
         by: ['seller_id'],
         _count: { _all: true },
-        where: { seller_id: { in: customerIds } }
+        where: { seller_id: { in: customerIds }, status: 'APPROVED' }  // Only APPROVED docs
       }),
       this.prisma.order_items.groupBy({
         by: ['seller_id'],
@@ -381,6 +405,37 @@ export class AdminService {
     return toJsonSafe(updated);
   }
 
+  async createStaffAccount(dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) {
+    const existing = await this.prisma.accounts.findUnique({ where: { email: dto.email.toLowerCase().trim() } });
+    if (existing) throw new ConflictException('Email đã được sử dụng.');
+
+    const role = await this.prisma.roles.findFirst({ where: { name: { equals: dto.role, mode: 'insensitive' } } });
+    if (!role) throw new NotFoundException(`Không tìm thấy role ${dto.role} trong hệ thống.`);
+
+    const passwordHash = await hash(dto.password, 10);
+
+    const account = await this.prisma.accounts.create({
+      data: {
+        email: dto.email.toLowerCase().trim(),
+        password_hash: passwordHash,
+        status: 'ACTIVE',
+        roles: { connect: { role_id: role.role_id } },
+        staff_profiles: {
+          create: { full_name: dto.fullName }
+        }
+      },
+      include: { staff_profiles: true, roles: true }
+    });
+
+    return toJsonSafe({
+      id: account.account_id,
+      email: account.email,
+      fullName: account.staff_profiles?.full_name,
+      role: account.roles.name,
+      status: account.status
+    });
+  }
+
   async getCategories(search?: string) {
     const categories = await this.prisma.categories.findMany({
       where: search ? { name: { contains: search, mode: 'insensitive' } } : undefined,
@@ -400,48 +455,6 @@ export class AdminService {
     );
   }
 
-  async createCategory(dto: CreateCategoryDto) {
-    try {
-      const created = await this.prisma.categories.create({
-        data: {
-          name: dto.name,
-          slug: dto.slug
-        }
-      });
-      return toJsonSafe(created);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Slug danh mục đã tồn tại.');
-      }
-      throw error;
-    }
-  }
-
-  async updateCategory(id: string, dto: UpdateCategoryDto) {
-    try {
-      const updated = await this.prisma.categories.update({
-        where: { category_id: Number(id) },
-        data: {
-          name: dto.name,
-          slug: dto.slug
-        }
-      });
-      return toJsonSafe(updated);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Slug danh mục đã tồn tại.');
-      }
-      throw error;
-    }
-  }
-
-  async deleteCategory(id: string) {
-    const deleted = await this.prisma.categories.delete({
-      where: { category_id: Number(id) }
-    });
-    return toJsonSafe(deleted);
-  }
-
   async getTags(search?: string) {
     const tags = await this.prisma.tags.findMany({
       where: search ? { tag_name: { contains: search, mode: 'insensitive' } } : undefined,
@@ -459,48 +472,6 @@ export class AdminService {
         usageCount: tag._count.document_tags
       }))
     );
-  }
-
-  async createTag(dto: CreateTagDto) {
-    try {
-      const created = await this.prisma.tags.create({
-        data: {
-          tag_name: dto.name,
-          slug: dto.slug
-        }
-      });
-      return toJsonSafe(created);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Slug hoặc tên thẻ đã tồn tại.');
-      }
-      throw error;
-    }
-  }
-
-  async updateTag(id: string, dto: UpdateTagDto) {
-    try {
-      const updated = await this.prisma.tags.update({
-        where: { tag_id: Number(id) },
-        data: {
-          tag_name: dto.name,
-          slug: dto.slug
-        }
-      });
-      return toJsonSafe(updated);
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Slug hoặc tên thẻ đã tồn tại.');
-      }
-      throw error;
-    }
-  }
-
-  async deleteTag(id: string) {
-    const deleted = await this.prisma.tags.delete({
-      where: { tag_id: Number(id) }
-    });
-    return toJsonSafe(deleted);
   }
 
   // 24. Dashboard đối soát tiền vào (cổng) vs tiền ra (ví seller)

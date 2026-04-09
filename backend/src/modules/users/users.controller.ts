@@ -14,13 +14,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
-
-  @Get()
-  @Roles('admin', 'mod')
-  findAll(@Query() query: PaginationQueryDto) {
-    return this.usersService.findAll(query);
-  }
+  constructor(private readonly usersService: UsersService) { }
 
   @Get('me')
   getProfile(@CurrentUser() user: AuthUser) {
@@ -35,17 +29,5 @@ export class UsersController {
   @Post('me/password')
   changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
     return this.usersService.changePassword(user, dto);
-  }
-
-  @Patch(':id/ban')
-  @Roles('admin', 'mod')
-  banUser(@Param('id') id: string) {
-    return this.usersService.setAccountStatus(Number(id), 'BANNED');
-  }
-
-  @Patch(':id/unban')
-  @Roles('admin', 'mod')
-  unbanUser(@Param('id') id: string) {
-    return this.usersService.setAccountStatus(Number(id), 'ACTIVE');
   }
 }

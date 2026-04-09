@@ -83,6 +83,19 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  async deleteFile(objectName: string): Promise<void> {
+    try {
+      const { error } = await this.supabase.storage
+        .from(this.bucketName)
+        .remove([objectName]);
+      if (error) console.warn('[Storage] Delete file warning:', error.message);
+      else console.log(`[Storage] Deleted: ${objectName}`);
+    } catch (err: any) {
+      // Non-fatal: just log, don't throw — the document action already succeeded
+      console.error('[Storage] deleteFile error:', err.message || err);
+    }
+  }
+
   getPublicUrl(objectName: string): string {
     const { data } = this.supabase.storage
       .from(this.bucketName)

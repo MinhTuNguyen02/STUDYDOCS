@@ -4,14 +4,14 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(dto: any) {
     const category = await this.prisma.categories.create({
       data: {
         name: dto.name,
         slug: dto.slug,
-        parent_id: dto.parentId ? Number(dto.parentId) : null
+        parent_id: dto.parent_id ? Number(dto.parent_id) : null
       }
     });
     return toJsonSafe(category);
@@ -28,15 +28,15 @@ export class CategoriesService {
     const categories = await this.prisma.categories.findMany({
       orderBy: { name: 'asc' }
     });
-    
+
     // Build tree
     const map = new Map();
     const roots: any[] = [];
-    
+
     categories.forEach(cat => {
       map.set(cat.category_id, { ...cat, children: [] });
     });
-    
+
     categories.forEach(cat => {
       if (cat.parent_id) {
         const parent = map.get(cat.parent_id);
@@ -51,14 +51,21 @@ export class CategoriesService {
 
   async update(id: number, dto: any) {
     const exists = await this.prisma.categories.findUnique({ where: { category_id: id } });
-    if (!exists) throw new NotFoundException('Danh muc khong ton tai');
+    if (!exists) throw new NotFoundException('Danh mục không tồn tại');
+
+    // Mở rộng thêm: Nếu FE gửi parent_id là null để gỡ cha của 1 danh mục
+    // Chúng ta cần xử lý việc FE có thể gửi parent_id = null thay vì chỉ undefined
+    const parentIdToUpdate = dto.parent_id !== undefined
+      ? (dto.parent_id ? Number(dto.parent_id) : null)
+      : exists.parent_id;
 
     const updated = await this.prisma.categories.update({
       where: { category_id: id },
       data: {
         name: dto.name,
         slug: dto.slug,
-        parent_id: dto.parentId ? Number(dto.parentId) : exists.parent_id
+        // SỬA Ở ĐÂY: Dùng biến parentIdToUpdate đã tính toán ở trên
+        parent_id: parentIdToUpdate
       }
     });
     return toJsonSafe(updated);

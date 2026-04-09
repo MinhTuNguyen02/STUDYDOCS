@@ -144,11 +144,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="remember" className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer" />
-              <label htmlFor="remember" className="text-sm text-foreground cursor-pointer select-none">Ghi nhớ đăng nhập</label>
-            </div>
-
             <button
               type="submit"
               disabled={loading}

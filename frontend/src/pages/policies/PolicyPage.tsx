@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import { formatDate } from '@/utils/format'
+import "react-quill-new/dist/quill.snow.css"
 
 export default function PolicyPage() {
   const { slug } = useParams()
@@ -73,11 +74,14 @@ export default function PolicyPage() {
           Cập nhật lần cuối: {formatDate(policy.updated_at || policy.updatedAt || policy.created_at)}
         </p>
 
-        {/* Content rendering: Assuming it's HTML from WYSIWYG editor */}
-        <div 
-          style={{ lineHeight: 1.8, fontSize: 'var(--text-base)' }}
-          dangerouslySetInnerHTML={{ __html: policy.content }} 
-        />
+        {/* Content rendering: HTML from WYSIWYG editor */}
+        <div className="ql-snow bg-transparent border-none mt-6">
+          <div 
+            className="ql-editor"
+            style={{ padding: 0, fontSize: 'var(--text-base)', lineHeight: 1.8 }}
+            dangerouslySetInnerHTML={{ __html: policy.content }} 
+          />
+        </div>
       </div>
     </div>
   )

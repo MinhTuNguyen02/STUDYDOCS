@@ -22,7 +22,7 @@ export default function AdminPackagesPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingPackage, setEditingPackage] = useState<Package | null>(null)
-  
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -78,7 +78,7 @@ export default function AdminPackagesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (formData.price < 0 || formData.download_turns < 1 || formData.duration_days < 1) {
       toast.error('Vui lòng nhập số liệu không âm và lớn hơn 0 cho lượt tải/thời hạn')
       return;
@@ -116,13 +116,11 @@ export default function AdminPackagesPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
-            <Cuboid className="w-6 h-6 text-primary" /> Quản lý Gói Bán (Packages)
+            <Cuboid className="w-6 h-6 text-primary" /> Quản lý Gói Bán
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Quản lý các gói lượt tải trả trước dành cho người dùng.</p>
         </div>
-        
-        <button 
-          onClick={() => handleOpenModal()} 
+        <button
+          onClick={() => handleOpenModal()}
           className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm shrink-0"
         >
           <Plus className="w-5 h-5" /> Thêm Gói mới
@@ -184,13 +182,13 @@ export default function AdminPackagesPage() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenModal(pkg)}
                               className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors tooltip-trigger" title="Sửa"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => setDeleteConfirm(pkg.package_id)}
                               className="p-2 text-danger hover:bg-danger/10 rounded-lg transition-colors tooltip-trigger" title="Ngừng bán"
                               disabled={pkg.status !== 'ACTIVE'}
@@ -222,12 +220,12 @@ export default function AdminPackagesPage() {
                 Đóng
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Tên Gói <span className="text-danger">*</span></label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold"
@@ -238,8 +236,8 @@ export default function AdminPackagesPage() {
 
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Giá bán (VNĐ) <span className="text-danger">*</span></label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   min="0"
                   step="1000"
                   value={formData.price}
@@ -252,8 +250,8 @@ export default function AdminPackagesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-foreground">Số lượt tải (Turns) <span className="text-danger">*</span></label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     value={formData.download_turns}
                     onChange={e => setFormData({ ...formData, download_turns: Number(e.target.value) })}
@@ -263,8 +261,8 @@ export default function AdminPackagesPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-foreground">Số ngày duy trì (Days) <span className="text-danger">*</span></label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="1"
                     value={formData.duration_days}
                     onChange={e => setFormData({ ...formData, duration_days: Number(e.target.value) })}
@@ -276,7 +274,7 @@ export default function AdminPackagesPage() {
 
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Mô tả ngắn</label>
-                <textarea 
+                <textarea
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm resize-none h-20"
@@ -285,7 +283,7 @@ export default function AdminPackagesPage() {
               </div>
 
               <div className="flex items-center gap-2 pt-2 pb-2">
-                <input 
+                <input
                   type="checkbox"
                   id="isActive"
                   checked={formData.is_active}

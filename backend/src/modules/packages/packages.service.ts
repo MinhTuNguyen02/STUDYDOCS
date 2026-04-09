@@ -11,7 +11,7 @@ export class PackagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService
-  ) {}
+  ) { }
 
   async getActivePackages() {
     const packages = await this.prisma.packages.findMany({
@@ -35,9 +35,9 @@ export class PackagesService {
         name: dto.name,
         description: dto.description,
         price: dto.price,
-        download_turns: dto.downloadTurns,
-        duration_days: dto.durationDays ?? 30,
-        status: dto.status ?? 'ACTIVE'
+        download_turns: dto.download_turns,
+        duration_days: dto.duration_days ?? 30,
+        status: dto.is_active !== undefined ? (dto.is_active ? 'ACTIVE' : 'INACTIVE') : 'ACTIVE'
       }
     });
     return { message: 'Tạo gói tải thành công.', data: pkg };
@@ -53,9 +53,9 @@ export class PackagesService {
         name: dto.name,
         description: dto.description,
         price: dto.price,
-        download_turns: dto.downloadTurns,
-        duration_days: dto.durationDays,
-        status: dto.status
+        download_turns: dto.download_turns,
+        duration_days: dto.duration_days,
+        status: dto.is_active !== undefined ? (dto.is_active ? 'ACTIVE' : 'INACTIVE') : existing.status
       }
     });
 
@@ -132,7 +132,7 @@ export class PackagesService {
   async deletePackage(id: number) {
     const existing = await this.prisma.packages.findUnique({ where: { package_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy gói này.');
-    
+
     await this.prisma.packages.update({
       where: { package_id: id },
       data: { delete_at: new Date() }
@@ -146,9 +146,9 @@ export class PackagesService {
   async handleExpirePackages() {
     this.logger.log('Running daily expire packages job...');
     const result = await this.prisma.user_packages.updateMany({
-      where: { 
-        status: 'ACTIVE', 
-        expires_at: { lt: new Date() } 
+      where: {
+        status: 'ACTIVE',
+        expires_at: { lt: new Date() }
       },
       // Since 'EXPIRED' might be the status from the checklist
       data: { status: 'EXPIRED' }

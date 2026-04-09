@@ -17,7 +17,7 @@ import { Roles } from '../../common/security/roles.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('admin', 'mod', 'accountant')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('dashboard')
   dashboard() {
@@ -80,6 +80,12 @@ export class AdminController {
     return this.adminService.getUsers(search);
   }
 
+  @Post('users/staff')
+  @Roles('admin')
+  createStaffAccount(@Body() dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) {
+    return this.adminService.createStaffAccount(dto);
+  }
+
   @Patch('users/:id/toggle-active')
   toggleUserActive(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.adminService.toggleUserActive(id, user);
@@ -90,39 +96,9 @@ export class AdminController {
     return this.adminService.getCategories(search);
   }
 
-  @Post('categories')
-  createCategory(@Body() dto: CreateCategoryDto) {
-    return this.adminService.createCategory(dto);
-  }
-
-  @Patch('categories/:id')
-  updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
-    return this.adminService.updateCategory(id, dto);
-  }
-
-  @Delete('categories/:id')
-  deleteCategory(@Param('id') id: string) {
-    return this.adminService.deleteCategory(id);
-  }
-
   @Get('tags')
   getTags(@Query('search') search?: string) {
     return this.adminService.getTags(search);
-  }
-
-  @Post('tags')
-  createTag(@Body() dto: CreateTagDto) {
-    return this.adminService.createTag(dto);
-  }
-
-  @Patch('tags/:id')
-  updateTag(@Param('id') id: string, @Body() dto: UpdateTagDto) {
-    return this.adminService.updateTag(id, dto);
-  }
-
-  @Delete('tags/:id')
-  deleteTag(@Param('id') id: string) {
-    return this.adminService.deleteTag(id);
   }
 
   @Get('audit-logs')

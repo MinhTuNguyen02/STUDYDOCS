@@ -8,7 +8,7 @@ import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 @ApiTags('Metadata')
 @Controller('tags')
 export class TagsController {
-  constructor(private readonly tagsService: TagsService) {}
+  constructor(private readonly tagsService: TagsService) { }
 
   @Get()
   findAll(@Query('search') search: string) {
@@ -18,8 +18,19 @@ export class TagsController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  create(@Body() dto: { tagName: string }) {
-    return this.tagsService.create(dto.tagName);
+  create(@Body() dto: { tag_name: string; slug: string }) {
+    return this.tagsService.create(dto);
+  }
+
+  // BỔ SUNG: Endpoint để Frontend có thể gọi API cập nhật Tag
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'mod')
+  update(
+    @Param('id') id: string,
+    @Body() dto: { tag_name: string; slug: string }
+  ) {
+    return this.tagsService.update(+id, dto);
   }
 
   @Delete(':id')

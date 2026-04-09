@@ -124,7 +124,7 @@ export default function PackagesPage() {
                         <Check className="w-4 h-4" />
                       </div>
                       <span className="text-muted-foreground leading-snug">
-                        Áp dụng cho mọi tài liệu trên hệ thống có giá trị dưới 50,000đ
+                        Áp dụng cho mọi tài liệu miễn phí trên hệ thống
                       </span>
                     </li>
                   </ul>

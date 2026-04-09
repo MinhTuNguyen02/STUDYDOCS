@@ -80,17 +80,16 @@ export default function AdminAuditLogsPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
-            <Activity className="w-6 h-6 text-primary" /> Nhật ký Hệ thống (Audit Logs)
+            <Activity className="w-6 h-6 text-primary" /> Nhật ký Hệ thống
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Lưu trữ bằng chứng thao tác của BQT và Kế toán để truy vết.</p>
         </div>
       </div>
 
       <div className="bg-card border border-border p-4 rounded-2xl shadow-sm mb-6 flex flex-wrap gap-4 items-center w-full">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={searchEmail}
             onChange={e => setSearchEmail(e.target.value)}
             placeholder="Tìm theo email người thực hiện..."
@@ -98,7 +97,7 @@ export default function AdminAuditLogsPage() {
           />
         </div>
         <div className="w-full md:w-auto">
-          <select 
+          <select
             value={actionFilter}
             onChange={e => setActionFilter(e.target.value)}
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -113,7 +112,7 @@ export default function AdminAuditLogsPage() {
           </select>
         </div>
         <div className="w-full md:w-auto">
-          <select 
+          <select
             value={limit}
             onChange={e => setLimit(Number(e.target.value))}
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -123,7 +122,7 @@ export default function AdminAuditLogsPage() {
             <option value={500}>500 dòng gần nhất</option>
           </select>
         </div>
-        <button 
+        <button
           onClick={handleApplyFilter}
           className="btn bg-primary text-white hover:bg-primary-hover px-6 py-2 rounded-xl text-sm font-semibold shadow-sm w-full md:w-auto"
         >
@@ -152,7 +151,7 @@ export default function AdminAuditLogsPage() {
                 {filteredLogs.map(log => (
                   <tr key={log.log_id} className="hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => setSelectedLog(log)}>
                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
-                      {new Date(log.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second:'2-digit', day: '2-digit', month: '2-digit', year: 'numeric'})}
+                      {new Date(log.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4">
                       <div className="font-semibold text-primary">{log.accounts?.email || 'System'}</div>
@@ -195,7 +194,7 @@ export default function AdminAuditLogsPage() {
                 Đóng
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">

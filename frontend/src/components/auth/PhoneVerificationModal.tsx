@@ -18,20 +18,22 @@ export default function PhoneVerificationModal({ onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const recaptchaVerifier = useRef<RecaptchaVerifier | null>(null);
-
   const initRecaptcha = () => {
-    if (!recaptchaVerifier.current && recaptchaContainerRef.current && import.meta.env.VITE_FIREBASE_API_KEY) {
-      recaptchaVerifier.current = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        size: 'invisible'
-      });
+    if (!(window as any).recaptchaVerifier && import.meta.env.VITE_FIREBASE_API_KEY) {
+      try {
+        (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible'
+        });
+      } catch (err) {
+        console.error('Lỗi khi khởi tạo RecaptchaVerifier', err);
+      }
     }
   };
 
   useEffect(() => {
     if (step === 1) {
-      initRecaptcha();
+      // Đợi DOM render id="recaptcha-container"
+      setTimeout(initRecaptcha, 100);
     }
   }, [step]);
 
@@ -45,9 +47,9 @@ export default function PhoneVerificationModal({ onClose }: Props) {
       const res = await authApi.sendOtp(phoneNumber);
       
       if (res.mode === 'FIREBASE') {
-        if (!recaptchaVerifier.current) {
+        if (!(window as any).recaptchaVerifier) {
            initRecaptcha(); // Khởi tạo lại nếu bị mất do lỗi trước đó
-           if (!recaptchaVerifier.current) {
+           if (!(window as any).recaptchaVerifier) {
              toast.error('Firebase chưa được cấu hình ở Frontend.');
              setLoading(false);
              return;
@@ -61,7 +63,8 @@ export default function PhoneVerificationModal({ onClose }: Props) {
           formattedPhone = '+84' + formattedPhone;
         }
 
-        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifier.current);
+        const appVerifier = (window as any).recaptchaVerifier;
+        const confirmation = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
         setConfirmationResult(confirmation);
         toast.success('Đã gửi mã OTP qua Firebase!');
         setStep(2);
@@ -71,10 +74,13 @@ export default function PhoneVerificationModal({ onClose }: Props) {
         setStep(2);
       }
     } catch (err: any) {
+      console.error(err);
       toast.error(err?.response?.data?.message || err.message || 'Không thể gửi mã OTP');
-      if (recaptchaVerifier.current) {
-        recaptchaVerifier.current.clear();
-        recaptchaVerifier.current = null;
+      if ((window as any).recaptchaVerifier) {
+        try {
+          (window as any).recaptchaVerifier.clear();
+        } catch(e) {}
+        (window as any).recaptchaVerifier = null;
       }
     } finally {
       setLoading(false);
@@ -125,7 +131,7 @@ export default function PhoneVerificationModal({ onClose }: Props) {
             {step === 1 ? 'Vui lòng xác minh số điện thoại để đảm bảo quyền lợi và bảo mật tài khoản.' : `Đã gửi mã OTP đến ${phoneNumber}`}
           </p>
 
-          <div ref={recaptchaContainerRef}></div>
+          <div id="recaptcha-container"></div>
 
           {step === 1 ? (
             <form onSubmit={handleSendOtp} className="space-y-4">

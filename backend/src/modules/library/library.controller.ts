@@ -10,7 +10,7 @@ import { LibraryService } from './library.service';
 @Controller('library')
 @UseGuards(JwtAuthGuard)
 export class LibraryController {
-  constructor(private readonly libraryService: LibraryService) {}
+  constructor(private readonly libraryService: LibraryService) { }
 
   @Get('documents')
   listMyDocuments(@CurrentUser() user: AuthUser) {

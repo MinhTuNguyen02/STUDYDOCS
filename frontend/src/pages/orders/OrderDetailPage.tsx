@@ -31,12 +31,9 @@ export default function OrderDetailPage() {
   const handleDownload = async (documentId: number) => {
     try {
       const res = await libraryApi.getDownloadLink(documentId)
-      const signedUrl = res.signedUrl || res.downloadUrl || res.data?.signedUrl || res.data?.downloadUrl
-      if (signedUrl) {
-        // signedUrl = "/files/download/..." → backend route là /api/files/download/...
-        // Vite proxy /api → http://localhost:4000, nên mở window với /api + signedUrl
-        const url = signedUrl.startsWith('http') ? signedUrl : `/api${signedUrl}`
-        window.open(url, '_blank')
+
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank')
       } else {
         toast.error('Không tìm thấy link tải xuống')
       }
@@ -98,7 +95,7 @@ export default function OrderDetailPage() {
 
         <div className="p-6 md:p-8">
           <h3 className="font-semibold text-lg mb-4 text-foreground">Sản phẩm đã mua</h3>
-          
+
           <div className="space-y-4">
             {items.map((item: any, index: number) => {
               const doc = item.document || item
@@ -117,17 +114,17 @@ export default function OrderDetailPage() {
                       <span className="uppercase text-xs font-semibold px-2 py-0.5 bg-muted rounded-md">{ext}</span>
                     </div>
                   </div>
-                  
+
                   {status === 'PAID' && (
                     <div className="flex items-center justify-end shrink-0 gap-2">
-                      <button 
+                      <button
                         onClick={() => setDisputeTarget(item)}
                         className="p-3 bg-danger/10 text-danger hover:bg-danger hover:text-white rounded-xl transition-colors tooltip-trigger"
                         title="Khiếu nại / Hoàn tiền"
                       >
                         <AlertTriangle className="w-5 h-5" />
                       </button>
-                      <button 
+                      <button
                         onClick={() => handleDownload(doc.id || doc.document_id)}
                         className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
                         title="Tải xuống tài liệu"

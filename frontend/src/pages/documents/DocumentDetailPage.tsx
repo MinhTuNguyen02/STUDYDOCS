@@ -68,13 +68,13 @@ export default function DocumentDetailPage() {
     if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không tải tài liệu');
     if (isOwner) return toast.error('Bạn là chủ sở hữu, hãy xem file tại mục quản lý')
 
-    setAddingToCart(true)
+    setAddingToCart(true) // Dành riêng cho FE3, FE4 không có thì bỏ dòng này
     try {
-      const res = await libraryApi.requestDownload(Number(id))
-      const rawUrl = res.signedUrl || res.downloadUrl || res.data?.downloadUrl || res.data?.signedUrl
-      if (rawUrl) {
-        const fullUrl = rawUrl.startsWith('http') ? rawUrl : `/api${rawUrl}`
-        window.open(fullUrl, '_blank')
+      const res = await libraryApi.requestDownload(Number(id || doc.id))
+
+      // Chỉ cần check res.downloadUrl, không cần rawUrl hay startsWith('http') nữa
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank')
         toast.success(res.message || 'Bắt đầu tải tài liệu')
       } else {
         toast.error('Đã xảy ra lỗi, không sinh được link.')
@@ -82,7 +82,7 @@ export default function DocumentDetailPage() {
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Không thể tải tài liệu này')
     } finally {
-      setAddingToCart(false)
+      setAddingToCart?.(false) // Dành riêng cho FE3
     }
   }
 
@@ -124,7 +124,7 @@ export default function DocumentDetailPage() {
   const isFree = !doc.price || doc.price === 0
   const isOwner = user?.customerId && Number(doc.sellerId || doc.seller_id || 0) === Number(user.customerId)
   const isWishlisted = doc.isWishlisted || wishlistIds.includes(Number(id))
-  
+
   const ext = doc.file_extension || doc.fileExtension || 'N/A'
   const rating = doc.rating || 0
   const reviewCount = reviews.length || doc.reviewCount || doc.reviews?.length || 0

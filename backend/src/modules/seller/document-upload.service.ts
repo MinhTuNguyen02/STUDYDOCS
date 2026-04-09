@@ -26,6 +26,7 @@ export class DocumentUploadService {
 
     let pageCount = 0;
     let previewBuffer: Buffer | null = null;
+    let reviewBuffer: Buffer | null = null;
     let pdfBufferToParse: Buffer | null = null;
 
     // Convert logic
@@ -53,6 +54,7 @@ export class DocumentUploadService {
         const processed = await this.processPdfBuffer(pdfBufferToParse);
         pageCount = processed.pageCount;
         previewBuffer = processed.previewBuffer;
+        reviewBuffer = processed.reviewBuffer;
       } catch (e) {
         if (extension === 'pdf') {
           throw new BadRequestException('Khong the doc file PDF nay.');
@@ -63,19 +65,28 @@ export class DocumentUploadService {
     }
 
     // Upload main document
-    const fileKey = `docs/${slug}-${Date.now()}.${extension}`;
+    const ts = Date.now();
+    const fileKey = `docs/${slug}-${ts}.${extension}`;
     await this.storageService.uploadFile(fileKey, file.buffer, file.mimetype);
 
-    // Upload preview
+    // Upload preview (30% + watermark — for buyers to sample)
     let previewKey = `previews/placeholder.png`;
     if (previewBuffer) {
-      previewKey = `previews/${slug}-${Date.now()}.pdf`;
+      previewKey = `previews/${slug}-${ts}.pdf`;
       await this.storageService.uploadFile(previewKey, previewBuffer, 'application/pdf');
+    }
+
+    // Upload review (100% + light watermark — for staff moderation only, deleted after decision)
+    let reviewKey: string | null = null;
+    if (reviewBuffer) {
+      reviewKey = `reviews/${slug}-${ts}.pdf`;
+      await this.storageService.uploadFile(reviewKey, reviewBuffer, 'application/pdf');
     }
 
     return {
       fileKey,
       previewKey,
+      reviewKey,
       pageCount,
       fileHash,
       fileSize: file.size,
@@ -83,57 +94,78 @@ export class DocumentUploadService {
     };
   }
 
-  private async processPdfBuffer(buffer: Buffer): Promise<{ pageCount: number, previewBuffer: Buffer }> {
+  private async processPdfBuffer(buffer: Buffer): Promise<{ pageCount: number, previewBuffer: Buffer, reviewBuffer: Buffer }> {
     const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
     const totalPages = pdfDoc.getPageCount();
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    // Lay 30% so trang
-    const previewCount = Math.max(1, Math.floor(totalPages * 0.3));
+    // ── 1. REVIEW PDF — Full pages, light diagonal watermark ──
+    const reviewPdf = await PDFDocument.create();
+    const reviewFont = await reviewPdf.embedFont(StandardFonts.HelveticaBold);
+    const allPageIndices = Array.from({ length: totalPages }, (_, i) => i);
+    const reviewCopied = await reviewPdf.copyPages(pdfDoc, allPageIndices);
 
-    const previewPdf = await PDFDocument.create();
-
-    const copiedPages = await previewPdf.copyPages(
-      pdfDoc,
-      Array.from({ length: previewCount }, (_, i) => i)
-    );
-
-    const font = await previewPdf.embedFont(StandardFonts.HelveticaBold);
-    const text = 'STUDYDOCS';
-    const size = 70;
-
-    // Tính chính xác chiều rộng và chiều cao của text
-    const textWidth = font.widthOfTextAtSize(text, size);
-    const textHeight = font.heightAtSize(size);
-
-    for (const page of copiedPages) {
+    for (const page of reviewCopied) {
       const { width, height } = page.getSize();
-
-      // 2. Lấy tọa độ tâm của trang
-      const centerX = width / 2;
-      const centerY = height / 2;
-
-      // 3. Quy đổi góc xoay sang Radian để dùng Math.sin và Math.cos
-      const angle = -45;
+      const text = 'STUDYDOCS - STAFF REVIEW';
+      const size = 42;
+      const textWidth = reviewFont.widthOfTextAtSize(text, size);
+      const textHeight = reviewFont.heightAtSize(size);
+      const angle = -35;
       const angleRad = (angle * Math.PI) / 180;
-
-      // 4. Công thức lượng giác dịch chuyển tọa độ x, y để tâm chữ vào giữa
-      const x = centerX - (textWidth / 2) * Math.cos(angleRad) + (textHeight / 2) * Math.sin(angleRad);
-      const y = centerY - (textWidth / 2) * Math.sin(angleRad) - (textHeight / 2) * Math.cos(angleRad);
+      const cx = width / 2;
+      const cy = height / 2;
+      const x = cx - (textWidth / 2) * Math.cos(angleRad) + (textHeight / 2) * Math.sin(angleRad);
+      const y = cy - (textWidth / 2) * Math.sin(angleRad) - (textHeight / 2) * Math.cos(angleRad);
 
       page.drawText(text, {
-        x: x,
-        y: y,
-        size: size,
-        font: font, // Truyền font vào để chữ đẹp và khớp với kích thước tính toán
+        x, y, size,
+        font: reviewFont,
+        color: rgb(0.1, 0.4, 0.9),
+        rotate: degrees(angle),
+        opacity: 0.15   // Very light — readable but doesn't obstruct content
+      });
+      reviewPdf.addPage(page);
+    }
+
+    // ── 2. PREVIEW PDF — 30% pages, strong red watermark for buyers ──
+    const previewCount = Math.max(1, Math.floor(totalPages * 0.3));
+    const previewPdf = await PDFDocument.create();
+    const previewFont = await previewPdf.embedFont(StandardFonts.HelveticaBold);
+    const previewText = 'STUDYDOCS';
+    const previewSize = 70;
+
+    const previewCopied = await previewPdf.copyPages(pdfDoc, Array.from({ length: previewCount }, (_, i) => i));
+
+    for (const page of previewCopied) {
+      const { width, height } = page.getSize();
+      const textWidth = previewFont.widthOfTextAtSize(previewText, previewSize);
+      const textHeight = previewFont.heightAtSize(previewSize);
+      const angle = -45;
+      const angleRad = (angle * Math.PI) / 180;
+      const cx = width / 2;
+      const cy = height / 2;
+      const x = cx - (textWidth / 2) * Math.cos(angleRad) + (textHeight / 2) * Math.sin(angleRad);
+      const y = cy - (textWidth / 2) * Math.sin(angleRad) - (textHeight / 2) * Math.cos(angleRad);
+
+      page.drawText(previewText, {
+        x, y,
+        size: previewSize,
+        font: previewFont,
         color: rgb(0.95, 0.1, 0.1),
         rotate: degrees(angle),
         opacity: 0.3
       });
-
       previewPdf.addPage(page);
     }
 
-    const saved = await previewPdf.save();
-    return { pageCount: totalPages, previewBuffer: Buffer.from(saved) };
+    const reviewSaved = await reviewPdf.save();
+    const previewSaved = await previewPdf.save();
+
+    return {
+      pageCount: totalPages,
+      previewBuffer: Buffer.from(previewSaved),
+      reviewBuffer: Buffer.from(reviewSaved)
+    };
   }
 }

@@ -21,7 +21,7 @@ export const adminApi = {
     const res = await api.get(`/admin/approvals/documents/${id}/review-url`);
     return res.data;
   },
-  
+
   getUsers: async (params?: any) => {
     const res = await api.get('/admin/users', { params });
     return res.data;
@@ -30,13 +30,13 @@ export const adminApi = {
     const res = await api.patch(`/admin/users/${id}/toggle-active`);
     return res.data;
   },
+  createStaffAccount: async (data: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) => {
+    const res = await api.post('/admin/users/staff', data);
+    return res.data;
+  },
 
   getAllDocuments: async (params?: any) => {
     const res = await api.get('/admin/documents', { params });
-    return res.data;
-  },
-  toggleDocumentStatus: async (id: number) => {
-    const res = await api.patch(`/admin/documents/${id}/toggle-status`);
     return res.data;
   },
 
@@ -50,7 +50,7 @@ export const adminApi = {
   },
 
   getReports: async () => {
-    const res = await api.get('/reports'); 
+    const res = await api.get('/reports');
     return res.data;
   },
   resolveReport: async (id: number, data: { status: string }) => {
@@ -83,7 +83,7 @@ export const adminApi = {
     const res = await api.get('/configs');
     return res.data;
   },
-  updateConfig: async (key: string, data: { value: string }) => {
+  updateConfig: async (key: string, data: { value: string; description?: string }) => {
     const res = await api.put(`/configs/${key}`, data);
     return res.data;
   },

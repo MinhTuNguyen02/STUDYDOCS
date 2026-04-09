@@ -28,8 +28,9 @@ export default function LibraryPage() {
   const handleDownload = async (documentId: number) => {
     try {
       const res = await libraryApi.getDownloadLink(documentId)
-      if (res.downloadUrl || res.data?.downloadUrl) {
-        window.open(res.downloadUrl || res.data.downloadUrl, '_blank')
+
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank')
       } else {
         toast.error('Không tìm thấy link tải xuống')
       }
@@ -102,7 +103,7 @@ export default function LibraryPage() {
                   <div className="absolute bottom-0 w-full bg-black/30 backdrop-blur-sm text-white text-center text-xs py-1.5 font-bold tracking-widest uppercase">
                     {ext}
                   </div>
-                  
+
                   {/* Badge */}
                   <div className="absolute top-3 left-3">
                     {downloadType === 'FREE' ? (
@@ -130,8 +131,8 @@ export default function LibraryPage() {
                       <span>Mua ngày: {formatDate(doc.purchased_at || doc.createdAt || doc.created_at)}</span>
                     </p>
                   </div>
-                  
-                  <button 
+
+                  <button
                     onClick={() => handleDownload(doc.document_id || doc.id)}
                     className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 bg-primary/10 text-primary hover:bg-primary hover:text-white font-semibold rounded-lg transition-colors cursor-pointer"
                   >

@@ -17,7 +17,7 @@ export default function AdminConfigsPage() {
   // Edit Mode state
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
-  
+
   // Create / Update Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [formData, setFormData] = useState({ key: '', value: '', description: '' })
@@ -68,10 +68,12 @@ export default function AdminConfigsPage() {
 
     // Since we only have updateConfig which works as upsert in backend:
     try {
-      await adminApi.updateConfig(formData.key, { 
-        value: formData.value, 
+      await adminApi.updateConfig(formData.key, {
+        value: formData.value,
+        description: formData.description
       })
       toast.success('Thêm tham số thành công')
+      setFormData({ key: '', value: '', description: '' })
       setIsModalOpen(false)
       fetchConfigs()
     } catch (error: any) {
@@ -86,13 +88,12 @@ export default function AdminConfigsPage() {
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <Settings className="w-6 h-6 text-primary" /> Cấu hình Hệ thống
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Quản lý các tham số, tỷ lệ chia sẻ, giới hạn thanh toán của hệ thống.</p>
         </div>
-        <button 
+        <button
           onClick={() => {
             setFormData({ key: '', value: '', description: '' })
             setIsModalOpen(true)
-          }} 
+          }}
           className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm"
         >
           <Settings className="w-5 h-5" /> Thêm cấu hình
@@ -135,7 +136,7 @@ export default function AdminConfigsPage() {
                     <td className="px-6 py-4">
                       {editingKey === config.config_key ? (
                         <div className="flex items-center gap-2">
-                          <input 
+                          <input
                             type="text"
                             value={editValue}
                             onChange={(e) => setEditValue(e.target.value)}
@@ -153,13 +154,13 @@ export default function AdminConfigsPage() {
                     <td className="px-6 py-4 text-right align-middle">
                       {editingKey === config.config_key ? (
                         <div className="flex items-center justify-end gap-2">
-                          <button 
+                          <button
                             onClick={() => handleSaveInline(config.config_key)}
                             className="flex items-center gap-1 px-3 py-1.5 bg-success text-white rounded-lg text-xs font-bold hover:bg-emerald-600 transition"
                           >
                             <Save className="w-3.5 h-3.5" /> Lưu
                           </button>
-                          <button 
+                          <button
                             onClick={() => setEditingKey(null)}
                             className="px-3 py-1.5 bg-muted text-foreground rounded-lg text-xs font-bold hover:bg-gray-200 transition"
                           >
@@ -167,7 +168,7 @@ export default function AdminConfigsPage() {
                           </button>
                         </div>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => handleEditInline(config)}
                           className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors tooltip-trigger" title="Sửa tham số"
                         >
@@ -195,12 +196,12 @@ export default function AdminConfigsPage() {
                 Đóng
               </button>
             </div>
-            
+
             <form onSubmit={handleCreateNew} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Khoá (Key) <span className="text-danger">*</span></label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.key}
                   onChange={e => setFormData({ ...formData, key: e.target.value.toUpperCase() })}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm"
@@ -211,8 +212,8 @@ export default function AdminConfigsPage() {
 
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Giá trị (Value) <span className="text-danger">*</span></label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.value}
                   onChange={e => setFormData({ ...formData, value: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"

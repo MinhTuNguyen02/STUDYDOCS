@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { adminApi } from '@/api/admin.api'
 import { FileText, Plus, Edit2, Trash2, CheckCircle2, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import RichTextEditor from '@/components/ui/RichTextEditor'
 
 interface Policy {
-  id: number
+  policy_id: number
   title: string
   slug: string
   content: string
@@ -19,7 +20,7 @@ export default function AdminPoliciesPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null)
-  
+
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
@@ -69,7 +70,7 @@ export default function AdminPoliciesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.title || !formData.slug || !formData.content) {
       toast.error('Vui lòng điền đủ Tiêu đề, Slug và Nội dung')
       return;
@@ -77,7 +78,7 @@ export default function AdminPoliciesPage() {
 
     try {
       if (editingPolicy) {
-        await adminApi.updatePolicy(editingPolicy.id, {
+        await adminApi.updatePolicy(editingPolicy.policy_id, {
           title: formData.title,
           slug: formData.slug,
           content: formData.content,
@@ -124,7 +125,7 @@ export default function AdminPoliciesPage() {
         .replace(/([^0-9a-z-\s])/g, '')
         .replace(/(\s+)/g, '-')
         .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '') 
+        .replace(/^-+|-+$/g, '')
         : prev.slug
     }))
   }
@@ -136,11 +137,10 @@ export default function AdminPoliciesPage() {
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <FileText className="w-6 h-6 text-primary" /> Quản lý Chính sách & Điều khoản
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Quản lý nội dung trang T&C, Chính sách Bảo mật, Đổi trả...</p>
         </div>
-        
-        <button 
-          onClick={() => handleOpenModal()} 
+
+        <button
+          onClick={() => handleOpenModal()}
           className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm shrink-0"
         >
           <Plus className="w-5 h-5" /> Thêm Bài Mới
@@ -168,7 +168,7 @@ export default function AdminPoliciesPage() {
                   </tr>
                 ) : (
                   policies.map((pol) => (
-                    <tr key={pol.id} className="hover:bg-muted/50 transition-colors">
+                    <tr key={pol.policy_id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-base text-primary mb-1">{pol.title}</div>
                         <div className="font-mono text-xs bg-muted text-muted-foreground px-2 py-1 rounded inline-block">/{pol.slug}</div>
@@ -188,21 +188,21 @@ export default function AdminPoliciesPage() {
                         {new Date(pol.updated_at).toLocaleDateString('vi-VN')}
                       </td>
                       <td className="px-6 py-4 text-right align-middle">
-                        {deleteConfirm === pol.id ? (
+                        {deleteConfirm === pol.policy_id ? (
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => handleDelete(pol.id)} className="px-3 py-1 bg-danger text-white rounded-md text-xs font-bold hover:bg-red-600 transition">Xoá luôn</button>
+                            <button onClick={() => handleDelete(pol.policy_id)} className="px-3 py-1 bg-danger text-white rounded-md text-xs font-bold hover:bg-red-600 transition">Xoá luôn</button>
                             <button onClick={() => setDeleteConfirm(null)} className="px-3 py-1 bg-muted text-foreground rounded-md text-xs font-bold hover:bg-gray-200 transition">Hủy</button>
                           </div>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenModal(pol)}
                               className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors tooltip-trigger" title="Chỉnh sửa nội dung"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
-                            <button 
-                              onClick={() => setDeleteConfirm(pol.id)}
+                            <button
+                              onClick={() => setDeleteConfirm(pol.policy_id)}
                               className="p-2 text-danger hover:bg-danger/10 rounded-lg transition-colors tooltip-trigger" title="Xoá bài viết"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -231,13 +231,13 @@ export default function AdminPoliciesPage() {
                 Đóng
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 overflow-y-auto">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-foreground">Tiêu đề bài viết <span className="text-danger">*</span></label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.title}
                     onChange={handleTitleChange}
                     className="w-full px-4 py-2 border border-border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold"
@@ -247,8 +247,8 @@ export default function AdminPoliciesPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 text-foreground">Đường dẫn (Slug) <span className="text-danger">*</span></label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={formData.slug}
                     onChange={e => setFormData({ ...formData, slug: e.target.value })}
                     className="w-full px-4 py-2 border border-border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono text-primary"
@@ -258,18 +258,15 @@ export default function AdminPoliciesPage() {
               </div>
 
               <div className="flex-1 flex flex-col min-h-[300px]">
-                <label className="block text-sm font-semibold mb-1.5 text-foreground">Nội dung (Hỗ trợ HTML/Markdown) <span className="text-danger">*</span></label>
-                <textarea 
+                <label className="block text-sm font-semibold mb-1.5 text-foreground">Nội dung bài viết <span className="text-danger">*</span></label>
+                <RichTextEditor
                   value={formData.content}
-                  onChange={e => setFormData({ ...formData, content: e.target.value })}
-                  className="w-full flex-1 min-h-[300px] px-4 py-3 border border-border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none font-mono text-sm leading-relaxed"
-                  placeholder="<h1>Điều khoản</h1><p>Nội dung chính sách...</p>"
-                  required
+                  onChange={(val) => setFormData({ ...formData, content: val })}
                 />
               </div>
 
               <div className="flex items-center gap-2 pt-2">
-                <input 
+                <input
                   type="checkbox"
                   id="isActivePol"
                   checked={formData.is_active}

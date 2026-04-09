@@ -213,12 +213,7 @@ export class AuthService {
 
     const { phoneNumber } = dto;
 
-    // Lưu SĐT vào profile
-    await this.prisma.customer_profiles.update({
-      where: { customer_id: user.customerId },
-      data: { phone_number: phoneNumber }
-    });
-
+    // Không lưu số điện thoại vội, chỉ lưu khi Verify thành công để tránh lỗi rác DB
     const firebaseProjectId = this.configService.get<string>('FIREBASE_PROJECT_ID', '');
 
     // Mode 1: Firebase Production — Frontend gọi Firebase Auth SDK để gửi OTP qua SMS thật
@@ -240,6 +235,12 @@ export class AuthService {
         phone_otp_code: otpCode,
         phone_otp_expires_at: new Date(Date.now() + 5 * 60 * 1000)
       }
+    });
+
+    // Lưu tạm SĐT vào profile nhưng chưa verify (cho Mock Mode)
+    await this.prisma.customer_profiles.update({
+      where: { customer_id: user.customerId },
+      data: { phone_number: phoneNumber }
     });
 
     return { message: 'Ma OTP da duoc gui (che do Mock). Xem console.', mode: 'MOCK' };

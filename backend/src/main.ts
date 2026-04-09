@@ -11,6 +11,9 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT', 4000);
 
+  // Kích hoạt Shutdown Hooks để giải phóng connection Prisma khi reload BE
+  app.enableShutdownHooks();
+
   app.setGlobalPrefix('api');
   
   // Security Headers

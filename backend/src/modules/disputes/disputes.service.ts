@@ -11,7 +11,7 @@ export class DisputesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService
-  ) {}
+  ) { }
 
   async createDispute(user: AuthUser, dto: { orderItemId: number; reason: string; description: string }) {
     if (!user.customerId) throw new ForbiddenException('Chỉ khách hàng mới có thể khiếu nại.');
@@ -23,10 +23,21 @@ export class DisputesService {
 
     if (!orderItem) throw new NotFoundException('Không tìm thấy Order Item.');
     if (orderItem.orders.buyer_id !== user.customerId) {
-        throw new ForbiddenException('Bạn không phải là người mua của item này.');
+      throw new ForbiddenException('Bạn không phải là người mua của item này.');
     }
 
-    // Rule: Dispute chỉ hiện khi NOW() - order.created_at <= 2 ngày
+    // --- RULE MỚI: BẮT BUỘC STATUS = HELD ---
+    if (orderItem.status !== 'HELD') {
+      throw new BadRequestException('Chỉ có thể khiếu nại đối với đơn hàng đang trong thời gian tạm giữ tiền.');
+    }
+
+    // --- RULE MỚI: BẮT BUỘC CHƯA QUÁ HẠN HOLD ---
+    if (orderItem.hold_until && orderItem.hold_until <= new Date()) {
+      throw new BadRequestException('Thời gian tạm giữ tiền cho đơn hàng này đã kết thúc, không thể tạo khiếu nại.');
+    }
+
+    // Rule cũ: Dispute chỉ hiện khi NOW() - order.created_at <= 2 ngày 
+    // (Có thể cân nhắc bỏ nếu hold_until đã cover, nhưng cứ giữ cho an toàn 2 lớp)
     const daysSinceOrder = (Date.now() - orderItem.orders.created_at.getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceOrder > 2) {
       throw new BadRequestException('Đã quá thời hạn 2 ngày để khiếu nại hoàn tiền.');
@@ -53,7 +64,7 @@ export class DisputesService {
 
   async analyzeDispute(user: AuthUser, disputeId: number) {
     if (!user.staffId) throw new ForbiddenException('Chỉ dành cho Mod/Admin.');
-    
+
     return this.prisma.disputes.update({
       where: { id: disputeId },
       data: { status: 'INVESTIGATING', staff_id: user.staffId }
@@ -64,8 +75,8 @@ export class DisputesService {
     return this.prisma.disputes.findMany({
       orderBy: { created_at: 'desc' },
       include: {
-        order_items: { 
-          include: { 
+        order_items: {
+          include: {
             documents: { select: { title: true } },
             orders: { select: { order_id: true } }
           }
@@ -107,11 +118,17 @@ export class DisputesService {
     // Nếu RESOLVED -> Trả lại tiền (Refund)
     if (dto.status === 'RESOLVED') {
       const orderItem = dispute.order_items;
-      
+
+      // --- RULE MỚI: CHỐT CHẶN BẢO VỆ Ở TẦNG RESOLVE ---
+      // Lỡ trong lúc đang Investigating, cronjob chạy và giải phóng tiền thì sao? Phải chặn lại!
+      if (orderItem.status !== 'HELD') {
+        throw new BadRequestException('Đơn hàng không còn ở trạng thái tạm giữ (HELD). Không thể hoàn tiền lúc này.');
+      }
+
       const res = await this.prisma.$transaction(async (tx) => {
         // 1. Trả tiền PAYMENT cho Buyer
         const buyerWallet = await tx.wallets.findFirst({
-           where: { customer_id: orderItem.orders.buyer_id, wallet_type: 'PAYMENT' }
+          where: { customer_id: orderItem.orders.buyer_id, wallet_type: 'PAYMENT' }
         });
 
         if (!buyerWallet) throw new BadRequestException('Không tìm thấy ví PAYMENT của người mua.');
@@ -123,25 +140,19 @@ export class DisputesService {
 
         // 2. Lấy ví người bán và system revenue
         const { systemRevenue } = await this.ledger.getSystemWallets(tx);
-        
+
         const sellerWallet = await tx.wallets.findFirst({
           where: { customer_id: orderItem.documents.seller_id, wallet_type: 'REVENUE' }
         });
-        
+
         if (!sellerWallet) throw new BadRequestException('Không tìm thấy ví REVENUE người bán.');
 
-        // 3. Trừ tiền người bán (Ưu tiên trừ từ pending_balance nếu trạng thái là HELD, nếu RELEASED trừ balance)
-        if (orderItem.status === 'HELD') {
-            await tx.wallets.update({
-              where: { wallet_id: sellerWallet.wallet_id },
-              data: { pending_balance: { decrement: orderItem.seller_earning } }
-            });
-        } else if (orderItem.status === 'RELEASED') { // Or PAID directly
-            await tx.wallets.update({
-              where: { wallet_id: sellerWallet.wallet_id },
-              data: { balance: { decrement: orderItem.seller_earning } }
-            });
-        }
+        // 3. Trừ tiền người bán 
+        // DO ĐÃ CHẶN HELD Ở TRÊN, NAY CHỈ CẦN TRỪ PENDING BALANCE (Xóa logic RELEASED/PAID)
+        await tx.wallets.update({
+          where: { wallet_id: sellerWallet.wallet_id },
+          data: { pending_balance: { decrement: orderItem.seller_earning } }
+        });
 
         // 4. Trừ tiền SYSTEM_REVENUE
         await tx.wallets.update({
@@ -155,11 +166,7 @@ export class DisputesService {
           data: { status: 'REFUNDED' }
         });
 
-        // 6. Ghi Ledger REFUND (đảo chiều bút toán PURCHASE)
-        // PURCHASE: buyer=debit, seller/system=credit
-        // REFUND:   buyer=credit(hoàn), seller/system=debit(thu hồi)
-        // Nhưng theo chuẩn kế toán: buyer nhận lại tiền = DEBIT (tài sản tăng)
-        // seller/system trả tiền = CREDIT (tài sản giảm)
+        // 6. Ghi Ledger REFUND 
         await this.ledger.recordTransaction(
           tx,
           'REFUND',
@@ -167,9 +174,10 @@ export class DisputesService {
           disputeId,
           `Hoàn tiền khiếu nại (Item ID: ${orderItem.order_item_id})`,
           [
-            { wallet_id: buyerWallet.wallet_id, debit_amount: orderItem.unit_price, credit_amount: 0 },
-            { wallet_id: sellerWallet.wallet_id, debit_amount: 0, credit_amount: orderItem.seller_earning },
-            { wallet_id: systemRevenue.wallet_id, debit_amount: 0, credit_amount: orderItem.commission_fee }
+            // Đã fix lỗi Nợ/Có kế toán từ round trước
+            { wallet_id: buyerWallet.wallet_id, debit_amount: 0, credit_amount: orderItem.unit_price },
+            { wallet_id: sellerWallet.wallet_id, debit_amount: orderItem.seller_earning, credit_amount: 0 },
+            { wallet_id: systemRevenue.wallet_id, debit_amount: orderItem.commission_fee, credit_amount: 0 }
           ]
         );
 

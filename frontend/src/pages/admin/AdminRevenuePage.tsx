@@ -22,7 +22,7 @@ interface RevenueEntry {
 export default function AdminRevenuePage() {
   const [data, setData] = useState<RevenueEntry[]>([])
   const [loading, setLoading] = useState(false)
-  
+
   const [startDate, setStartDate] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() - 30)
@@ -87,7 +87,6 @@ export default function AdminRevenuePage() {
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <LineChart className="w-6 h-6 text-primary" /> Báo cáo Doanh thu Hệ thống
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Phân tích tiền hoa hồng, chi phí và lợi nhuận trên ví SYSTEM_REVENUE.</p>
         </div>
       </div>
 
@@ -98,8 +97,8 @@ export default function AdminRevenuePage() {
             <label className="block text-xs font-semibold text-muted-foreground mb-1">Từ ngày</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
                 className="pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
@@ -110,23 +109,23 @@ export default function AdminRevenuePage() {
             <label className="block text-xs font-semibold text-muted-foreground mb-1">Đến ngày</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input 
-                type="date" 
+              <input
+                type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
                 className="pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
               />
             </div>
           </div>
-          <button 
-            onClick={fetchRevenue} 
+          <button
+            onClick={fetchRevenue}
             className="btn bg-primary text-white hover:bg-primary-hover px-6 py-2 rounded-xl text-sm font-semibold h-[38px] mt-auto shadow-sm"
           >
             Lọc dữ liệu
           </button>
         </div>
 
-        <button 
+        <button
           onClick={handleExportCSV}
           className="btn bg-success text-white hover:bg-emerald-600 px-6 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 h-[38px] shrink-0 shadow-sm"
         >
@@ -178,7 +177,7 @@ export default function AdminRevenuePage() {
                 {data.map((item) => (
                   <tr key={item.entry_id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 text-muted-foreground text-xs whitespace-nowrap">
-                      {new Date(item.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'})}
+                      {new Date(item.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-4 font-mono font-bold text-xs">TXN-{item.transaction_id}</td>
                     <td className="px-6 py-4">

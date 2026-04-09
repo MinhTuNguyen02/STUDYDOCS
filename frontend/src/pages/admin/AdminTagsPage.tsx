@@ -14,12 +14,12 @@ export default function AdminTagsPage() {
   const [tags, setTags] = useState<TagItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  
+
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTag, setEditingTag] = useState<TagItem | null>(null)
   const [formData, setFormData] = useState({ tag_name: '', slug: '' })
-  
+
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
@@ -124,12 +124,11 @@ export default function AdminTagsPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold font-heading">Quản lý Tags</h1>
-          <p className="text-muted-foreground text-sm mt-1">Quản lý các từ khoá (tags) dùng cho tài liệu.</p>
         </div>
-        
+
         <div className="flex items-center gap-3 w-full md:w-auto">
           <form onSubmit={handleSearch} className="flex-1 md:w-64">
-            <input 
+            <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -137,8 +136,8 @@ export default function AdminTagsPage() {
               className="w-full px-4 py-2 border border-border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none text-sm"
             />
           </form>
-          <button 
-            onClick={() => handleOpenModal()} 
+          <button
+            onClick={() => handleOpenModal()}
             className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm shrink-0"
           >
             <Plus className="w-5 h-5" /> Thêm Tag
@@ -189,13 +188,13 @@ export default function AdminTagsPage() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
-                            <button 
+                            <button
                               onClick={() => handleOpenModal(tag)}
                               className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors tooltip-trigger" title="Sửa"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => setDeleteConfirm(tag.tag_id)}
                               className="p-2 text-danger hover:bg-danger/10 rounded-lg transition-colors tooltip-trigger" title="Xóa"
                             >
@@ -225,12 +224,12 @@ export default function AdminTagsPage() {
                 Đóng
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Tên Tag <span className="text-danger">*</span></label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.tag_name}
                   onChange={handleNameChange}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
@@ -241,8 +240,8 @@ export default function AdminTagsPage() {
 
               <div>
                 <label className="block text-sm font-semibold mb-1.5 text-foreground">Slug (đường dẫn) <span className="text-danger">*</span></label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={formData.slug}
                   onChange={e => setFormData({ ...formData, slug: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-muted/50 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-mono text-sm"

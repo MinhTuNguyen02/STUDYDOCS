@@ -252,6 +252,7 @@ export class SellerService {
         status: 'PENDING',
         file_url: dto.storageKey ?? `docs/${dto.slug}.${extension.toLowerCase()}`,
         preview_url: dto.previewKey ?? `preview/${dto.slug}`,
+        review_url: (dto as any).reviewKey ?? null,
         file_size: Math.floor(dto.fileSizeMb * 1024 * 1024),
         file_extension: extension.toLowerCase(),
         file_hash: fileHash,

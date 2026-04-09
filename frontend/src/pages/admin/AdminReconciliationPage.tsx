@@ -54,9 +54,6 @@ export default function AdminReconciliationPage() {
           <h1 className="text-3xl font-bold font-heading flex items-center gap-3">
             <Scale className="w-8 h-8 text-primary" /> Đối soát Tài chính
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Kiểm tra phương trình kế toán kép (Double-entry Ledger) theo thời gian thực.
-          </p>
         </div>
         <div className="text-right">
           <p className="text-sm text-muted-foreground font-semibold">Cập nhật lần cuối</p>
@@ -109,7 +106,7 @@ export default function AdminReconciliationPage() {
           <div className="mt-4 pt-4 border-t border-border flex items-start gap-2 relative z-10">
             <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Tổng số tiền thực tế (Fiat) đang lưu trữ tại tài khoản ngân hàng của Nền tảng (Ví GATEWAY_POOL).
+              Tổng số tiền thực tế (Fiat) đang lưu trữ tại tài khoản ngân hàng của Nền tảng.
             </p>
           </div>
         </div>
@@ -156,7 +153,7 @@ export default function AdminReconciliationPage() {
             <div className="mt-4 pt-4 border-t border-border flex items-start gap-2 relative z-10">
               <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Tiền hoa hồng, phí dịch vụ đọng lại trên nền tảng (Ví SYSTEM_REVENUE) đang giữ.
+                Tiền hoa hồng, phí dịch vụ đọng lại trên nền tảng đang giữ.
               </p>
             </div>
           </div>

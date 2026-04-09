@@ -88,9 +88,9 @@ export default function AdminDisputesPage() {
   }
 
   const filteredDisputes = disputes.filter(d => {
-    const matchesSearch = d.reason.toLowerCase().includes(search.toLowerCase()) || 
-                          d.customer_profiles?.full_name.toLowerCase().includes(search.toLowerCase()) ||
-                          d.order_items?.documents?.title.toLowerCase().includes(search.toLowerCase())
+    const matchesSearch = d.reason.toLowerCase().includes(search.toLowerCase()) ||
+      d.customer_profiles?.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      d.order_items?.documents?.title.toLowerCase().includes(search.toLowerCase())
     const matchesStatus = filterStatus === 'ALL' || d.status === filterStatus
     return matchesSearch && matchesStatus
   })
@@ -112,11 +112,10 @@ export default function AdminDisputesPage() {
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <ShieldAlert className="w-6 h-6 text-orange-500" /> Quản lý Khiếu nại
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Xử lý các tranh chấp, báo cáo lỗi tài liệu và hoàn tiền.</p>
         </div>
-        
+
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <select 
+          <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="px-4 py-2 border border-border rounded-xl bg-background text-sm outline-none"
@@ -130,7 +129,7 @@ export default function AdminDisputesPage() {
 
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input 
+            <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -164,8 +163,8 @@ export default function AdminDisputesPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredDisputes.map((dispute) => (
-                  <tr 
-                    key={dispute.id} 
+                  <tr
+                    key={dispute.id}
                     onClick={() => handleOpenModal(dispute)}
                     className="hover:bg-muted/50 transition-colors cursor-pointer"
                   >
@@ -178,7 +177,7 @@ export default function AdminDisputesPage() {
                     <td className="px-6 py-4 text-orange-600 font-semibold">{dispute.reason}</td>
                     <td className="px-6 py-4">{getStatusBadge(dispute.status)}</td>
                     <td className="px-6 py-4 text-right text-muted-foreground text-xs">
-                      {new Date(dispute.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric'})}
+                      {new Date(dispute.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
                     </td>
                   </tr>
                 ))}
@@ -200,9 +199,9 @@ export default function AdminDisputesPage() {
                 Đóng
               </button>
             </div>
-            
+
             <div className="p-6 space-y-6">
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/30 p-4 rounded-xl border border-border">
                   <p className="text-xs text-muted-foreground font-semibold uppercase mb-1">Người khiếu nại</p>
@@ -234,10 +233,10 @@ export default function AdminDisputesPage() {
               {/* Resolution Form */}
               <div className="border-t border-border pt-6">
                 <label className="font-semibold mb-2 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground" /> 
+                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
                   Ghi chú Giải quyết / Phán quyết của BQT: <span className="text-danger">*</span>
                 </label>
-                <textarea 
+                <textarea
                   value={resolutionNote}
                   onChange={e => setResolutionNote(e.target.value)}
                   disabled={selectedDispute.status === 'RESOLVED' || selectedDispute.status === 'REJECTED'}

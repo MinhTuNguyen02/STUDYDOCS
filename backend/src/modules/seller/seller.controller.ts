@@ -58,7 +58,8 @@ export class SellerController {
         fileSizeMb: uploadResult.fileSize / (1024 * 1024),
         fileExtension: dto.fileExtension || uploadResult.extension,
         storageKey: uploadResult.fileKey,
-        previewKey: uploadResult.previewKey
+        previewKey: uploadResult.previewKey,
+        reviewKey: uploadResult.reviewKey   // full-page review PDF for staff
     };
 
     return this.sellerService.createDocument(user, mergedDto);

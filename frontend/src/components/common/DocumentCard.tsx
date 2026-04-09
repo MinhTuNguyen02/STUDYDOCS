@@ -33,10 +33,9 @@ export default function DocumentCard({ document }: Props) {
 
     try {
       const res = await libraryApi.requestDownload(Number(document.id))
-      const rawUrl = res.signedUrl || res.downloadUrl || res.data?.downloadUrl || res.data?.signedUrl
-      if (rawUrl) {
-        const fullUrl = rawUrl.startsWith('http') ? rawUrl : `/api${rawUrl}`
-        window.open(fullUrl, '_blank')
+
+      if (res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank')
         toast.success(res.message || 'Bắt đầu tải tài liệu')
       } else {
         toast.error('Đã xảy ra lỗi, không sinh được link.')

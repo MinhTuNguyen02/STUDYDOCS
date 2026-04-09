@@ -18,7 +18,8 @@ interface PendingDoc {
   pageCount: number;
   fileExtension: string;
   size: string;
-  previewSignedUrl?: string | null; // Short-lived signed URL for watermarked preview PDF
+  previewSignedUrl?: string | null;  // 30% watermarked preview (for buyers sample)
+  reviewSignedUrl?: string | null;   // 100% full-page review PDF (staff only, 2h TTL)
 }
 
 export default function AdminApprovalsPage() {
@@ -88,8 +89,8 @@ export default function AdminApprovalsPage() {
     }
   };
 
-  // Use the pre-signed preview URL returned by the backend
-  const getViewUrl = (doc: PendingDoc) => doc.previewSignedUrl || null;
+  // Prefer full review PDF if available, fall back to 30% preview
+  const getViewUrl = (doc: PendingDoc) => doc.reviewSignedUrl || doc.previewSignedUrl || null;
 
   const handleReviewOriginal = async (id: number) => {
     // Audit log will still be recorded on backend reliably without halting UX
@@ -342,7 +343,9 @@ export default function AdminApprovalsPage() {
                       />
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-muted-foreground">
-                          ⚠️ Đây là bản xem trước có watermark (30% đầu), không phải file gốc.
+                          {previewDoc.reviewSignedUrl
+                            ? '📄 Bản xem duyệt đầy đủ (chỉ dành cho nhân viên, xóa sau khi duyệt/từ chối).'
+                            : '⚠️ Bản xem trước có watermark (30% đầu). Nhân viên xem để tham khảo.'}
                         </p>
                         <a
                           href={viewUrl}
