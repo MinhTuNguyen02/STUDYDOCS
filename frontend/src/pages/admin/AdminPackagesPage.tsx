@@ -18,6 +18,7 @@ interface Package {
 export default function AdminPackagesPage() {
   const [packages, setPackages] = useState<Package[]>([])
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('ALL')
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -128,6 +129,30 @@ export default function AdminPackagesPage() {
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Hoạt động</option>
+              <option value="INACTIVE">Bị ẩn</option>
+            </select>
+            
+            {statusFilter !== 'ALL' && (
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+                title="Xóa bộ lọc"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-center py-12 text-muted-foreground animate-pulse">Đang tải danh sách packages...</div>
         ) : (
@@ -144,12 +169,12 @@ export default function AdminPackagesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {packages.length === 0 ? (
+                {packages.filter(p => statusFilter === 'ALL' || p.status === statusFilter).length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-8 text-muted-foreground">Chưa có gói bán nào.</td>
                   </tr>
                 ) : (
-                  packages.map((pkg) => (
+                  packages.filter(p => statusFilter === 'ALL' || p.status === statusFilter).map((pkg) => (
                     <tr key={pkg.package_id} className={`hover:bg-muted/50 transition-colors ${pkg.status !== 'ACTIVE' ? 'opacity-50 grayscale' : ''}`}>
                       <td className="px-6 py-4 font-medium text-muted-foreground">#{pkg.package_id}</td>
                       <td className="px-6 py-4 font-bold text-lg text-primary">{pkg.name}</td>

@@ -80,8 +80,15 @@ export class TagsService {
   }
 
   async remove(id: number) {
-    return this.prisma.tags.delete({
-      where: { tag_id: id }
-    });
+    try {
+      return await this.prisma.tags.delete({
+        where: { tag_id: id }
+      });
+    } catch (error: any) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException('Không thể xóa thẻ này. Hiện trạng đang có tài liệu sử dụng thẻ này.');
+      }
+      throw error;
+    }
   }
 }

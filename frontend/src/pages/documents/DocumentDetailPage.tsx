@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
+import { reviewsApi } from '@/api/reviews.api'
 import { wishlistApi } from '@/api/cart.api'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -10,7 +11,7 @@ import ReviewForm from '@/components/reviews/ReviewForm'
 import SellerReplyForm from '@/components/reviews/SellerReplyForm'
 import ReportModal from '@/components/common/ReportModal'
 import { formatPrice, formatFileSize, formatDate } from '@/utils/format'
-import { Star, ShoppingCart, Download, ShieldCheck, FileText, CheckCircle2, ChevronRight, CornerDownRight, Tag, AlertTriangle, Heart } from 'lucide-react'
+import { Star, ShoppingCart, Download, ShieldCheck, FileText, CheckCircle2, ChevronRight, CornerDownRight, Tag, AlertTriangle, Heart, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function DocumentDetailPage() {
@@ -27,6 +28,30 @@ export default function DocumentDetailPage() {
   const [addingToWishlist, setAddingToWishlist] = useState(false)
   const [isPurchased, setIsPurchased] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
+
+  const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
+
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này? Dữ liệu không thể khôi phục.')) return;
+    try {
+      await reviewsApi.deleteReview(reviewId);
+      toast.success('Đã xóa đánh giá');
+      fetchDocAndReviews();
+    } catch (err: any) {
+      toast.error('Lỗi: ' + (err?.response?.data?.message || err.message));
+    }
+  }
+
+  const handleDeleteReply = async (reviewId: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa phản hồi này?')) return;
+    try {
+      await reviewsApi.deleteReply(reviewId);
+      toast.success('Đã xóa phản hồi');
+      fetchDocAndReviews();
+    } catch (err: any) {
+      toast.error('Lỗi: ' + (err?.response?.data?.message || err.message));
+    }
+  }
 
   const fetchDocAndReviews = async () => {
     try {
@@ -129,7 +154,7 @@ export default function DocumentDetailPage() {
   const rating = doc.rating || 0
   const reviewCount = reviews.length || doc.reviewCount || doc.reviews?.length || 0
 
-  const hasReviewed = reviews.some((r: any) => r.buyer && Number(r.buyer.id) === Number(user?.customerId))
+  const hasReviewed = !!doc.hasReviewed || reviews.some((r: any) => r.buyer && Number(r.buyer.id) === Number(user?.customerId))
 
   return (
     <div className="bg-background text-foreground">
@@ -183,6 +208,7 @@ export default function DocumentDetailPage() {
                   <span className="text-success font-medium">Đã kiểm duyệt</span>
                 </div>
                 <div>{doc.downloadCount || 0} lượt tải</div>
+                <div>{doc.viewCount || 0} lượt xem</div>
               </div>
 
               {/* Preview Document */}
@@ -236,49 +262,77 @@ export default function DocumentDetailPage() {
                 <div className="mb-8 p-4 bg-primary/5 border border-primary/20 rounded-xl">
                   <p className="text-primary font-medium text-sm flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5" />
-                    Bạn đã gửi đánh giá cho tài liệu này. Cảm ơn phản hồi của bạn!
+                    Đánh giá của bạn đã được ghi nhận. Mỗi người dùng chỉ được đánh giá 1 lần cho mỗi tài liệu.
                   </p>
                 </div>
               )}
 
               {reviews.length > 0 ? (
                 <div className="space-y-6">
-                  {reviews.map((rev: any) => (
-                    <div key={rev.review_id || rev.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="font-semibold flex items-center gap-2">
-                          <div className="w-8 h-8 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold text-sm">
-                            {rev.buyer?.name?.charAt(0)?.toUpperCase() || 'U'}
-                          </div>
-                          {rev.buyer?.name || `Ẩn danh ${rev.buyer?.id || ''}`}
-                        </div>
-                        <span className="text-sm text-muted-foreground">{formatDate(rev.created_at || rev.createdAt)}</span>
-                      </div>
-                      <div className="flex text-yellow-400 mb-3">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className={`w-4 h-4 ${i < rev.rating ? 'fill-current' : 'text-gray-300 fill-transparent'}`} />
-                        ))}
-                      </div>
-                      <p className="text-foreground">{rev.comment}</p>
+                  {reviews.map((rev: any) => {
+                    const isMyReview = Number(rev.buyer?.id || rev.buyer_id) === Number(user?.customerId);
+                    const canDeleteReview = isStaff || isMyReview;
+                    const canDeleteReply = isStaff || isOwner;
 
-                      {/* Hiển thị phản hồi của người bán */}
-                      {(rev.sellerReply || rev.seller_reply) ? (
-                        <div className="mt-4 p-4 bg-muted/30 border border-border rounded-xl ml-4 relative">
-                          <CornerDownRight className="absolute -left-5 top-4 w-4 h-4 text-muted-foreground" />
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-semibold text-sm text-foreground flex items-center gap-1">
-                              Phản hồi của người bán
-                              {isOwner && <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">Bạn</span>}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{formatDate(rev.repliedAt || rev.replied_at)}</span>
+                    return (
+                      <div key={rev.review_id || rev.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-semibold flex items-center gap-2">
+                            <div className="w-8 h-8 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold text-sm">
+                              {rev.buyer?.name?.charAt(0)?.toUpperCase() || 'U'}
+                            </div>
+                            {rev.buyer?.name || `Ẩn danh ${rev.buyer?.id || ''}`}
                           </div>
-                          <p className="text-sm text-foreground/90 whitespace-pre-line">{rev.sellerReply || rev.seller_reply}</p>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{formatDate(rev.created_at || rev.createdAt)}</span>
+                            {canDeleteReview && (
+                              <button
+                                onClick={() => handleDeleteReview(rev.review_id || rev.id)}
+                                className="text-danger flex items-center gap-1 text-xs hover:bg-danger/10 px-2 py-1 rounded"
+                                title="Xóa đánh giá"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Xóa
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        isOwner && <SellerReplyForm reviewId={rev.review_id || rev.id} onSuccess={fetchDocAndReviews} />
-                      )}
-                    </div>
-                  ))}
+                        <div className="flex text-yellow-400 mb-3">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className={`w-4 h-4 ${i < rev.rating ? 'fill-current' : 'text-gray-300 fill-transparent'}`} />
+                          ))}
+                        </div>
+                        <p className="text-foreground">{rev.comment}</p>
+
+                        {/* Hiển thị phản hồi của người bán */}
+                        {(rev.sellerReply || rev.seller_reply) ? (
+                          <div className="mt-4 p-4 bg-muted/30 border border-border rounded-xl ml-4 relative">
+                            <CornerDownRight className="absolute -left-5 top-4 w-4 h-4 text-muted-foreground" />
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-semibold text-sm text-foreground flex items-center gap-1">
+                                Phản hồi của người bán
+                                {isOwner && <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">Bạn</span>}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-muted-foreground">{formatDate(rev.repliedAt || rev.replied_at)}</span>
+                                {canDeleteReply && (
+                                  <button
+                                    onClick={() => handleDeleteReply(rev.review_id || rev.id)}
+                                    className="text-danger flex items-center gap-1 text-xs hover:bg-danger/10 px-2 py-1 rounded"
+                                    title="Xóa phản hồi"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" /> Xóa phản hồi
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-sm text-foreground/90 whitespace-pre-line">{rev.sellerReply || rev.seller_reply}</p>
+                          </div>
+                        ) : (
+                          isOwner && <SellerReplyForm reviewId={rev.review_id || rev.id} onSuccess={fetchDocAndReviews} />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="text-muted-foreground">Chưa có đánh giá nào. {isPurchased ? 'Hãy là người đầu tiên đánh giá!' : 'Bạn cần mua tài liệu để đánh giá.'}</p>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { adminApi } from '@/api/admin.api'
 import { Settings, Save, Edit2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { formatDateTime } from '@/utils/format'
 
 interface Config {
   config_key: string
@@ -17,6 +18,7 @@ export default function AdminConfigsPage() {
   // Edit Mode state
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
+  const [editDescription, setEditDescription] = useState<string>('')
 
   // Create / Update Modal
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -41,6 +43,7 @@ export default function AdminConfigsPage() {
   const handleEditInline = (config: Config) => {
     setEditingKey(config.config_key)
     setEditValue(config.config_value)
+    setEditDescription(config.description || '')
   }
 
   const handleSaveInline = async (key: string) => {
@@ -50,7 +53,7 @@ export default function AdminConfigsPage() {
     }
 
     try {
-      await adminApi.updateConfig(key, { value: editValue })
+      await adminApi.updateConfig(key, { value: editValue, description: editDescription })
       toast.success('Cập nhật thành công')
       setEditingKey(null)
       fetchConfigs()
@@ -130,7 +133,7 @@ export default function AdminConfigsPage() {
                         {config.config_key}
                       </div>
                       <div className="text-xs text-muted-foreground mt-2">
-                        {new Date(config.updated_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        {formatDateTime(config.updated_at)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -148,8 +151,17 @@ export default function AdminConfigsPage() {
                         <span className="font-semibold text-primary">{config.config_value}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      <span className="text-xs">{config.description || '—'}</span>
+                    <td className="px-6 py-4 text-muted-foreground min-w-[200px]">
+                      {editingKey === config.config_key ? (
+                        <textarea
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          className="w-full min-h-[60px] px-3 py-1.5 border border-primary/50 bg-background rounded-lg focus:outline-none focus:ring-2 ring-primary/20 text-xs"
+                          placeholder="Mô tả tham số..."
+                        />
+                      ) : (
+                        <span className="text-xs">{config.description || '—'}</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right align-middle">
                       {editingKey === config.config_key ? (

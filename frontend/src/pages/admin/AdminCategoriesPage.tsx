@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { documentsApi } from '@/api/documents.api'
 import { adminApi } from '@/api/admin.api'
-import { Plus, Edit2, Trash2, ChevronRight, Folder, FolderOpen, AlertCircle, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, ChevronRight, Folder, FolderOpen, AlertCircle, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Category {
@@ -47,12 +47,13 @@ function CategoryRow({
   node, depth, isLast, parentLines,
   onEdit, onDelete, deleteConfirm, setDeleteConfirm, handleDelete
 }: CategoryRowProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const hasChildren = node.children.length > 0
 
   return (
     <>
-      <tr className="hover:bg-muted/40 transition-colors group">
+      <tr className="hover:bg-muted/40 transition-colors group"
+        onClick={() => setExpanded(v => !v)}>
         {/* Tree cell */}
         <td className="px-4 py-3">
           <div className="flex items-center" style={{ paddingLeft: `${depth * 22}px` }}>
@@ -127,7 +128,7 @@ function CategoryRow({
               <button onClick={() => setDeleteConfirm(null)} className="px-3 py-1 bg-muted text-foreground rounded-md text-xs font-bold hover:bg-gray-200 transition">Hủy</button>
             </div>
           ) : (
-            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center justify-end gap-1">
               <button
                 onClick={() => onEdit(node)}
                 className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
@@ -178,9 +179,29 @@ export default function AdminCategoriesPage() {
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null)
 
+  // Search
+  const [searchTerm, setSearchTerm] = useState('')
+
   useEffect(() => { fetchCategories() }, [])
 
-  const tree = useMemo(() => buildTree(categories), [categories])
+  const tree = useMemo(() => {
+    let list = categories;
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      const matchedIds = new Set<number>();
+      categories.forEach(c => {
+        if (c.name.toLowerCase().includes(lower) || c.slug.toLowerCase().includes(lower)) {
+          let current: Category | undefined = c;
+          while (current) {
+            matchedIds.add(current.category_id);
+            current = categories.find(p => p.category_id === current?.parent_id);
+          }
+        }
+      })
+      list = categories.filter(c => matchedIds.has(c.category_id));
+    }
+    return buildTree(list)
+  }, [categories, searchTerm])
 
   const fetchCategories = async () => {
     setLoading(true)
@@ -269,12 +290,24 @@ export default function AdminCategoriesPage() {
             <span className="font-semibold text-foreground">{categories.filter(c => c.parent_id).length}</span> con
           </p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm"
-        >
-          <Plus className="w-5 h-5" /> Thêm danh mục
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Tìm danh mục..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full sm:w-64 pl-9 pr-4 py-2 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            />
+          </div>
+          <button
+            onClick={() => handleOpenModal()}
+            className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm"
+          >
+            <Plus className="w-5 h-5 hidden sm:block" /> Thêm mới
+          </button>
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">

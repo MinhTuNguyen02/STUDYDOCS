@@ -1,22 +1,50 @@
 import { useState, useEffect } from 'react'
 import { sellerApi } from '@/api/seller.api'
 import { formatBalance, formatDate } from '@/utils/format'
-import { TrendingUp, Clock, CheckCircle2, DollarSign } from 'lucide-react'
+import { TrendingUp, Clock, CheckCircle2, DollarSign, XCircle, Search, Filter } from 'lucide-react'
 import SellerLayout from '@/components/layout/SellerLayout'
 
 export default function SellerSalesPage() {
   const [sales, setSales] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    sellerApi.getSalesHistory()
-      .then(res => setSales(res.data || res))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+  const [filter, setFilter] = useState('ALL')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0 })
+  const [totalEarnings, setTotalEarnings] = useState(0)
+  const [totalOrders, setTotalOrders] = useState(0)
 
-  const totalEarnings = sales.reduce((sum, s) => sum + Number(s.sellerEarning || s.seller_earning || 0), 0)
-  const totalOrders = sales.length
+  // Trigger search on typing with debounce
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(1)
+      fetchSales()
+    }, 500)
+    return () => clearTimeout(t)
+  }, [search, filter, page])
+
+  const fetchSales = async () => {
+    setLoading(true)
+    try {
+      const res = await sellerApi.getSalesHistory({
+        status: filter === 'ALL' ? undefined : filter,
+        search,
+        page,
+        limit: 10
+      })
+      setSales(res.data || res)
+      if (res.meta) setMeta(res.meta)
+      if (res.totalEarnings !== undefined) setTotalEarnings(res.totalEarnings)
+      if (res.totalOrders !== undefined) setTotalOrders(res.totalOrders)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
 
   return (
     <SellerLayout>
@@ -43,6 +71,31 @@ export default function SellerSalesPage() {
       </div>
 
       <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row gap-4 justify-between bg-muted/20">
+          <div className="relative max-w-sm w-full">
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm theo tên tài liệu..."
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-muted-foreground" />
+            <select
+              value={filter} onChange={(e) => setFilter(e.target.value)}
+              className="px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-background font-medium"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="HELD">Tạm giữ</option>
+              <option value="RELEASED">Đã cộng ví</option>
+              <option value="REFUNDED">Bị hoàn tiền</option>
+            </select>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -62,7 +115,7 @@ export default function SellerSalesPage() {
               ) : sales.length === 0 ? (
                 <tr><td colSpan={7} className="p-12 text-center text-muted-foreground">
                   <TrendingUp className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-                  <p>Chưa có giao dịch bán hàng nào.</p>
+                  <p>{search ? 'Không tìm thấy đơn hàng khớp với bộ lọc.' : 'Chưa có giao dịch bán hàng nào.'}</p>
                 </td></tr>
               ) : sales.map((sale: any) => (
                 <tr key={sale.id || sale.order_item_id} className="hover:bg-muted/30 transition-colors">
@@ -70,9 +123,19 @@ export default function SellerSalesPage() {
                   <td className="p-4 max-w-xs truncate font-medium" title={sale.document?.title}>{sale.document?.title}</td>
                   <td className="p-4 font-medium">{formatBalance(sale.unitPrice || sale.unit_price)}</td>
                   <td className="p-4 text-warning font-medium">-{formatBalance(sale.commissionFee || sale.commission_fee || 0)}</td>
-                  <td className="p-4 font-bold text-success">+{formatBalance(sale.sellerEarning || sale.seller_earning || 0)}</td>
+                  <td className="p-4 font-bold text-success">
+                    {sale.status === 'REFUNDED' ? (
+                      <span className="text-danger line-through opacity-70">+{formatBalance(sale.sellerEarning || sale.seller_earning || 0)}</span>
+                    ) : (
+                      `+${formatBalance(sale.sellerEarning || sale.seller_earning || 0)}`
+                    )}
+                  </td>
                   <td className="p-4">
-                    {(sale.status === 'HELD' || sale.fund_status === 'HELD') ? (
+                    {sale.status === 'REFUNDED' ? (
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-danger bg-danger/10 px-2 py-1 rounded-md w-fit">
+                        <XCircle className="w-3.5 h-3.5" /> Bị hoàn tiền
+                      </span>
+                    ) : (sale.status === 'HELD' || sale.fund_status === 'HELD') ? (
                       <span className="flex items-center gap-1.5 text-xs font-bold text-warning bg-warning/10 px-2 py-1 rounded-md w-fit">
                         <Clock className="w-3.5 h-3.5" /> Tạm giữ
                       </span>
@@ -88,6 +151,33 @@ export default function SellerSalesPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
+        {meta.total > meta.limit && (
+          <div className="p-4 border-t border-border flex justify-between items-center bg-muted/10">
+            <span className="text-sm text-muted-foreground">
+              Hiển thị tối đa {meta.limit} kết quả (Tổng cộng: {meta.total})
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg disabled:opacity-50 hover:bg-muted"
+              >
+                Trang trước
+              </button>
+              <span className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg">
+                Trang {page} / {Math.ceil(meta.total / meta.limit)}
+              </span>
+              <button
+                disabled={page * meta.limit >= meta.total}
+                onClick={() => setPage(page + 1)}
+                className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg disabled:opacity-50 hover:bg-muted"
+              >
+                Trang sau
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </SellerLayout>
   )

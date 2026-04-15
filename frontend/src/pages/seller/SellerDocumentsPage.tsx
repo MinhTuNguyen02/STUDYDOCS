@@ -10,16 +10,29 @@ export default function SellerDocumentsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('ALL')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0 })
 
+  // Trigger search on typing with debounce
   useEffect(() => {
-    fetchDocs()
-  }, [filter])
+    const t = setTimeout(() => {
+      setPage(1)
+      fetchDocs()
+    }, 500)
+    return () => clearTimeout(t)
+  }, [search, filter, page])
 
   const fetchDocs = async () => {
     setLoading(true)
     try {
-      const res = await sellerApi.getMyDocuments(filter)
+      const res = await sellerApi.getMyDocuments({
+        status: filter === 'ALL' ? undefined : filter,
+        search,
+        page,
+        limit: 10
+      })
       setDocuments(res.data || res)
+      if (res.meta) setMeta(res.meta)
     } catch (err) {
       console.error(err)
     } finally {
@@ -36,9 +49,7 @@ export default function SellerDocumentsPage() {
     }
   }
 
-  const filtered = documents.filter(doc =>
-    !search || doc.title?.toLowerCase().includes(search.toLowerCase())
-  )
+
 
   return (
     <SellerLayout>
@@ -93,12 +104,12 @@ export default function SellerDocumentsPage() {
             <tbody className="divide-y divide-border">
               {loading ? (
                 <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Đang tải...</td></tr>
-              ) : filtered.length === 0 ? (
+              ) : documents.length === 0 ? (
                 <tr><td colSpan={7} className="p-12 text-center text-muted-foreground">
                   <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground/40" />
                   <p>{search ? 'Không tìm thấy tài liệu khớp.' : 'Chưa có tài liệu nào.'}</p>
                 </td></tr>
-              ) : filtered.map((doc: any) => (
+              ) : documents.map((doc: any) => (
                 <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
                   <td className="p-4 font-medium max-w-xs truncate" title={doc.title}>{doc.title}</td>
                   <td className="p-4 font-bold text-primary">{formatBalance(doc.price)}</td>
@@ -119,6 +130,33 @@ export default function SellerDocumentsPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
+        {meta.total > meta.limit && (
+          <div className="p-4 border-t border-border flex justify-between items-center bg-muted/10">
+            <span className="text-sm text-muted-foreground">
+              Hiển thị tối đa {meta.limit} tài liệu (Tổng cộng: {meta.total})
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg disabled:opacity-50 hover:bg-muted"
+              >
+                Trang trước
+              </button>
+              <span className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg">
+                Trang {page} / {Math.ceil(meta.total / meta.limit)}
+              </span>
+              <button
+                disabled={page * meta.limit >= meta.total}
+                onClick={() => setPage(page + 1)}
+                className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg disabled:opacity-50 hover:bg-muted"
+              >
+                Trang sau
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </SellerLayout>
   )

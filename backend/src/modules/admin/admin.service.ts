@@ -31,37 +31,151 @@ export class AdminService {
     return 'CUSTOMER';
   }
 
-  async getDashboard() {
+  async getDashboard(params?: { startDate?: string; endDate?: string }) {
     const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
 
-    const [pendingApprovals, totalDocuments, ordersToday, revenueAgg] = await Promise.all([
+    let startOfDay, endOfDay;
+    if (params?.startDate && params?.endDate) {
+      startOfDay = new Date(params.startDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      endOfDay = new Date(params.endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+    } else {
+      // Default to last 7 days
+      startOfDay = new Date(now);
+      startOfDay.setDate(startOfDay.getDate() - 6);
+      startOfDay.setHours(0, 0, 0, 0);
+      endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+    }
+
+    const [pendingApprovals, totalDocuments, payments, orders, documents] = await Promise.all([
       this.prisma.documents.count({ where: { status: 'PENDING' } }),
       this.prisma.documents.count(),
-      this.prisma.orders.count({
-        where: {
-          created_at: {
-            gte: startOfDay,
-            lte: endOfDay
-          }
-        }
+      this.prisma.payments.findMany({
+        where: { status: 'COMPLETED', created_at: { gte: startOfDay, lte: endOfDay } },
+        select: { amount: true, created_at: true }
       }),
-      this.prisma.payments.aggregate({
-        _sum: { amount: true },
-        where: {
-          status: 'COMPLETED',
-        }
+      this.prisma.orders.findMany({
+        where: { status: 'PAID', created_at: { gte: startOfDay, lte: endOfDay } },
+        select: { created_at: true }
+      }),
+      this.prisma.documents.findMany({
+        where: { created_at: { gte: startOfDay, lte: endOfDay } },
+        select: { created_at: true }
       })
     ]);
+
+    const revenueRange = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const ordersRange = orders.length;
+
+    // Build chart data
+    const chartMap = new Map<string, { date: string; revenue: number; orders: number; documents: number }>();
+    let current = new Date(startOfDay);
+    while (current <= endOfDay) {
+      // format YYYY-MM-DD
+      const dateStr = current.toISOString().split('T')[0];
+      chartMap.set(dateStr, { date: dateStr, revenue: 0, orders: 0, documents: 0 });
+      current.setDate(current.getDate() + 1);
+    }
+
+    payments.forEach(p => {
+      if (!p.created_at) return;
+      const dateStr = p.created_at.toISOString().split('T')[0];
+      if (chartMap.has(dateStr)) chartMap.get(dateStr)!.revenue += Number(p.amount);
+    });
+    orders.forEach(o => {
+      if (!o.created_at) return;
+      const dateStr = o.created_at.toISOString().split('T')[0];
+      if (chartMap.has(dateStr)) chartMap.get(dateStr)!.orders += 1;
+    });
+    documents.forEach(d => {
+      const dateStr = d.created_at.toISOString().split('T')[0];
+      if (chartMap.has(dateStr)) chartMap.get(dateStr)!.documents += 1;
+    });
+
+    const chartData = Array.from(chartMap.values());
+
+    // Top Uploaders
+    const topUploadersGroup = await this.prisma.documents.groupBy({
+      by: ['seller_id'],
+      _count: { document_id: true },
+      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      orderBy: { _count: { document_id: 'desc' } },
+      take: 5
+    });
+
+    // Top Sellers by Quantity
+    const topSellersGroup = await this.prisma.order_items.groupBy({
+      by: ['seller_id'],
+      _count: { order_item_id: true },
+      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      orderBy: { _count: { order_item_id: 'desc' } },
+      take: 5
+    });
+
+    // Top Sellers by Revenue
+    const topRevenueGroup = await this.prisma.order_items.groupBy({
+      by: ['seller_id'],
+      _sum: { seller_earning: true },
+      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      orderBy: { _sum: { seller_earning: 'desc' } },
+      take: 5
+    });
+
+    // Fetch user profiles for the tops
+    const sellerIds = new Set([
+      ...topUploadersGroup.map(u => u.seller_id),
+      ...topSellersGroup.map(s => s.seller_id),
+      ...topRevenueGroup.map(r => r.seller_id)
+    ]);
+    const profiles = await this.prisma.customer_profiles.findMany({
+      where: { customer_id: { in: Array.from(sellerIds) } },
+      select: { customer_id: true, full_name: true }
+    });
+    const profileMap = new Map(profiles.map(p => [p.customer_id, p.full_name]));
+
+    const topUploaders = topUploadersGroup.map(u => ({ id: u.seller_id, name: profileMap.get(u.seller_id), count: u._count.document_id }));
+    const topSellers = topSellersGroup.map(s => ({ id: s.seller_id, name: profileMap.get(s.seller_id), count: s._count.order_item_id }));
+    const topRevenueSellers = topRevenueGroup.map(r => ({ id: r.seller_id, name: profileMap.get(r.seller_id), revenue: Number(r._sum.seller_earning || 0) }));
+
+    // Top Documents
+    const topDocsOrderedGroup = await this.prisma.order_items.groupBy({
+      by: ['document_id'],
+      _count: { order_item_id: true },
+      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      orderBy: { _count: { order_item_id: 'desc' } },
+      take: 5
+    });
+    const topDocsDownloadedGroup = await this.prisma.download_history.groupBy({
+      by: ['document_id'],
+      _count: { id: true },
+      where: { download_at: { gte: startOfDay, lte: endOfDay } },
+      orderBy: { _count: { id: 'desc' } },
+      take: 5
+    });
+
+    const docIds = new Set([...topDocsOrderedGroup.map(d => d.document_id), ...topDocsDownloadedGroup.map(d => d.document_id)]);
+    const docsMeta = await this.prisma.documents.findMany({
+      where: { document_id: { in: Array.from(docIds) } },
+      select: { document_id: true, title: true }
+    });
+    const docMap = new Map(docsMeta.map(d => [d.document_id, d.title]));
+
+    const topBoughtDocs = topDocsOrderedGroup.map(d => ({ id: d.document_id, title: docMap.get(d.document_id), count: d._count.order_item_id }));
+    const topDownloadedDocs = topDocsDownloadedGroup.map(d => ({ id: d.document_id, title: docMap.get(d.document_id), count: d._count.id }));
 
     return {
       pendingApprovals,
       totalDocuments,
-      ordersToday,
-      revenueToday: Number((revenueAgg._sum as any).amount ?? 0)
+      ordersRange,
+      revenueRange,
+      chartData,
+      topUploaders,
+      topSellers,
+      topRevenueSellers,
+      topBoughtDocs,
+      topDownloadedDocs
     };
   }
 
@@ -244,7 +358,15 @@ export class AdminService {
         status: filters.status && filters.status !== 'ALL' ? (filters.status as any) : undefined,
         category_id: filters.categoryId && filters.categoryId !== 'ALL' ? Number(filters.categoryId) : undefined,
         OR: filters.search
-          ? [{ title: { contains: filters.search, mode: 'insensitive' } }, { slug: { contains: filters.search, mode: 'insensitive' } }]
+          ? [
+            { title: { contains: filters.search, mode: 'insensitive' } },
+            { slug: { contains: filters.search, mode: 'insensitive' } },
+            {
+              customer_profiles: {
+                full_name: { contains: filters.search, mode: 'insensitive' }
+              }
+            }
+          ]
           : undefined
       },
       orderBy: { created_at: 'desc' },

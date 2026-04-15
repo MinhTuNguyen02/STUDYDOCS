@@ -12,7 +12,7 @@ const getCategoryIconAndColor = (name: string) => {
   if (n.includes('khoa học') || n.includes('lý') || n.includes('hóa')) return { icon: Microscope, color: 'bg-pink-100 text-pink-700' }
   if (n.includes('sử') || n.includes('địa')) return { icon: Globe, color: 'bg-orange-100 text-orange-700' }
   if (n.includes('nghệ thuật') || n.includes('nhạc')) return { icon: Palette, color: 'bg-yellow-100 text-yellow-700' }
-  if (n.includes('tin học') || n.includes('cntt') || n.includes('lập trình')) return { icon: Code, color: 'bg-indigo-100 text-indigo-700' }
+  if (n.includes('tin học') || n.includes('công nghệ thông tin') || n.includes('lập trình')) return { icon: Code, color: 'bg-indigo-100 text-indigo-700' }
   return { icon: GraduationCap, color: 'bg-red-100 text-red-700' }
 }
 

@@ -11,8 +11,8 @@ export const sellerApi = {
     return res.data
   },
   
-  getMyDocuments: async (status?: string) => {
-    const res = await api.get('/seller/documents', { params: { status: status === 'ALL' ? undefined : status } })
+  getMyDocuments: async (params?: { status?: string, search?: string, page?: number, limit?: number }) => {
+    const res = await api.get('/seller/documents', { params })
     return res.data
   },
   
@@ -28,8 +28,8 @@ export const sellerApi = {
     return res.data
   },
   
-  getSalesHistory: async () => {
-    const res = await api.get('/seller/sales/order-items')
+  getSalesHistory: async (params?: { status?: string, search?: string, page?: number, limit?: number }) => {
+    const res = await api.get('/seller/sales/order-items', { params })
     return res.data
   }
 }

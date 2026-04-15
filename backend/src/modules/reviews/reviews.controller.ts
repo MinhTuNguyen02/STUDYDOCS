@@ -1,5 +1,5 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Delete, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
@@ -10,7 +10,7 @@ import { UpsertReviewDto } from './dto/upsert-review.dto';
 @ApiTags('Interactions (Reviews, Reports, Disputes)')
 @Controller('reviews')
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+  constructor(private readonly reviewsService: ReviewsService) { }
 
   @Get('documents/:documentId')
   listByDocument(@Param('documentId') documentId: string) {
@@ -31,5 +31,16 @@ export class ReviewsController {
     @Body('reply') reply: string
   ) {
     return this.reviewsService.replyToReview(user, Number(id), reply);
+  }
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
+  deleteReview(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.reviewsService.deleteReview(user, Number(id));
+  }
+
+  @Delete(':id/reply')
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
+  deleteReply(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.reviewsService.deleteReply(user, Number(id));
   }
 }

@@ -22,6 +22,7 @@
     "test:e2e:part4": "jest --config jest.config.js --runInBand --verbose --testPathPatterns=04-interaction"
   },
   "dependencies": {
+    "@nestjs-modules/mailer": "^2.3.4",
     "@nestjs/common": "^10.4.15",
     "@nestjs/config": "^3.3.0",
     "@nestjs/core": "^10.4.15",
@@ -47,6 +48,7 @@
     "helmet": "^8.1.0",
     "minio": "^8.0.7",
     "multer": "^2.1.1",
+    "nodemailer": "^8.0.5",
     "otplib": "^13.4.0",
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
@@ -67,6 +69,7 @@
     "@nestjs/testing": "^10.4.15",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.13.10",
+    "@types/nodemailer": "^8.0.0",
     "@types/otplib": "^7.0.0",
     "@types/qrcode": "^1.5.6",
     "@types/supertest": "^7.2.0",

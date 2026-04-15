@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '@/api/admin.api'
-import { formatBalance, formatDate } from '@/utils/format'
+import { formatBalance, formatDateTime, toVNDateString } from '@/utils/format'
 import { LineChart, DollarSign, Calendar, Download, TrendingUp } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { usePagination } from '@/hooks/usePagination'
+import Pagination from '@/components/common/Pagination'
 
 // Chống lỗi missing moment do import
 interface RevenueEntry {
@@ -26,9 +28,9 @@ export default function AdminRevenuePage() {
   const [startDate, setStartDate] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() - 30)
-    return d.toISOString().split('T')[0]
+    return toVNDateString(d)
   })
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
+  const [endDate, setEndDate] = useState(() => toVNDateString())
 
   useEffect(() => {
     fetchRevenue()
@@ -52,25 +54,32 @@ export default function AdminRevenuePage() {
       return
     }
 
-    // Prepare CSV Content
-    const headers = ['Mã Giao Dịch', 'Thời Gian', 'Loại', 'Mô Tả', 'Thu Nhập (Credit)', 'Khấu Trừ (Debit)', 'Số Dư Cuối']
+    const headers = ['Mã Giao Dịch', 'Thời Gian', 'Loại', 'Mô Tả', 'Thu Nhập (Credit)', 'Khấu Trừ (Debit)']
+
     const csvContent = [
       headers.join(','),
-      ...data.map(item => [
-        `TXN-${item.transaction_id}`,
-        new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19),
-        item.ledger_transactions.transaction_type,
-        `"${item.ledger_transactions.description}"`,
-        Number(item.credit_amount),
-        Number(item.debit_amount)
-      ].join(','))
+      ...data.map(item => {
+        // Xử lý escape dấu ngoặc kép an toàn cho chuẩn CSV
+        const safeDescription = item.ledger_transactions.description
+          ? item.ledger_transactions.description.replace(/"/g, '""')
+          : '';
+
+        return [
+          `TXN-${item.transaction_id}`,
+          new Date(item.created_at).toISOString().replace('T', ' ').substring(0, 19),
+          item.ledger_transactions.transaction_type,
+          `"${safeDescription}"`, // Bọc chuỗi đã được escape an toàn
+          Number(item.credit_amount),
+          Number(item.debit_amount)
+        ].join(',')
+      })
     ].join('\n')
 
     // Download CSV
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.setAttribute('download', `bao_cao_doanh_thu_${new Date().toISOString().replace(/[:\-T]/g, '').slice(0, 8)}.csv`)
+    link.setAttribute('download', `bao_cao_doanh_thu_${toVNDateString().replace(/-/g, '')}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -79,6 +88,8 @@ export default function AdminRevenuePage() {
   const totalCredit = data.reduce((acc, cur) => acc + Number(cur.credit_amount), 0)
   const totalDebit = data.reduce((acc, cur) => acc + Number(cur.debit_amount), 0)
   const netRevenue = totalCredit - totalDebit
+
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(data, 20);
 
   return (
     <div>
@@ -162,7 +173,7 @@ export default function AdminRevenuePage() {
         ) : data.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">Không có dữ liệu trong khoảng thời gian này.</div>
         ) : (
-          <div className="overflow-x-auto max-h-[500px]">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs sticky top-0 z-10 shadow-sm leading-relaxed">
                 <tr>
@@ -174,10 +185,10 @@ export default function AdminRevenuePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {data.map((item) => (
+                {paginatedItems.map((item) => (
                   <tr key={item.entry_id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4 text-muted-foreground text-xs whitespace-nowrap">
-                      {new Date(item.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      {formatDateTime(item.created_at)}
                     </td>
                     <td className="px-6 py-4 font-mono font-bold text-xs">TXN-{item.transaction_id}</td>
                     <td className="px-6 py-4">
@@ -197,6 +208,7 @@ export default function AdminRevenuePage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
         )}
       </div>
 

@@ -3,26 +3,43 @@ import { useAuthStore } from '@/store/authStore'
 import { usersApi } from '@/api/users.api'
 import { authApi } from '@/api/auth.api'
 import { walletsApi } from '@/api/wallets.api'
-import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar } from 'lucide-react'
+import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import QRCode from 'react-qr-code'
 import { formatBalance, formatDate } from '@/utils/format'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 
 export default function ProfilePage() {
   const { user } = useAuthStore()
   const [profile, setProfile] = useState<any>(null)
 
+  const [isEditingName, setIsEditingName] = useState(false)
+
   // Wallets
   const [wallets, setWallets] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const [withdrawals, setWithdrawals] = useState<any[]>([])
 
+  // URL params
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabQuery = searchParams.get('tab')?.toUpperCase()
+
   const [loading, setLoading] = useState(true)
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'INFO' | 'PASSWORD' | 'WALLET' | '2FA'>('INFO')
+  const [activeTab, setActiveTab] = useState<'INFO' | 'PASSWORD' | 'WALLET' | '2FA'>((tabQuery as any) || 'INFO')
+
+  useEffect(() => {
+    if (tabQuery && ['INFO', 'PASSWORD', 'WALLET', '2FA'].includes(tabQuery)) {
+      setActiveTab(tabQuery as any)
+    }
+  }, [tabQuery])
+
+  const handleTabChange = (tab: 'INFO' | 'PASSWORD' | 'WALLET' | '2FA') => {
+    setActiveTab(tab)
+    setSearchParams({ tab: tab.toLowerCase() })
+  }
 
   // Forms
   const [fullName, setFullName] = useState('')
@@ -38,6 +55,10 @@ export default function ProfilePage() {
   const [twoFaCode, setTwoFaCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
+
+  // Wallet Filters
+  const [txWalletType, setTxWalletType] = useState<string>('ALL') // 'ALL' | 'PAYMENT' | 'REVENUE'
+  const [txSign, setTxSign] = useState<string>('ALL') // 'ALL' | 'CREDIT' | 'DEBIT'
 
   useEffect(() => {
     fetchData()
@@ -69,10 +90,13 @@ export default function ProfilePage() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isEditingName) return
+
     setIsSubmitting(true)
     try {
       await usersApi.updateProfile({ fullName })
       toast.success('Cập nhật thông tin thành công')
+      setIsEditingName(false)
       fetchData()
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Có lỗi xảy ra')
@@ -185,9 +209,9 @@ export default function ProfilePage() {
           </span>
         </div>
 
-        <nav className="bg-card border border-border rounded-2xl p-2 shadow-sm flex flex-col">
+        <nav className="bg-card border border-border rounded-2xl p-2 shadow-sm flex flex-col gap-1">
           <button
-            onClick={() => setActiveTab('INFO')}
+            onClick={() => handleTabChange('INFO')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'INFO' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
               }`}
           >
@@ -196,7 +220,7 @@ export default function ProfilePage() {
 
           {!isStaff && (
             <button
-              onClick={() => setActiveTab('WALLET')}
+              onClick={() => handleTabChange('WALLET')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'WALLET' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
                 }`}
             >
@@ -206,7 +230,7 @@ export default function ProfilePage() {
 
           {!isGoogleLogin && (
             <button
-              onClick={() => setActiveTab('PASSWORD')}
+              onClick={() => handleTabChange('PASSWORD')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'PASSWORD' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
                 }`}
             >
@@ -238,7 +262,7 @@ export default function ProfilePage() {
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-foreground flex items-center gap-2"><Calendar className="w-4 h-4" /> Ngày tham gia</label>
                     <div className="px-4 py-3 bg-muted rounded-xl text-muted-foreground cursor-not-allowed">
-                      {new Date(profile?.accounts?.created_at || new Date()).toLocaleDateString('vi-VN')}
+                      {formatDate(profile?.accounts?.created_at)}
                     </div>
                   </div>
 
@@ -269,17 +293,50 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-foreground">Họ và Tên</label>
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                    />
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                        <UserIcon className="w-4 h-4" /> Họ và Tên
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isEditingName) setFullName(profile?.full_name || ''); // Reset nếu hủy
+                          setIsEditingName(!isEditingName);
+                        }}
+                        className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
+                      >
+                        {isEditingName ? (
+                          <><X className="w-3 h-3" /> Hủy</>
+                        ) : (
+                          <><Edit3 className="w-3 h-3" /> Chỉnh sửa</>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        disabled={!isEditingName}
+                        required
+                        className={`w-full px-4 py-3 border rounded-xl transition-all outline-none ${isEditingName
+                          ? 'bg-background border-primary ring-2 ring-primary/10 shadow-sm'
+                          : 'bg-muted border-border text-muted-foreground cursor-not-allowed'
+                          }`}
+                      />
+                    </div>
                   </div>
 
-                  <button type="submit" disabled={isSubmitting} className="w-full btn bg-primary text-white hover:bg-primary-hover rounded-xl py-3 flex justify-center items-center gap-2 mt-4 text-base shadow-lg cursor-pointer">
+                  {/* Nút lưu chỉ hiện hoặc có hiệu lực khi đang ở chế độ chỉnh sửa */}
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !isEditingName}
+                    className={`w-full btn rounded-xl py-3 flex justify-center items-center gap-2 mt-4 text-base shadow-lg transition-all ${isEditingName
+                      ? 'bg-primary text-white hover:bg-primary-hover cursor-pointer'
+                      : 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
+                      }`}
+                  >
                     <Save className="w-5 h-5" />
                     {isSubmitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}
                   </button>
@@ -298,7 +355,7 @@ export default function ProfilePage() {
                         <span className="text-muted-foreground">lượt</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Làm mới vào ngày {profile?.free_downloads_reset_at ? new Date(profile.free_downloads_reset_at).toLocaleDateString('vi-VN') : 'mỗi tháng'}.
+                        Làm mới vào ngày {profile?.free_downloads_reset_at ? formatDate(profile.free_downloads_reset_at) : 'mỗi tháng'}.
                       </p>
                     </div>
                     <div className="bg-muted/50 border border-border rounded-2xl p-6">
@@ -316,7 +373,7 @@ export default function ProfilePage() {
                             </div>
                             <div className="flex justify-between text-sm mt-1">
                               <span className="text-muted-foreground">Hết hạn:</span>
-                              <span className="font-semibold">{new Date(activePackage.expires_at).toLocaleDateString('vi-VN')}</span>
+                              <span className="font-semibold">{formatDate(activePackage.expires_at)}</span>
                             </div>
                           </div>
                           <Link to="/packages">
@@ -428,13 +485,59 @@ export default function ProfilePage() {
 
               {/* Transactions */}
               <div className="border border-border rounded-1xl shadow-sm mt-8 overflow-hidden rounded-2xl">
-                <div className="p-4 border-b border-border bg-muted/30">
+                <div className="p-4 border-b border-border bg-muted/30 flex justify-between items-center flex-wrap gap-4">
                   <h3 className="font-bold flex items-center gap-2"><History className="w-5 h-5 text-primary" /> Lịch sử giao dịch</h3>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={txWalletType}
+                      onChange={(e) => setTxWalletType(e.target.value)}
+                      className="px-3 py-1.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary font-medium"
+                    >
+                      <option value="ALL">Tất cả ví</option>
+                      <option value="PAYMENT">Ví thanh toán</option>
+                      <option value="REVENUE">Ví doanh thu</option>
+                    </select>
+
+                    <select
+                      value={txSign}
+                      onChange={(e) => setTxSign(e.target.value)}
+                      className="px-3 py-1.5 bg-background border border-border rounded-lg text-sm outline-none focus:border-primary font-medium"
+                    >
+                      <option value="ALL">Tất cả loại giao dịch</option>
+                      <option value="CREDIT">Tiền vào (+)</option>
+                      <option value="DEBIT">Tiền ra (-)</option>
+                    </select>
+
+                    {(txWalletType !== 'ALL' || txSign !== 'ALL') && (
+                      <button 
+                        onClick={() => { setTxWalletType('ALL'); setTxSign('ALL'); }}
+                        className="text-danger flex items-center gap-1 text-sm font-semibold hover:bg-danger/10 px-2 py-1.5 rounded-lg transition-colors"
+                        title="Xóa lọc"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
-                  {transactions.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground text-sm">Chưa có giao dịch.</div>
-                  ) : (
+                  {(() => {
+                    const filteredTransactions = transactions.filter(tx => {
+                      let wMatch = true
+                      let sMatch = true
+                      if (txWalletType !== 'ALL') wMatch = (tx.walletType || tx.wallet_type) === txWalletType
+                      if (txSign !== 'ALL') {
+                        const isCredit = !!tx.credit && tx.credit > 0
+                        if (txSign === 'CREDIT') sMatch = isCredit
+                        if (txSign === 'DEBIT') sMatch = !isCredit
+                      }
+                      return wMatch && sMatch
+                    })
+
+                    if (filteredTransactions.length === 0) {
+                      return <div className="text-center py-12 text-muted-foreground text-sm">Không tìm thấy giao dịch nào phù hợp.</div>
+                    }
+
+                    return (
                     <table className="w-full text-left">
                       <thead>
                         <tr className="bg-muted/50 text-muted-foreground text-xs border-b border-border uppercase tracking-wide">
@@ -445,7 +548,7 @@ export default function ProfilePage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {transactions.map((tx: any, idx) => {
+                        {filteredTransactions.map((tx: any, idx) => {
                           const isCredit = !!tx.credit && tx.credit > 0
                           const amount = isCredit ? tx.credit : tx.debit
                           return (
@@ -467,7 +570,8 @@ export default function ProfilePage() {
                         })}
                       </tbody>
                     </table>
-                  )}
+                    )
+                  })()}
                 </div>
               </div>
             </div>

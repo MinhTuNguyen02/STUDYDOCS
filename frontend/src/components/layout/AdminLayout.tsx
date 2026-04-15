@@ -99,17 +99,19 @@ export default function AdminLayout({ children }: Props) {
           </button>
         </div>
 
-        <div className="p-4 border-b border-border">
+        <Link to="/admin/profile" className="block p-4 border-b border-border hover:bg-muted transition-colors cursor-pointer" onClick={() => setIsSidebarOpen(false)}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
               {user?.fullName?.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
               <p className="font-semibold text-sm truncate">{user?.fullName}</p>
-              <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{role}</p>
+              <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1">
+                {role}
+              </p>
             </div>
           </div>
-        </div>
+        </Link>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6 custom-scrollbar">
           {filteredGroups.map((group, groupIndex) => (

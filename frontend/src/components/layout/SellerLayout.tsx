@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, TrendingUp, Upload } from 'lucide-react'
+import { LayoutDashboard, FileText, TrendingUp, Wallet } from 'lucide-react'
 
 interface Props {
   children: ReactNode
@@ -13,6 +13,7 @@ export default function SellerLayout({ children }: Props) {
     { name: 'Tổng quan', path: '/seller/dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { name: 'Tài liệu của tôi', path: '/seller/documents', icon: <FileText className="w-5 h-5" /> },
     { name: 'Lịch sử đơn hàng', path: '/seller/sales', icon: <TrendingUp className="w-5 h-5" /> },
+    { name: 'Quản lý ví tín dụng', path: '/profile?tab=wallet', icon: <Wallet className="w-5 h-5" /> },
   ]
 
   return (

@@ -7,7 +7,7 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(user: AuthUser) {
+  async findAll(user: AuthUser, status?: string, pageStr?: string, limitStr?: string) {
     const isInternalRole = user.roleNames.some((role) => ['admin', 'mod', 'accountant'].includes(role));
 
     const where = isInternalRole
@@ -16,26 +16,42 @@ export class OrdersService {
           buyer_id: user.customerId ?? -1
         };
 
-    const orders = await this.prisma.orders.findMany({
-      where,
-      orderBy: { order_id: 'desc' },
-      include: {
-        customer_profiles: true,
-        order_items: {
-          include: {
-            documents: {
-              select: {
-                document_id: true,
-                title: true,
-                slug: true
+    const whereConfig: any = { ...where };
+    if (status && status !== 'ALL') {
+      whereConfig.status = status;
+    }
+
+    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
+    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const skip = (page - 1) * limit;
+
+    const [total, orders] = await Promise.all([
+      this.prisma.orders.count({ where: whereConfig }),
+      this.prisma.orders.findMany({
+        where: whereConfig,
+        skip,
+        take: limit,
+        orderBy: { order_id: 'desc' },
+        include: {
+          customer_profiles: true,
+          order_items: {
+            include: {
+              documents: {
+                select: {
+                  document_id: true,
+                  title: true,
+                  slug: true
+                }
               }
             }
           }
         }
-      }
-    });
+      })
+    ]);
 
-    return toJsonSafe(
+    return {
+      meta: { page, limit, total },
+      data: toJsonSafe(
       orders.map((order) => ({
         id: order.order_id,
         buyerId: order.buyer_id,
@@ -54,6 +70,7 @@ export class OrdersService {
           }
         }))
       }))
-    );
+      )
+    };
   }
 }

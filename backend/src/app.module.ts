@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MailerModule } from '@nestjs-modules/mailer';
 import { SecurityModule } from './common/security/security.module';
 import { PrismaModule } from './database/prisma.module';
 import { AdminModule } from './modules/admin/admin.module';
@@ -59,7 +60,24 @@ import { DisputesModule } from './modules/disputes/disputes.module';
     }]),
     DownloadsModule,
     ReportsModule,
-    DisputesModule
+    DisputesModule,
+    MailerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        transport: {
+          host: 'smtp.gmail.com',
+          port: 587,
+          secure: false, // TLS
+          auth: {
+            user: config.get<string>('MAIL_USER'),
+            pass: config.get<string>('MAIL_PASS'),
+          },
+        },
+        defaults: {
+          from: `"StudyDocs Support" <${config.get<string>('MAIL_USER')}>`,
+        },
+      }),
+    }),
   ],
   providers: [
     {

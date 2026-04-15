@@ -8,6 +8,7 @@ import AdminRoute from '@/components/guards/AdminRoute'
 import LoginPage from '@/pages/auth/LoginPage'
 import RegisterPage from '@/pages/auth/RegisterPage'
 import VerifyPhonePage from '@/pages/auth/VerifyPhonePage'
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage'
 
 // ── Public Pages ──
 import HomePage from '@/pages/home/HomePage'
@@ -51,6 +52,7 @@ import AdminPackagesPage from '@/pages/admin/AdminPackagesPage'
 import AdminRevenuePage from '@/pages/admin/AdminRevenuePage'
 import AdminPoliciesPage from '@/pages/admin/AdminPoliciesPage'
 import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage'
+import AdminProfilePage from '@/pages/admin/AdminProfilePage'
 import PlaceholderAdminPage from '@/pages/admin/PlaceholderAdminPage'
 
 import { useEffect } from 'react'
@@ -91,6 +93,7 @@ function App() {
       {/* ── Public Auth ── */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* ── Protected Auth ── */}
       <Route
@@ -157,6 +160,7 @@ function App() {
                 <Route path="/policies" element={<AdminPoliciesPage />} />
                 <Route path="/audit-logs" element={<AdminAuditLogsPage />} />
                 <Route path="/packages" element={<AdminPackagesPage />} />
+                <Route path="/profile" element={<AdminProfilePage />} />
               </Routes>
             </AdminLayout>
           </AdminRoute>

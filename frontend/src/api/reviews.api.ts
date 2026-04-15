@@ -8,5 +8,13 @@ export const reviewsApi = {
   replyReview: async (reviewId: number, data: { reply: string }) => {
     const res = await api.post(`/reviews/${reviewId}/reply`, data)
     return res.data
+  },
+  deleteReview: async (reviewId: number) => {
+    const res = await api.delete(`/reviews/${reviewId}`)
+    return res.data
+  },
+  deleteReply: async (reviewId: number) => {
+    const res = await api.delete(`/reviews/${reviewId}/reply`)
+    return res.data
   }
 }

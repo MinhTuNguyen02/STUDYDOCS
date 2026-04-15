@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '@/api/admin.api'
-import { formatBalance } from '@/utils/format'
+import { formatBalance, formatDateTime } from '@/utils/format'
 import { CheckCircle2, AlertTriangle, ShieldCheck, Scale, Wallet, Landmark, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -58,7 +58,7 @@ export default function AdminReconciliationPage() {
         <div className="text-right">
           <p className="text-sm text-muted-foreground font-semibold">Cập nhật lần cuối</p>
           <p className="text-sm font-mono mt-1 bg-muted px-3 py-1.5 rounded-lg border border-border">
-            {new Date(timestamp).toLocaleString('vi-VN')}
+            {formatDateTime(timestamp)}
           </p>
         </div>
       </div>
@@ -72,11 +72,11 @@ export default function AdminReconciliationPage() {
         )}
         <div>
           <h2 className={`text-xl font-bold font-heading ${report.isDoubleEntryMatched ? 'text-success' : 'text-danger'}`}>
-            {report.isDoubleEntryMatched ? 'Khớp sổ tuyệt đối (Reconciled)' : 'Báo động: Lệch sổ tài chính (Unreconciled)'}
+            {report.isDoubleEntryMatched ? 'Khớp sổ tuyệt đối' : 'Báo động: Lệch sổ tài chính'}
           </h2>
           <p className="text-foreground/80 mt-1.5 leading-relaxed">
             Hệ thống ngân hàng của nền tảng đang <strong>{report.isSystemSolvent ? 'có khả năng thanh khoản 100%' : 'MẤT KHẢ NĂNG THANH KHOẢN'}</strong>.
-            Phương trình kế toán: <code className="bg-background px-2 py-0.5 rounded border border-border text-sm font-bold text-primary mx-1">{report.accountingEquation}</code>
+            {/* Phương trình kế toán: <code className="bg-background px-2 py-0.5 rounded border border-border text-sm font-bold text-primary mx-1">{report.accountingEquation}</code> */}
           </p>
 
           {!report.isDoubleEntryMatched && (

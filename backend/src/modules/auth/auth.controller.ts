@@ -71,4 +71,14 @@ export class AuthController {
   verify2FA(@CurrentUser() user: AuthUser, @Body('code') code: string) {
     return this.authService.verify2FA(user, code);
   }
+
+  @Post('forgot-password')
+  forgotPassword(@Body('email') email: string) {
+    return this.authService.forgotPassword(email);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body() dto: any) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
+  }
 }

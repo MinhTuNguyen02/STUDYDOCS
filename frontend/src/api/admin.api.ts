@@ -1,8 +1,8 @@
 import api from './client';
 
 export const adminApi = {
-  getDashboardStats: async () => {
-    const res = await api.get('/admin/dashboard');
+  getDashboardStats: async (params?: any) => {
+    const res = await api.get('/admin/dashboard', { params });
     return res.data;
   },
   getApprovals: async () => {

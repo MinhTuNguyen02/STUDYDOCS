@@ -6,6 +6,7 @@ import TopupModal from '@/components/common/TopupModal'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store, ShieldCheck, Upload } from 'lucide-react'
 import { FiFacebook, FiInstagram, FiYoutube } from 'react-icons/fi'
+import { documentsApi } from '@/api/documents.api'
 
 interface Props {
   children: ReactNode
@@ -19,6 +20,9 @@ export default function MainLayout({ children }: Props) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showTopupModal, setShowTopupModal] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
+
+  const [footerCategories, setFooterCategories] = useState<any[]>([])
+  const [footerPolicies, setFooterPolicies] = useState<any[]>([])
 
   const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
 
@@ -35,6 +39,11 @@ export default function MainLayout({ children }: Props) {
       fetchCart()
     }
   }, [user, fetchCart])
+
+  useEffect(() => {
+    documentsApi.getCategories().then(res => setFooterCategories(res || []))
+    documentsApi.getPolicies().then(res => setFooterPolicies(res || []))
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -274,20 +283,30 @@ export default function MainLayout({ children }: Props) {
             <div>
               <h3 className="mb-4 text-white font-bold text-lg">Danh mục</h3>
               <ul className="space-y-2 text-white/80 text-sm">
-                <li><Link to="/documents" className="hover:text-white transition-colors">Toán học</Link></li>
-                <li><Link to="/documents" className="hover:text-white transition-colors">Ngữ văn</Link></li>
-                <li><Link to="/documents" className="hover:text-white transition-colors">Tiếng Anh</Link></li>
-                <li><Link to="/documents" className="hover:text-white transition-colors">Xem tất cả</Link></li>
+                <li><Link to="/documents" className="hover:text-white transition-colors flex items-center gap-2 font-semibold text-primary-foreground"><span className="w-1 h-1 rounded-full bg-white"></span>Tất cả danh mục</Link></li>
+                {footerCategories.slice(0, 3).map(c => (
+                  <li key={c.category_id || c.id}>
+                    <Link to={`/documents?categoryId=${c.category_id || c.id}`} className="hover:text-white transition-colors flex items-center gap-2">
+                      <span className="w-1 h-1 rounded-full bg-white/50"></span>
+                      {c.name}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
 
             <div>
               <h3 className="mb-4 text-white font-bold text-lg">Hỗ trợ</h3>
               <ul className="space-y-2 text-white/80 text-sm">
-                <li><Link to="/policies" className="hover:text-white transition-colors">Chính sách</Link></li>
-                <li><Link to="/policies/about" className="hover:text-white transition-colors">Hướng dẫn mua hàng</Link></li>
-                <li><Link to="/policies/about" className="hover:text-white transition-colors">Chính sách đổi trả</Link></li>
-                <li><Link to="/policies/about" className="hover:text-white transition-colors">Điều khoản sử dụng</Link></li>
+                <li><Link to="/policies" className="hover:text-white transition-colors flex items-center gap-2 font-semibold text-primary-foreground"><span className="w-1 h-1 rounded-full bg-white"></span>Chính sách chung</Link></li>
+                {footerPolicies.slice(0, 3).map(p => (
+                  <li key={p.policy_id || p.id}>
+                    <Link to={`/policies/${p.slug}`} className="hover:text-white transition-colors flex items-center gap-2">
+                      <span className="w-1 h-1 rounded-full bg-white/50"></span>
+                      {p.title}
+                    </Link>
+                  </li>
+                ))}
               </ul>
             </div>
 

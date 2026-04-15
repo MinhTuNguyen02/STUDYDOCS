@@ -3,10 +3,13 @@ import { adminApi } from '@/api/admin.api';
 import toast from 'react-hot-toast';
 import { ShieldCheck, XCircle } from 'lucide-react';
 import { formatBalance, formatDate } from '@/utils/format';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/common/Pagination';
 
 export default function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   useEffect(() => {
     fetchWithdrawals();
@@ -37,6 +40,9 @@ export default function AdminWithdrawalsPage() {
     }
   };
 
+  const filteredWithdrawals = withdrawals.filter(w => statusFilter === 'ALL' || w.status === statusFilter);
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredWithdrawals);
+
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       <div className="flex items-center justify-between">
@@ -44,6 +50,31 @@ export default function AdminWithdrawalsPage() {
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="PENDING">Chờ duyệt</option>
+              <option value="PAID">Hoàn tất</option>
+              <option value="REJECTED">Từ chối</option>
+            </select>
+            
+            {statusFilter !== 'ALL' && (
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+                title="Xóa bộ lọc"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
+
         {loading ? (
           <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
         ) : (
@@ -60,7 +91,9 @@ export default function AdminWithdrawalsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {withdrawals.map((w) => (
+                {filteredWithdrawals.length === 0 ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
+                ) : paginatedItems.map((w) => (
                   <tr key={w.id} className="hover:bg-muted/10">
                     <td className="p-4">
                       <div className="font-semibold text-sm">{w.accountName || w.user?.fullName}</div>
@@ -91,6 +124,7 @@ export default function AdminWithdrawalsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
         )}
       </div>
     </div>

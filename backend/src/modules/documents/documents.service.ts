@@ -106,6 +106,7 @@ export class DocumentsService {
     }
 
     let hasPurchased = false;
+    let hasReviewed = false;
     if (user?.customerId) {
       if (document.customer_profiles?.customer_id === user.customerId) {
         hasPurchased = true; // Seller themselves
@@ -124,6 +125,11 @@ export class DocumentsService {
           });
           if (download) hasPurchased = true;
         }
+
+        const existingReview = await this.prisma.reviews.findFirst({
+          where: { document_id: documentId, buyer_id: user.customerId }
+        });
+        if (existingReview) hasReviewed = true;
       }
     }
 
@@ -146,6 +152,7 @@ export class DocumentsService {
       tags: document.document_tags.map(t => t.tags.tag_name),
       previewUrl: document.preview_url,
       hasPurchased,
+      hasReviewed,
       createdAt: document.created_at,
       publishedAt: document.published_at
     });

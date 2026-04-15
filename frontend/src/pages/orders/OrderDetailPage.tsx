@@ -42,7 +42,16 @@ export default function OrderDetailPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (orderObj: any) => {
+    let status = orderObj.status || orderObj.paymentStatus;
+    const items = orderObj.items || orderObj.order_items || [];
+    if (status === 'PAID' && items.length > 0) {
+      const allRefunded = items.every((item: any) => item.status === 'REFUNDED');
+      const someRefunded = items.some((item: any) => item.status === 'REFUNDED');
+      if (allRefunded) status = 'REFUNDED';
+      else if (someRefunded) status = 'PARTIAL_REFUND';
+    }
+
     switch (status) {
       case 'PAID':
         return <span className="bg-success/10 text-success px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><CheckCircle2 className="w-4 h-4" /> Đã thanh toán</span>
@@ -52,6 +61,8 @@ export default function OrderDetailPage() {
         return <span className="bg-danger/10 text-danger px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><XCircle className="w-4 h-4" /> Đã hủy</span>
       case 'REFUNDED':
         return <span className="bg-info/10 text-info px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><AlertCircle className="w-4 h-4" /> Đã hoàn tiền</span>
+      case 'PARTIAL_REFUND':
+        return <span className="bg-info/10 text-info px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><AlertCircle className="w-4 h-4" /> Hoàn tiền 1 phần</span>
       default:
         return <span className="bg-gray-100 text-gray-600 px-4 py-1.5 text-sm font-semibold rounded-full">{status}</span>
     }
@@ -89,7 +100,7 @@ export default function OrderDetailPage() {
             </p>
           </div>
           <div>
-            {getStatusBadge(status)}
+            {getStatusBadge(order)}
           </div>
         </div>
 
@@ -110,12 +121,19 @@ export default function OrderDetailPage() {
                       {doc.title}
                     </Link>
                     <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span className="font-bold text-primary">{formatPrice(item.unitPrice || item.unit_price || doc.price || 0)}</span>
+                      <span className={`font-bold ${item.status === 'REFUNDED' ? 'text-muted-foreground line-through opacity-70' : 'text-primary'}`}>
+                        {formatPrice(item.unitPrice || item.unit_price || doc.price || 0)}
+                      </span>
                       <span className="uppercase text-xs font-semibold px-2 py-0.5 bg-muted rounded-md">{ext}</span>
+                      {item.status === 'REFUNDED' && (
+                        <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-danger/10 text-danger rounded-md">
+                          <XCircle className="w-3.5 h-3.5" /> Bị hoàn tiền
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {status === 'PAID' && (
+                  {(status === 'PAID' && item.status !== 'REFUNDED') && (
                     <div className="flex items-center justify-end shrink-0 gap-2">
                       <button
                         onClick={() => setDisputeTarget(item)}

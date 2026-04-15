@@ -3,10 +3,13 @@ import { adminApi } from '@/api/admin.api';
 import toast from 'react-hot-toast';
 import { AlertOctagon, CheckCircle } from 'lucide-react';
 import { formatDate } from '@/utils/format';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/common/Pagination';
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   useEffect(() => {
     fetchReports();
@@ -24,6 +27,9 @@ export default function AdminReportsPage() {
     }
   };
 
+  const filteredReports = reports.filter(r => statusFilter === 'ALL' || r.status === statusFilter);
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredReports);
+
   const handleResolve = async (id: number) => {
     try {
       await adminApi.resolveReport(id, { status: 'RESOLVED' });
@@ -39,6 +45,30 @@ export default function AdminReportsPage() {
       <h1 className="text-2xl font-bold font-heading">Chi tiết Báo cáo</h1>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="PENDING">Đang chờ</option>
+              <option value="RESOLVED">Đã giải quyết</option>
+            </select>
+            
+            {statusFilter !== 'ALL' && (
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+                title="Xóa bộ lọc"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -52,9 +82,9 @@ export default function AdminReportsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {reports.length === 0 ? (
+              {filteredReports.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
-              ) : reports.map((rep) => (
+              ) : paginatedItems.map((rep) => (
                 <tr key={rep.report_id} className="hover:bg-muted/10">
                   <td className="p-4 text-sm text-muted-foreground">{formatDate(rep.created_at)}</td>
                   <td className="p-4 text-sm">
@@ -79,6 +109,7 @@ export default function AdminReportsPage() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
       </div>
     </div>
   );

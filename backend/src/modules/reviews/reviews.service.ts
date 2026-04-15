@@ -11,7 +11,7 @@ export class ReviewsService {
 
   private async recalculateDocumentRating(documentId: number) {
     const aggregate = await this.prisma.reviews.aggregate({
-      where: { document_id: documentId },
+      where: { document_id: documentId, is_deleted: { not: true } },
       _avg: { rating: true },
       _count: { _all: true }
     });
@@ -32,7 +32,7 @@ export class ReviewsService {
     const docId = Number(documentId);
 
     const reviews = await this.prisma.reviews.findMany({
-      where: { document_id: docId },
+      where: { document_id: docId, is_deleted: { not: true } },
       include: {
         customer_profiles: {
           select: {
@@ -91,6 +91,10 @@ export class ReviewsService {
       }
     });
 
+    if (existingByDoc && existingByDoc.is_deleted) {
+      throw new ForbiddenException('Bạn chỉ được tham gia đánh giá 1 lần cho mỗi tài liệu (Đánh giá của bạn đã bị xóa)');
+    }
+
     const result = existingByDoc
       ? await this.prisma.reviews.update({
           where: { review_id: existingByDoc.review_id },
@@ -138,5 +142,45 @@ export class ReviewsService {
     });
 
     return toJsonSafe(updated);
+  }
+
+  async deleteReview(user: AuthUser, reviewId: number) {
+    const review = await this.prisma.reviews.findUnique({ where: { review_id: reviewId } });
+    if (!review) throw new NotFoundException('Không tìm thấy đánh giá.');
+
+    const isStaff = user.roleNames?.some(r => ['admin', 'mod'].includes(r.toLowerCase()));
+    if (!isStaff && review.buyer_id !== user.customerId) {
+      throw new ForbiddenException('Bạn không có quyền xóa đánh giá này.');
+    }
+
+    await this.prisma.reviews.update({
+      where: { review_id: reviewId },
+      data: { is_deleted: true }
+    });
+    await this.recalculateDocumentRating(review.document_id);
+    return { success: true, message: 'Đã xóa đánh giá.' };
+  }
+
+  async deleteReply(user: AuthUser, reviewId: number) {
+    const review = await this.prisma.reviews.findUnique({ 
+      where: { review_id: reviewId },
+      include: { documents: true }
+    });
+    if (!review) throw new NotFoundException('Không tìm thấy đánh giá.');
+
+    const isStaff = user.roleNames?.some(r => ['admin', 'mod'].includes(r.toLowerCase()));
+    if (!isStaff && review.documents.seller_id !== user.customerId) {
+      throw new ForbiddenException('Bạn không có quyền xóa phản hồi này.');
+    }
+
+    await this.prisma.reviews.update({
+      where: { review_id: reviewId },
+      data: {
+        seller_reply: null,
+        replied_at: null
+      }
+    });
+
+    return { success: true, message: 'Đã xóa phản hồi của người bán.' };
   }
 }

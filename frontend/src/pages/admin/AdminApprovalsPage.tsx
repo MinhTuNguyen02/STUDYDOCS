@@ -3,6 +3,8 @@ import { adminApi } from '@/api/admin.api';
 import toast from 'react-hot-toast';
 import { FileCheck, XCircle, Search, X, FileText, Tag, Info, Eye, ExternalLink } from 'lucide-react';
 import { formatBalance, formatDate } from '@/utils/format';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/common/Pagination';
 
 interface PendingDoc {
   id: number;
@@ -42,6 +44,8 @@ export default function AdminApprovalsPage() {
       d.categoryName.toLowerCase().includes(q)
     ) : documents);
   }, [search, documents]);
+
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filtered);
 
   const fetchPendingDocuments = async () => {
     try {
@@ -162,7 +166,7 @@ export default function AdminApprovalsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((doc) => (
+                {paginatedItems.map((doc) => (
                   <tr key={doc.id} className="hover:bg-muted/10 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -212,6 +216,7 @@ export default function AdminApprovalsPage() {
             </table>
           )}
         </div>
+        <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
       </div>
 
       {/* ── Preview Modal ── */}

@@ -3,6 +3,7 @@ import { adminApi } from '@/api/admin.api'
 import { FileText, Plus, Edit2, Trash2, CheckCircle2, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import RichTextEditor from '@/components/ui/RichTextEditor'
+import { formatDate } from '@/utils/format'
 
 interface Policy {
   policy_id: number
@@ -16,6 +17,7 @@ interface Policy {
 export default function AdminPoliciesPage() {
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('ALL')
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -148,6 +150,30 @@ export default function AdminPoliciesPage() {
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Hoạt động</option>
+              <option value="INACTIVE">Bị ẩn</option>
+            </select>
+            
+            {statusFilter !== 'ALL' && (
+              <button
+                onClick={() => setStatusFilter('ALL')}
+                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+                title="Xóa bộ lọc"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-center py-12 text-muted-foreground animate-pulse">Đang tải biểu mẫu...</div>
         ) : (
@@ -162,12 +188,12 @@ export default function AdminPoliciesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {policies.length === 0 ? (
+                {policies.filter(pol => statusFilter === 'ALL' || (statusFilter === 'ACTIVE' ? pol.is_active : !pol.is_active)).length === 0 ? (
                   <tr>
                     <td colSpan={4} className="text-center py-8 text-muted-foreground">Chưa có bài viết chính sách nào.</td>
                   </tr>
                 ) : (
-                  policies.map((pol) => (
+                  policies.filter(pol => statusFilter === 'ALL' || (statusFilter === 'ACTIVE' ? pol.is_active : !pol.is_active)).map((pol) => (
                     <tr key={pol.policy_id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-bold text-base text-primary mb-1">{pol.title}</div>
@@ -185,7 +211,7 @@ export default function AdminPoliciesPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right text-muted-foreground text-xs font-mono">
-                        {new Date(pol.updated_at).toLocaleDateString('vi-VN')}
+                        {formatDate(pol.updated_at)}
                       </td>
                       <td className="px-6 py-4 text-right align-middle">
                         {deleteConfirm === pol.policy_id ? (

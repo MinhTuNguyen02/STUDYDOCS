@@ -209,11 +209,7 @@ export class WalletsService {
       return { releasedCount: 0 };
     }
 
-    // Lấy account_id của system account để ghi audit_log
-    const systemAccount = await this.prisma.accounts.findUnique({
-      where: { email: 'system@studydocs.vn' }
-    });
-    const systemAccountId = systemAccount?.account_id ?? 1;
+
 
     await this.prisma.$transaction(async (tx) => {
       for (const item of heldItems) {
@@ -243,18 +239,9 @@ export class WalletsService {
           data: { status: 'RELEASED' }
         });
       }
-
-      await tx.audit_logs.create({
-        data: {
-          account_id: systemAccountId,
-          action: 'RELEASE_HELD_FUNDS',
-          target_table: 'order_items',
-          target_id: 0,
-          old_value: { count: heldItems.length },
-          new_value: { releasedAt: now.toISOString() }
-        }
-      });
     });
+
+    console.log(`[Cron] Đã release thành công ${heldItems.length} khoản tiền bị hold vào số dư khả dụng.`);
 
     return { releasedCount: heldItems.length };
   }

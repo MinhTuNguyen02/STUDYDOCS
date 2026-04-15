@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 
@@ -72,8 +72,15 @@ export class CategoriesService {
   }
 
   async remove(id: number) {
-    return this.prisma.categories.delete({
-      where: { category_id: id }
-    });
+    try {
+      return await this.prisma.categories.delete({
+        where: { category_id: id }
+      });
+    } catch (error: any) {
+      if (error.code === 'P2003') {
+        throw new BadRequestException('Không thể xóa danh mục. Hiện đang có danh mục con hoặc tài liệu thuộc danh mục này.');
+      }
+      throw error;
+    }
   }
 }

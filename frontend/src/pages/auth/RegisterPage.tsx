@@ -10,10 +10,17 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
   const navigate = useNavigate()
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+
+    if (password !== confirmPassword) {
+      toast.error('Mật khẩu xác nhận không khớp!')
+      return
+    }
+
     setLoading(true)
     try {
       await authApi.register({ fullName, email, password })
@@ -96,6 +103,28 @@ export default function RegisterPage() {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground mt-1.5">Mật khẩu phải có ít nhất 6 ký tự.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-foreground">Xác nhận mật khẩu</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className={`w-full pl-10 pr-12 py-3 bg-background border rounded-xl focus:outline-none focus:ring-2 transition-all text-sm font-medium ${confirmPassword && password !== confirmPassword
+                      ? 'border-danger focus:ring-danger focus:border-danger'
+                      : 'border-border focus:ring-primary focus:border-primary'
+                    }`}
+                />
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-xs text-danger mt-1">Mật khẩu xác nhận không khớp.</p>
+              )}
             </div>
 
             <button

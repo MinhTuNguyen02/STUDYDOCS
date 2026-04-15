@@ -33,8 +33,14 @@ export class SellerController {
   }
 
   @Get('documents')
-  listMyDocuments(@CurrentUser() user: AuthUser, @Query('status') status?: string) {
-    return this.sellerService.listMyDocuments(user, status);
+  listMyDocuments(
+    @CurrentUser() user: AuthUser, 
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ) {
+    return this.sellerService.listMyDocuments(user, status, search, page, limit);
   }
 
   @Post('documents')
@@ -71,7 +77,13 @@ export class SellerController {
   }
 
   @Get('sales/order-items')
-  listSales(@CurrentUser() user: AuthUser) {
-    return this.sellerService.listSales(user);
+  listSales(
+    @CurrentUser() user: AuthUser,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string
+  ) {
+    return this.sellerService.listSales(user, status, search, page, limit);
   }
 }

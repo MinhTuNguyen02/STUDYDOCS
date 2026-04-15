@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { MailerService } from '@nestjs-modules/mailer';
 import { compare, compareSync, hash } from 'bcryptjs';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
@@ -19,7 +20,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly firebaseAdmin: FirebaseAdminService
+    private readonly firebaseAdmin: FirebaseAdminService,
+    private readonly mailerService: MailerService
   ) { }
 
   private hashRefreshToken(token: string) {
@@ -415,5 +417,86 @@ export class AuthService {
     });
 
     return { message: 'Kich hoat 2FA thanh cong va luu vao Database.' };
+  }
+
+  async forgotPassword(email: string) {
+    const formattedEmail = email.trim().toLowerCase();
+    const account = await this.prisma.accounts.findUnique({ where: { email: formattedEmail } });
+    
+    if (!account) {
+      // Don't throw 404 to prevent email enumeration, but we'll throw here for UX
+      throw new NotFoundException('Khong tim thay tai khoan voi email nay.');
+    }
+
+    const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    await this.prisma.accounts.update({
+      where: { account_id: account.account_id },
+      data: {
+        reset_password_token: token,
+        reset_password_expires: expiresAt
+      }
+    });
+
+    const resetLink = `http://localhost:5173/reset-password?token=${token}`;
+    
+    // Gửi email thực tế thông qua thư viện nodemailer / mailer
+    await this.mailerService.sendMail({
+      to: formattedEmail,
+      subject: 'Yêu cầu đặt lại mật khẩu - StudyDocs',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
+          <h2 style="color: #4F46E5;">Khôi Phục Mật Khẩu StudyDocs</h2>
+          <p>Xin chào,</p>
+          <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản liên kết với địa chỉ email <strong>${formattedEmail}</strong>.</p>
+          <p>Vui lòng click vào nút bên dưới để tiến hành thiết lập mật khẩu mới. Liên kết này có thời hạn sử dụng là <strong>15 phút</strong>.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${resetLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">
+              Đặt lại mật khẩu
+            </a>
+          </div>
+          <p style="font-size: 14px; color: #666;">Nếu nút bấm không hoạt động, bạn có thể copy và dán trực tiếp đường dẫn sau vào trình duyệt:</p>
+          <p style="font-size: 14px; color: #4F46E5; word-break: break-all;">${resetLink}</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
+          <p style="font-size: 12px; color: #999;">Nếu bạn không yêu cầu khôi phục mật khẩu, vui lòng bỏ qua email này. Tài khoản của bạn vẫn an toàn.</p>
+          <p style="font-size: 12px; color: #999;">Trân trọng,<br/>Đội ngũ StudyDocs</p>
+        </div>
+      `,
+    });
+
+    console.log(`\n\n[MAIL SENT] Đã gửi mail reset password cho ${formattedEmail}\n\n`);
+
+    return { message: 'Link dat lai mat khau da duoc gui' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    if (!token || !newPassword) {
+      throw new BadRequestException('Thieu token hoac mat khau moi.');
+    }
+
+    const account = await this.prisma.accounts.findFirst({
+      where: {
+        reset_password_token: token,
+        reset_password_expires: { gt: new Date() } // Token phải còn hạn
+      }
+    });
+
+    if (!account) {
+      throw new BadRequestException('Token khong hop le hoac da het han.');
+    }
+
+    const hashedPassword = await hash(newPassword, 12);
+
+    await this.prisma.accounts.update({
+      where: { account_id: account.account_id },
+      data: {
+        password_hash: hashedPassword,
+        reset_password_token: null,
+        reset_password_expires: null
+      }
+    });
+
+    return { message: 'Doi mat khau thanh cong' };
   }
 }

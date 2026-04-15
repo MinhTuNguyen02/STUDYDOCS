@@ -20,8 +20,8 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) { }
 
   @Get('dashboard')
-  dashboard() {
-    return this.adminService.getDashboard();
+  dashboard(@Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
+    return this.adminService.getDashboard({ startDate, endDate });
   }
 
   @Get('reconciliation')
@@ -60,7 +60,7 @@ export class AdminController {
   getDocuments(
     @Query('status') status?: string,
     @Query('categoryId') categoryId?: string,
-    @Query('search') search?: string
+    @Query('search') search?: string,
   ) {
     return this.adminService.getDocuments({ status, categoryId, search });
   }

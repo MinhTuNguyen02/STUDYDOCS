@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { Ban, CheckCircle, Search, Users, ShieldCheck, Plus, X, Eye, EyeOff, Info } from 'lucide-react';
 import { formatDate } from '@/utils/format';
 import { useAuthStore } from '@/store/authStore';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/common/Pagination';
 
 type TabType = 'customers' | 'staff';
 
@@ -38,6 +40,8 @@ export default function AdminUsersPage() {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState('NEWEST');
   const [activeTab, setActiveTab] = useState<TabType>('customers');
   const currentUser = useAuthStore(state => state.user);
 
@@ -98,22 +102,40 @@ export default function AdminUsersPage() {
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
-    return allUsers.filter(u => {
+    let result = allUsers.filter(u => {
       const matchesTab = activeTab === 'staff' ? isStaff(u) : !isStaff(u);
       if (!matchesTab) return false;
+      
+      const statusMathes = statusFilter === 'ALL' || 
+          (statusFilter === 'ACTIVE' && u.isActive) ||
+          (statusFilter === 'BANNED' && !u.isActive);
+      if (!statusMathes) return false;
+
       if (!term) return true;
       return (
         (u.email || '').toLowerCase().includes(term) ||
         (u.fullName || '').toLowerCase().includes(term)
       );
     });
-  }, [allUsers, searchTerm, activeTab]);
+
+    if (sortBy === 'DOCS_DESC') {
+      result.sort((a, b) => (b.documentsCount || 0) - (a.documentsCount || 0));
+    } else if (sortBy === 'SALES_DESC') {
+      result.sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0));
+    } else { // NEWEST
+      result.sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime());
+    }
+
+    return result;
+  }, [allUsers, searchTerm, activeTab, statusFilter, sortBy]);
 
   const customerCount = useMemo(() => allUsers.filter(u => !isStaff(u)).length, [allUsers]);
   const staffCount = useMemo(() => allUsers.filter(u => isStaff(u)).length, [allUsers]);
 
   const isCurrentUser = (u: any) => currentUser?.accountId === u.id;
   const isAdmin = (currentUser as any)?.roleNames?.some((r: string) => r.toLowerCase() === 'admin');
+
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filtered, 15);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
@@ -167,8 +189,8 @@ export default function AdminUsersPage() {
 
       {/* Table card */}
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-muted/30">
-          <div className="relative max-w-sm">
+        <div className="p-4 border-b border-border bg-muted/30 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
@@ -177,6 +199,39 @@ export default function AdminUsersPage() {
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
             />
+          </div>
+          <div className="flex flex-wrap w-full md:w-auto gap-3 items-center">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[140px]"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Hoạt động</option>
+              <option value="BANNED">Bị khóa</option>
+            </select>
+            
+            {activeTab === 'customers' && (
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[180px]"
+              >
+                <option value="NEWEST">Mới nhất</option>
+                <option value="DOCS_DESC">Nhiều tài liệu nhất</option>
+                <option value="SALES_DESC">Lượt bán nhiều nhất</option>
+              </select>
+            )}
+
+            {(searchTerm || statusFilter !== 'ALL' || sortBy !== 'NEWEST') && (
+              <button
+                onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setSortBy('NEWEST'); }}
+                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none shrink-0 border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+                title="Xóa bộ lọc"
+              >
+                Xóa lọc
+              </button>
+            )}
           </div>
         </div>
 
@@ -212,7 +267,7 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((u) => (
+                {paginatedItems.map((u) => (
                   <tr key={u.id} className={`hover:bg-muted/10 transition-colors ${isCurrentUser(u) ? 'opacity-60' : ''}`}>
                     <td className="p-4">
                       <div className="font-semibold text-foreground">{u.fullName || '—'}</div>
@@ -260,6 +315,7 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
         )}
       </div>
 

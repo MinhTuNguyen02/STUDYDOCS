@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { adminApi } from '@/api/admin.api'
-import { formatPrice } from '@/utils/format'
+import { formatPrice, formatDateTime } from '@/utils/format'
 import { ShieldAlert, CheckCircle2, XCircle, Search, MessageSquare, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { usePagination } from '@/hooks/usePagination'
+import Pagination from '@/components/common/Pagination'
 
 interface Dispute {
   id: number
@@ -95,11 +97,13 @@ export default function AdminDisputesPage() {
     return matchesSearch && matchesStatus
   })
 
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredDisputes);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'OPEN': return <span className="px-2 py-1 bg-yellow-500/10 text-yellow-600 rounded-md text-xs font-bold border border-yellow-500/20">CHỜ XỬ LÝ</span>
       case 'INVESTIGATING': return <span className="px-2 py-1 bg-blue-500/10 text-blue-600 rounded-md text-xs font-bold border border-blue-500/20">ĐANG ĐIỀU TRA</span>
-      case 'RESOLVED': return <span className="px-2 py-1 bg-success/10 text-success rounded-md text-xs font-bold border border-success/20">CHẤP NHẬN BỒI THƯỜNG</span>
+      case 'RESOLVED': return <span className="px-2 py-1 bg-success/10 text-success rounded-md text-xs font-bold border border-success/20">CHẤP NHẬN HOÀN TIỀN</span>
       case 'REJECTED': return <span className="px-2 py-1 bg-danger/10 text-danger rounded-md text-xs font-bold border border-danger/20">TỪ CHỐI</span>
       default: return <span className="px-2 py-1 bg-muted rounded-md text-xs font-bold">{status}</span>
     }
@@ -149,41 +153,44 @@ export default function AdminDisputesPage() {
             Không có khiếu nại nào.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-4">Mã KN</th>
-                  <th className="px-6 py-4">Người khiếu nại</th>
-                  <th className="px-6 py-4">Tài liệu / Giá trị</th>
-                  <th className="px-6 py-4">Lý do</th>
-                  <th className="px-6 py-4">Trạng thái</th>
-                  <th className="px-6 py-4 text-right">Ngày gửi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredDisputes.map((dispute) => (
-                  <tr
-                    key={dispute.id}
-                    onClick={() => handleOpenModal(dispute)}
-                    className="hover:bg-muted/50 transition-colors cursor-pointer"
-                  >
-                    <td className="px-6 py-4 font-bold">#{dispute.id}</td>
-                    <td className="px-6 py-4 font-medium">{dispute.customer_profiles?.full_name || 'Khách ẩn danh'}</td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold">{dispute.order_items?.documents?.title}</div>
-                      <div className="text-xs text-danger font-mono mt-1">{formatPrice(dispute.order_items?.unit_price * 1 || 0)}</div>
-                    </td>
-                    <td className="px-6 py-4 text-orange-600 font-semibold">{dispute.reason}</td>
-                    <td className="px-6 py-4">{getStatusBadge(dispute.status)}</td>
-                    <td className="px-6 py-4 text-right text-muted-foreground text-xs">
-                      {new Date(dispute.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+                  <tr>
+                    <th className="px-6 py-4">Mã KN</th>
+                    <th className="px-6 py-4">Người khiếu nại</th>
+                    <th className="px-6 py-4">Tài liệu / Giá trị</th>
+                    <th className="px-6 py-4">Lý do</th>
+                    <th className="px-6 py-4">Trạng thái</th>
+                    <th className="px-6 py-4 text-right">Ngày gửi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedItems.map((dispute) => (
+                    <tr
+                      key={dispute.id}
+                      onClick={() => handleOpenModal(dispute)}
+                      className="hover:bg-muted/50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-6 py-4 font-bold">#{dispute.id}</td>
+                      <td className="px-6 py-4 font-medium">{dispute.customer_profiles?.full_name || 'Khách ẩn danh'}</td>
+                      <td className="px-6 py-4">
+                        <div className="font-semibold">{dispute.order_items?.documents?.title}</div>
+                        <div className="text-xs text-danger font-mono mt-1">{formatPrice(dispute.order_items?.unit_price * 1 || 0)}</div>
+                      </td>
+                      <td className="px-6 py-4 text-orange-600 font-semibold">{dispute.reason}</td>
+                      <td className="px-6 py-4">{getStatusBadge(dispute.status)}</td>
+                      <td className="px-6 py-4 text-right text-muted-foreground text-xs">
+                        {formatDateTime(dispute.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+          </>
         )}
       </div>
 

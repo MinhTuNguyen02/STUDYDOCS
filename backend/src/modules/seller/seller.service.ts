@@ -145,38 +145,58 @@ export class SellerService {
     return { year, data: results };
   }
 
-  async listMyDocuments(user: AuthUser, status?: string) {
+  async listMyDocuments(
+    user: AuthUser, 
+    status?: string, 
+    search?: string, 
+    pageStr?: string, 
+    limitStr?: string
+  ) {
     const sellerId = this.ensureSeller(user);
+    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
+    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const skip = (page - 1) * limit;
 
-    const docs = await this.prisma.documents.findMany({
-      where: {
-        seller_id: sellerId,
-        status: status && status !== 'ALL' ? (status as any) : undefined
-      },
-      include: {
-        categories: true
-      },
-      orderBy: { created_at: 'desc' }
-    });
+    const where: Prisma.documentsWhereInput = {
+      seller_id: sellerId,
+      status: status && status !== 'ALL' ? (status as any) : undefined,
+      title: search ? { contains: search, mode: 'insensitive' } : undefined
+    };
 
-    return toJsonSafe(
-      docs.map((doc) => ({
-        id: doc.document_id,
-        title: doc.title,
-        slug: doc.slug,
-        status: doc.status,
-        price: doc.price,
-        viewCount: doc.view_count,
-        downloadCount: doc.download_count,
-        pageCount: doc.page_count,
-        fileExtension: doc.file_extension,
-        fileSize: doc.file_size,
-        category: doc.categories.name,
-        rejectionReason: doc.rejection_reason,
-        createdAt: doc.created_at,
-        publishedAt: doc.published_at
-      }))
-    );
+    const [total, docs] = await Promise.all([
+      this.prisma.documents.count({ where }),
+      this.prisma.documents.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          categories: true
+        },
+        orderBy: { created_at: 'desc' }
+      })
+    ]);
+
+    return {
+      meta: { page, limit, total },
+      data: toJsonSafe(
+        docs.map((doc) => ({
+          id: doc.document_id,
+          title: doc.title,
+          slug: doc.slug,
+          status: doc.status,
+          price: doc.price,
+          viewCount: doc.view_count,
+          downloadCount: doc.download_count,
+          pageCount: doc.page_count,
+          fileExtension: doc.file_extension,
+          fileSize: doc.file_size,
+          category: doc.categories?.name,
+          rejectionReason: doc.rejection_reason,
+          createdAt: doc.created_at,
+          publishedAt: doc.published_at
+        }))
+      )
+    };
   }
 
   async createDocument(user: AuthUser, dto: CreateSellerDocumentDto) {
@@ -299,29 +319,65 @@ export class SellerService {
     return toJsonSafe(updated);
   }
 
-  async listSales(user: AuthUser) {
+  async listSales(
+    user: AuthUser, 
+    status?: string, 
+    search?: string, 
+    pageStr?: string, 
+    limitStr?: string
+  ) {
     const sellerId = this.ensureSeller(user);
+    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
+    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const skip = (page - 1) * limit;
 
-    const items = await this.prisma.order_items.findMany({
-      where: { seller_id: sellerId },
-      include: {
-        documents: { select: { title: true, slug: true } },
-        orders: { select: { order_id: true, status: true, created_at: true } }
-      },
-      orderBy: { created_at: 'desc' }
+    const where: Prisma.order_itemsWhereInput = {
+      seller_id: sellerId,
+      status: status && status !== 'ALL' ? (status as any) : undefined,
+      documents: search ? { title: { contains: search, mode: 'insensitive' } } : undefined
+    };
+
+    // Calculate aggregated stats across all pages
+    const overallItems = await this.prisma.order_items.findMany({
+      where,
+      select: { status: true, seller_earning: true }
     });
+    const totalEarnings = overallItems.reduce((sum, item) => {
+      if (item.status === 'REFUNDED') return sum;
+      return sum + Number(item.seller_earning || 0);
+    }, 0);
+    const totalOrders = overallItems.length;
 
-    return toJsonSafe(
-      items.map((item) => ({
-        id: item.order_item_id,
-        status: item.status,
-        unitPrice: item.unit_price,
-        commissionFee: item.commission_fee,
-        sellerEarning: item.seller_earning,
-        holdUntil: item.hold_until,
-        document: item.documents,
-        order: item.orders
-      }))
-    );
+    const [total, items] = await Promise.all([
+      this.prisma.order_items.count({ where }),
+      this.prisma.order_items.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          documents: { select: { title: true, slug: true } },
+          orders: { select: { order_id: true, status: true, created_at: true } }
+        },
+        orderBy: { created_at: 'desc' }
+      })
+    ]);
+
+    return {
+      meta: { page, limit, total },
+      totalEarnings,
+      totalOrders,
+      data: toJsonSafe(
+        items.map((item) => ({
+          id: item.order_item_id,
+          status: item.status,
+          unitPrice: item.unit_price,
+          commissionFee: item.commission_fee,
+          sellerEarning: item.seller_earning,
+          holdUntil: item.hold_until,
+          document: item.documents,
+          order: item.orders
+        }))
+      )
+    };
   }
 }

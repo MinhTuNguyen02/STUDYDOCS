@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { adminApi } from '@/api/admin.api'
 import { Activity, Search, ChevronRight, FileJson } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { formatDateTime, formatDateTimeSec } from '@/utils/format'
+import { usePagination } from '@/hooks/usePagination'
+import Pagination from '@/components/common/Pagination'
 
 interface AuditLog {
   log_id: number
@@ -24,7 +27,6 @@ export default function AdminAuditLogsPage() {
   // Filters
   const [searchEmail, setSearchEmail] = useState('')
   const [actionFilter, setActionFilter] = useState('')
-  const [limit, setLimit] = useState(100)
 
   // View Details Modal
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
@@ -55,6 +57,8 @@ export default function AdminAuditLogsPage() {
     if (!searchEmail.trim()) return true
     return log.accounts?.email?.toLowerCase().includes(searchEmail.toLowerCase())
   })
+
+  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredLogs, 20);
 
   // Helper cho JSON highlight
   const renderJson = (data: any) => {
@@ -114,7 +118,7 @@ export default function AdminAuditLogsPage() {
         <div className="w-full md:w-auto">
           <select
             value={limit}
-            onChange={e => setLimit(Number(e.target.value))}
+            // onChange={e => setLimit(Number(e.target.value))}
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value={50}>50 dòng gần nhất</option>
@@ -136,48 +140,51 @@ export default function AdminAuditLogsPage() {
         ) : filteredLogs.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">Không tìm thấy bản ghi Audit Log nào.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-4 rounded-tl-2xl w-[15%]">TG Thực hiện</th>
-                  <th className="px-6 py-4 w-[20%]">Tài khoản (Tác nhân)</th>
-                  <th className="px-6 py-4 w-[25%]">Hành động</th>
-                  <th className="px-6 py-4 w-[25%]">Mục tiêu (Target)</th>
-                  <th className="px-6 py-4 text-right rounded-tr-2xl w-[15%]">Tra soát</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredLogs.map(log => (
-                  <tr key={log.log_id} className="hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => setSelectedLog(log)}>
-                    <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
-                      {new Date(log.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-primary">{log.accounts?.email || 'System'}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">UID: {log.account_id}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border uppercase tracking-wider ${getActionBadge(log.action)}`}>
-                        {log.action.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">[{log.target_table}]</span>
-                        <span className="font-semibold">ID: {log.target_id}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors group-hover:translate-x-1 duration-200">
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+                  <tr>
+                    <th className="px-6 py-4 rounded-tl-2xl w-[15%]">TG Thực hiện</th>
+                    <th className="px-6 py-4 w-[20%]">Tác nhân</th>
+                    <th className="px-6 py-4 w-[25%]">Hành động</th>
+                    <th className="px-6 py-4 w-[25%]">Mục tiêu</th>
+                    <th className="px-6 py-4 text-right rounded-tr-2xl w-[15%]">Tra soát</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedItems.map(log => (
+                    <tr key={log.log_id} className="hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => setSelectedLog(log)}>
+                      <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
+                        {formatDateTimeSec(log.created_at)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-primary">{log.accounts?.email || 'System'}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">UID: {log.account_id}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border uppercase tracking-wider ${getActionBadge(log.action)}`}>
+                          {log.action.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">[{log.target_table}]</span>
+                          <span className="font-semibold">ID: {log.target_id}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors group-hover:translate-x-1 duration-200">
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+          </>
         )}
       </div>
 
@@ -199,10 +206,10 @@ export default function AdminAuditLogsPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
                   <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Thời gian</p>
-                  <p className="font-mono text-sm">{new Date(selectedLog.created_at).toLocaleString('vi-VN')}</p>
+                  <p className="font-mono text-sm">{formatDateTimeSec(selectedLog.created_at)}</p>
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
-                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Diễn viên</p>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Tác nhân</p>
                   <p className="font-semibold text-sm">{selectedLog.accounts?.email}</p>
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
@@ -215,27 +222,81 @@ export default function AdminAuditLogsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-danger">
-                    <div className="w-2 h-2 rounded-full bg-danger"></div> Dữ liệu Mấu chốt (Old Value)
+              {/* User Friendly Diff Table */}
+              <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden mt-6">
+                <div className="p-4 border-b border-border bg-muted/30">
+                  <h4 className="font-bold text-sm flex items-center gap-2">
+                    <FileJson className="w-4 h-4 text-primary" /> Phân tích dữ liệu thay đổi
                   </h4>
-                  <div className="h-[300px] overflow-y-auto bg-[#1e1e1e] rounded-xl border border-border/50 p-4 shadow-inner">
-                    <pre className="text-[12px] font-mono text-[#d4d4d4]">
-                      {selectedLog.old_value ? JSON.stringify(selectedLog.old_value, null, 2) : 'null'}
-                    </pre>
-                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-sm mb-3 flex items-center gap-2 text-success">
-                    <div className="w-2 h-2 rounded-full bg-success"></div> Giá trị Thay đổi (New Value)
-                  </h4>
-                  <div className="h-[300px] overflow-y-auto bg-[#1e1e1e] rounded-xl border border-border/50 p-4 shadow-inner">
-                    <pre className="text-[12px] font-mono text-[#4EC9B0]">
-                      {selectedLog.new_value ? JSON.stringify(selectedLog.new_value, null, 2) : 'null'}
-                    </pre>
-                  </div>
-                </div>
+                {(() => {
+                  const oldVal = selectedLog.old_value || {};
+                  const newVal = selectedLog.new_value || {};
+                  const isOldObj = typeof oldVal === 'object' && oldVal !== null && !Array.isArray(oldVal);
+                  const isNewObj = typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal);
+
+                  if (!isOldObj && !isNewObj) {
+                    return (
+                      <div className="p-6 grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Giá trị trước đó</p>
+                          <div className="p-4 bg-muted/30 rounded-lg whitespace-pre-wrap">{String(oldVal)}</div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Giá trị cập nhật</p>
+                          <div className="p-4 bg-primary/5 text-primary font-medium rounded-lg whitespace-pre-wrap">{String(newVal)}</div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const keys = Array.from(new Set([...Object.keys(oldVal), ...Object.keys(newVal)]));
+                  if (keys.length === 0) return <p className="text-muted-foreground p-8 text-center">Không có dữ liệu chi tiết.</p>;
+
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-muted/50 text-muted-foreground font-semibold text-xs border-b border-border uppercase tracking-wider">
+                          <tr>
+                            <th className="px-6 py-4 w-[30%]">Trường Dữ liệu</th>
+                            <th className="px-6 py-4 w-[35%]">Trạng thái Cũ</th>
+                            <th className="px-6 py-4 w-[35%]">Trạng thái Mới</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {keys.map(k => {
+                            const oldD = oldVal[k];
+                            const newD = newVal[k];
+                            const isChanged = JSON.stringify(oldD) !== JSON.stringify(newD);
+
+                            const formatD = (d: any) => {
+                              if (d === null || d === undefined || d === '') return <span className="text-muted-foreground italic">Trống</span>;
+                              if (typeof d === 'boolean') return d ? 'Có / Bật' : 'Không / Tắt';
+                              if (typeof d === 'object') return <span className="font-mono text-[11px]">{JSON.stringify(d)}</span>;
+                              if (k.toLowerCase().includes('time') || k.toLowerCase().includes('date') || k.toLowerCase().includes('_at')) {
+                                const date = new Date(d);
+                                if (!isNaN(date.getTime())) return formatDateTime(date);
+                              }
+                              return String(d);
+                            };
+
+                            return (
+                              <tr key={k} className={`hover:bg-muted/30 transition-colors ${isChanged ? 'bg-primary/5' : ''}`}>
+                                <td className="px-6 py-4 font-mono font-bold text-foreground text-[13px]">{k}</td>
+                                <td className={`px-6 py-4 ${isChanged && oldD !== undefined ? 'text-danger line-through opacity-70 cursor-help' : 'text-muted-foreground'} `} title={String(oldD)}>
+                                  {formatD(oldD)}
+                                </td>
+                                <td className={`px-6 py-4 ${isChanged ? 'text-success font-bold bg-success/5' : 'text-foreground'}`}>
+                                  {formatD(newD)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
               </div>
 
             </div>

@@ -4,12 +4,14 @@ import { useAuthStore } from '@/store/authStore'
 import { authApi } from '@/api/auth.api'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, ArrowLeft } from 'lucide-react'
+import ForgotPasswordModal from '@/components/auth/ForgotPasswordModal'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [showForgotModal, setShowForgotModal] = useState(false)
 
   const login = useAuthStore((s) => s.login)
   const navigate = useNavigate()
@@ -56,7 +58,7 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Đăng nhập thất bại')
+      toast.error('Email hoặc mật khẩu không đúng')
     } finally {
       setLoading(false)
     }
@@ -121,7 +123,12 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex justify-between">
                 <label className="text-sm font-semibold text-foreground">Mật khẩu</label>
-                <span className="text-sm text-primary hover:underline font-semibold cursor-pointer">Quên mật khẩu?</span>
+                <span 
+                  onClick={() => setShowForgotModal(true)}
+                  className="text-sm text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  Quên mật khẩu?
+                </span>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -187,6 +194,10 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {showForgotModal && (
+        <ForgotPasswordModal onClose={() => setShowForgotModal(false)} />
+      )}
     </div>
   )
 }
