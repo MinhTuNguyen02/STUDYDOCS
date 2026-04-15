@@ -62,7 +62,7 @@ export default function AdminWithdrawalsPage() {
               <option value="PAID">Hoàn tất</option>
               <option value="REJECTED">Từ chối</option>
             </select>
-            
+
             {statusFilter !== 'ALL' && (
               <button
                 onClick={() => setStatusFilter('ALL')}
@@ -78,53 +78,55 @@ export default function AdminWithdrawalsPage() {
         {loading ? (
           <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
-                  <th className="p-4 font-semibold">Tài khoản Yêu cầu</th>
-                  <th className="p-4 font-semibold">Số tiền</th>
-                  <th className="p-4 font-semibold">Ngân hàng</th>
-                  <th className="p-4 font-semibold">Trạng thái</th>
-                  <th className="p-4 font-semibold">Ngày tạo</th>
-                  <th className="p-4 font-semibold text-right">Duyệt/Từ chối</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredWithdrawals.length === 0 ? (
-                  <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
-                ) : paginatedItems.map((w) => (
-                  <tr key={w.id} className="hover:bg-muted/10">
-                    <td className="p-4">
-                      <div className="font-semibold text-sm">{w.accountName || w.user?.fullName}</div>
-                    </td>
-                    <td className="p-4 font-bold text-primary">{formatBalance(w.amount)}</td>
-                    <td className="p-4 text-sm">
-                      <p className="font-semibold">{w.bankName}</p>
-                      <p className="text-muted-foreground">{w.accountNumber}</p>
-                    </td>
-                    <td className="p-4">
-                      {w.status === 'PENDING' && <span className="bg-warning/10 text-warning px-2 py-1 rounded text-xs font-bold">Chờ duyệt</span>}
-                      {w.status === 'PAID' && <span className="bg-success/10 text-success px-2 py-1 rounded text-xs font-bold">Hoàn tất</span>}
-                      {w.status === 'REJECTED' && <span className="bg-danger/10 text-danger px-2 py-1 rounded text-xs font-bold">Từ chối</span>}
-                    </td>
-                    <td className="p-4 text-sm text-muted-foreground">{formatDate(w.createdAt)}</td>
-                    <td className="p-4 text-right">
-                      {w.status === 'PENDING' ? (
-                         <div className="flex justify-end gap-2">
-                           <button onClick={() => handleAction(w.id, 'PAID')} className="p-2 bg-success text-white rounded-lg hover:bg-success/90 cursor-pointer" title="Duyệt"><ShieldCheck className="w-4 h-4" /></button>
-                           <button onClick={() => handleAction(w.id, 'REJECTED')} className="p-2 bg-danger/10 text-danger rounded-lg hover:bg-danger/20 cursor-pointer" title="Từ chối"><XCircle className="w-4 h-4" /></button>
-                         </div>
-                      ) : (
-                         <span className="text-muted-foreground text-sm italic">Đã xử lý</span>
-                      )}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
+                    <th className="p-4 font-semibold">Tài khoản Yêu cầu</th>
+                    <th className="p-4 font-semibold">Số tiền</th>
+                    <th className="p-4 font-semibold">Ngân hàng</th>
+                    <th className="p-4 font-semibold">Trạng thái</th>
+                    <th className="p-4 font-semibold">Ngày tạo</th>
+                    <th className="p-4 font-semibold text-right">Duyệt/Từ chối</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredWithdrawals.length === 0 ? (
+                    <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
+                  ) : paginatedItems.map((w) => (
+                    <tr key={w.id} className="hover:bg-muted/10">
+                      <td className="p-4">
+                        <div className="font-semibold text-sm">{w.accountName || w.user?.fullName}</div>
+                      </td>
+                      <td className="p-4 font-bold text-primary">{formatBalance(w.amount)}</td>
+                      <td className="p-4 text-sm">
+                        <p className="font-semibold">{w.bankName}</p>
+                        <p className="text-muted-foreground">{w.accountNumber}</p>
+                      </td>
+                      <td className="p-4">
+                        {w.status === 'PENDING' && <span className="bg-warning/10 text-warning px-2 py-1 rounded text-xs font-bold">Chờ duyệt</span>}
+                        {w.status === 'PAID' && <span className="bg-success/10 text-success px-2 py-1 rounded text-xs font-bold">Hoàn tất</span>}
+                        {w.status === 'REJECTED' && <span className="bg-danger/10 text-danger px-2 py-1 rounded text-xs font-bold">Từ chối</span>}
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground">{formatDate(w.createdAt)}</td>
+                      <td className="p-4 text-right">
+                        {w.status === 'PENDING' ? (
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => handleAction(w.id, 'PAID')} className="p-2 bg-success text-white rounded-lg hover:bg-success/90 cursor-pointer" title="Duyệt"><ShieldCheck className="w-4 h-4" /></button>
+                            <button onClick={() => handleAction(w.id, 'REJECTED')} className="p-2 bg-danger/10 text-danger rounded-lg hover:bg-danger/20 cursor-pointer" title="Từ chối"><XCircle className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm italic">Đã xử lý</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+          </>
         )}
       </div>
     </div>

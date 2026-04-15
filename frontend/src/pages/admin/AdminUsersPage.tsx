@@ -105,10 +105,10 @@ export default function AdminUsersPage() {
     let result = allUsers.filter(u => {
       const matchesTab = activeTab === 'staff' ? isStaff(u) : !isStaff(u);
       if (!matchesTab) return false;
-      
-      const statusMathes = statusFilter === 'ALL' || 
-          (statusFilter === 'ACTIVE' && u.isActive) ||
-          (statusFilter === 'BANNED' && !u.isActive);
+
+      const statusMathes = statusFilter === 'ALL' ||
+        (statusFilter === 'ACTIVE' && u.isActive) ||
+        (statusFilter === 'BANNED' && !u.isActive);
       if (!statusMathes) return false;
 
       if (!term) return true;
@@ -210,7 +210,7 @@ export default function AdminUsersPage() {
               <option value="ACTIVE">Hoạt động</option>
               <option value="BANNED">Bị khóa</option>
             </select>
-            
+
             {activeTab === 'customers' && (
               <select
                 value={sortBy}
@@ -240,82 +240,84 @@ export default function AdminUsersPage() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">Không có dữ liệu phù hợp.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
-                  <th className="p-4 font-semibold">Tên / Email</th>
-                  <th className="p-4 font-semibold">Vai trò</th>
-                  <th className="p-4 font-semibold">Tình trạng</th>
-                  <th className="p-4 font-semibold">Tham gia</th>
-                  {activeTab === 'customers' && (
-                    <th className="p-4 font-semibold text-center">
-                      <span className="inline-flex items-center gap-1.5 justify-center">
-                        Tài liệu
-                        <span className="group relative cursor-help z-99999">
-                          <Info className="w-3.5 h-3.5 text-muted-foreground/70 hover:text-primary transition-colors" />
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-popover text-popover-foreground text-xs rounded-xl shadow-xl border border-border p-3 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-left font-normal normal-case tracking-normal">
-                            <p className="font-semibold mb-1">Ý nghĩa tỉ số:</p>
-                            <p><strong className="text-primary">Số đầu</strong> — Tổng số tài liệu đã được duyệt</p>
-                            <p className="mt-1"><strong className="text-success">Số sau</strong> — Tổng lượt bán của tất cả tài liệu</p>
-                          </div>
-                        </span>
-                      </span>
-                    </th>
-                  )}
-                  <th className="p-4 font-semibold text-right">Hành động</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedItems.map((u) => (
-                  <tr key={u.id} className={`hover:bg-muted/10 transition-colors ${isCurrentUser(u) ? 'opacity-60' : ''}`}>
-                    <td className="p-4">
-                      <div className="font-semibold text-foreground">{u.fullName || '—'}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
-                    </td>
-                    <td className="p-4">
-                      <RoleBadge role={u.role} />
-                    </td>
-                    <td className="p-4">
-                      <StatusBadge isActive={u.isActive || u.accountStatus === 'ACTIVE'} />
-                    </td>
-                    <td className="p-4 text-muted-foreground text-xs">
-                      {formatDate(u.joinedAt || u.created_at)}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
+                    <th className="p-4 font-semibold">Tên / Email</th>
+                    <th className="p-4 font-semibold">Vai trò</th>
+                    <th className="p-4 font-semibold">Tình trạng</th>
+                    <th className="p-4 font-semibold">Tham gia</th>
                     {activeTab === 'customers' && (
-                      <td className="p-4 text-center">
-                        <div className="inline-flex items-center gap-1.5">
-                          <span className="font-bold text-primary">{u.documentsCount ?? 0}</span>
-                          <span className="text-muted-foreground text-xs">TL /</span>
-                          <span className="font-bold text-success">{u.totalSales ?? 0}</span>
-                          <span className="text-muted-foreground text-xs">bán</span>
-                        </div>
-                      </td>
+                      <th className="p-4 font-semibold text-center">
+                        <span className="inline-flex items-center gap-1.5 justify-center">
+                          Tài liệu
+                          <span className="group relative cursor-help z-99999">
+                            <Info className="w-3.5 h-3.5 text-muted-foreground/70 hover:text-primary transition-colors" />
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-popover text-popover-foreground text-xs rounded-xl shadow-xl border border-border p-3 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 text-left font-normal normal-case tracking-normal">
+                              <p className="font-semibold mb-1">Ý nghĩa tỉ số:</p>
+                              <p><strong className="text-primary">Số đầu</strong> — Tổng số tài liệu đã được duyệt</p>
+                              <p className="mt-1"><strong className="text-success">Số sau</strong> — Tổng lượt bán của tất cả tài liệu</p>
+                            </div>
+                          </span>
+                        </span>
+                      </th>
                     )}
-                    <td className="p-4 text-right">
-                      {isCurrentUser(u) ? (
-                        <span className="text-xs text-muted-foreground italic">Tài khoản hiện tại</span>
-                      ) : (
-                        <button
-                          onClick={() => handleToggleStatus(u.id)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ml-auto transition-colors ${u.isActive || u.accountStatus === 'ACTIVE'
-                            ? 'bg-danger/10 text-danger hover:bg-danger/20'
-                            : 'bg-success/10 text-success hover:bg-success/20'
-                            }`}
-                        >
-                          {u.isActive || u.accountStatus === 'ACTIVE'
-                            ? <><Ban className="w-3.5 h-3.5" /> Khóa</>
-                            : <><CheckCircle className="w-3.5 h-3.5" /> Mở khóa</>
-                          }
-                        </button>
-                      )}
-                    </td>
+                    <th className="p-4 font-semibold text-right">Hành động</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedItems.map((u) => (
+                    <tr key={u.id} className={`hover:bg-muted/10 transition-colors ${isCurrentUser(u) ? 'opacity-60' : ''}`}>
+                      <td className="p-4">
+                        <div className="font-semibold text-foreground">{u.fullName || '—'}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
+                      </td>
+                      <td className="p-4">
+                        <RoleBadge role={u.role} />
+                      </td>
+                      <td className="p-4">
+                        <StatusBadge isActive={u.isActive || u.accountStatus === 'ACTIVE'} />
+                      </td>
+                      <td className="p-4 text-muted-foreground text-xs">
+                        {formatDate(u.joinedAt || u.created_at)}
+                      </td>
+                      {activeTab === 'customers' && (
+                        <td className="p-4 text-center">
+                          <div className="inline-flex items-center gap-1.5">
+                            <span className="font-bold text-primary">{u.documentsCount ?? 0}</span>
+                            <span className="text-muted-foreground text-xs">TL /</span>
+                            <span className="font-bold text-success">{u.totalSales ?? 0}</span>
+                            <span className="text-muted-foreground text-xs">bán</span>
+                          </div>
+                        </td>
+                      )}
+                      <td className="p-4 text-right">
+                        {isCurrentUser(u) ? (
+                          <span className="text-xs text-muted-foreground italic">Tài khoản hiện tại</span>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleStatus(u.id)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ml-auto transition-colors ${u.isActive || u.accountStatus === 'ACTIVE'
+                              ? 'bg-danger/10 text-danger hover:bg-danger/20'
+                              : 'bg-success/10 text-success hover:bg-success/20'
+                              }`}
+                          >
+                            {u.isActive || u.accountStatus === 'ACTIVE'
+                              ? <><Ban className="w-3.5 h-3.5" /> Khóa</>
+                              : <><CheckCircle className="w-3.5 h-3.5" /> Mở khóa</>
+                            }
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+          </>
         )}
       </div>
 

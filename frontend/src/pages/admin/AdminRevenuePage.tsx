@@ -173,42 +173,44 @@ export default function AdminRevenuePage() {
         ) : data.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">Không có dữ liệu trong khoảng thời gian này.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs sticky top-0 z-10 shadow-sm leading-relaxed">
-                <tr>
-                  <th className="px-6 py-4">Thời gian</th>
-                  <th className="px-6 py-4">Mã Giao Dịch</th>
-                  <th className="px-6 py-4">Mô tả</th>
-                  <th className="px-6 py-4 text-right text-success border-x border-border">Thu (+)</th>
-                  <th className="px-6 py-4 text-right text-danger border-r border-border rounded-tr-2xl">Chi (-)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {paginatedItems.map((item) => (
-                  <tr key={item.entry_id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 text-muted-foreground text-xs whitespace-nowrap">
-                      {formatDateTime(item.created_at)}
-                    </td>
-                    <td className="px-6 py-4 font-mono font-bold text-xs">TXN-{item.transaction_id}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{item.ledger_transactions.transaction_type}</span>
-                        <span className="text-xs text-muted-foreground mt-0.5">{item.ledger_transactions.description}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right font-mono font-bold text-success border-x border-border/50">
-                      {Number(item.credit_amount) > 0 ? `+${formatBalance(item.credit_amount)}` : '—'}
-                    </td>
-                    <td className="px-6 py-4 text-right font-mono font-bold text-danger border-r border-border/50">
-                      {Number(item.debit_amount) > 0 ? `-${formatBalance(item.debit_amount)}` : '—'}
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs sticky top-0 z-10 shadow-sm leading-relaxed">
+                  <tr>
+                    <th className="px-6 py-4">Thời gian</th>
+                    <th className="px-6 py-4">Mã Giao Dịch</th>
+                    <th className="px-6 py-4">Mô tả</th>
+                    <th className="px-6 py-4 text-right text-success border-x border-border">Thu (+)</th>
+                    <th className="px-6 py-4 text-right text-danger border-r border-border rounded-tr-2xl">Chi (-)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {paginatedItems.map((item) => (
+                    <tr key={item.entry_id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-6 py-4 text-muted-foreground text-xs whitespace-nowrap">
+                        {formatDateTime(item.created_at)}
+                      </td>
+                      <td className="px-6 py-4 font-mono font-bold text-xs">TXN-{item.transaction_id}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-semibold">{item.ledger_transactions.transaction_type}</span>
+                          <span className="text-xs text-muted-foreground mt-0.5">{item.ledger_transactions.description}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono font-bold text-success border-x border-border/50">
+                        {Number(item.credit_amount) > 0 ? `+${formatBalance(item.credit_amount)}` : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono font-bold text-danger border-r border-border/50">
+                        {Number(item.debit_amount) > 0 ? `-${formatBalance(item.debit_amount)}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+          </>
         )}
       </div>
 
