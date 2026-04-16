@@ -15,7 +15,7 @@ export function toJsonSafe<T>(value: T): JsonSafe {
     const objectValue = value as Record<string, unknown>;
     if (typeof objectValue.toNumber === 'function') {
       try {
-        return Number(objectValue.toNumber());
+        return objectValue.toString();
       } catch {
         return String(value);
       }

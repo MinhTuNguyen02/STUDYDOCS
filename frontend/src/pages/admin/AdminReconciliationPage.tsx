@@ -9,6 +9,7 @@ interface ReconData {
   report: {
     totalFiatInBank_GATEWAY_POOL: number
     totalLiabilities_USER_WALLETS: number
+    totalLiabilities_TAX_PAYABLE: number
     totalEquity_SYSTEM_REVENUE: number
     accountingEquation: string
     discrepancy: number
@@ -48,7 +49,7 @@ export default function AdminReconciliationPage() {
   const { report, timestamp } = data
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
       <div className="flex justify-between items-end mb-8">
         <div>
           <h1 className="text-3xl font-bold font-heading flex items-center gap-3">
@@ -88,74 +89,70 @@ export default function AdminReconciliationPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-10 items-stretch">
         {/* Tài sản (Assets) */}
-        <div className="bg-card border-2 border-primary/20 rounded-3xl p-6 shadow-sm relative overflow-hidden">
+        <div className="xl:col-span-1 bg-card border-2 border-primary/20 rounded-3xl p-6 shadow-sm relative overflow-hidden flex flex-col justify-center">
           <div className="absolute -top-6 -right-6 w-32 h-32 bg-primary/5 rounded-full blur-2xl" />
           <div className="flex items-center gap-3 mb-4 relative z-10">
             <div className="p-3 bg-primary/10 rounded-xl text-primary"><Landmark className="w-6 h-6" /></div>
             <div>
-              <h3 className="font-bold text-lg leading-tight">Quỹ Ngân Hàng</h3>
-              <p className="text-xs text-muted-foreground uppercase font-semibold">Tài sản (Assets)</p>
+              <h3 className="font-bold text-base leading-tight">Quỹ Ngân Hàng</h3>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Tài sản (Assets)</p>
             </div>
           </div>
-          <p className="text-4xl font-black font-heading text-primary relative z-10">
+          <p className="text-3xl font-black font-heading text-primary relative z-10">
             {formatBalance(report.totalFiatInBank_GATEWAY_POOL)}
           </p>
-          <div className="mt-4 pt-4 border-t border-border flex items-start gap-2 relative z-10">
-            <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Tổng số tiền thực tế (Fiat) đang lưu trữ tại tài khoản ngân hàng của Nền tảng.
-            </p>
-          </div>
         </div>
 
-        <div className="hidden md:flex items-center justify-center font-black text-4xl text-muted-foreground/30 font-heading">
+        <div className="hidden xl:flex items-center justify-center font-black text-4xl text-muted-foreground/30 font-heading">
           {`=`}
         </div>
 
-        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="xl:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
           {/* Nợ phải trả (Liabilities) */}
-          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden">
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden flex flex-col justify-center">
             <div className="absolute -top-6 -right-6 w-32 h-32 bg-orange-500/5 rounded-full blur-2xl" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-3 bg-orange-500/10 rounded-xl text-orange-600"><Wallet className="w-6 h-6" /></div>
               <div>
-                <h3 className="font-bold text-lg leading-tight">Ví Người Dùng</h3>
-                <p className="text-xs text-muted-foreground uppercase font-semibold">Nợ phải trả (Liabilities)</p>
+                <h3 className="font-bold text-base leading-tight">Ví Người Dùng</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Nợ (Liabilities)</p>
               </div>
             </div>
-            <p className="text-4xl font-black font-heading text-orange-600 relative z-10">
+            <p className="text-3xl font-black font-heading text-orange-600 relative z-10">
               {formatBalance(report.totalLiabilities_USER_WALLETS)}
             </p>
-            <div className="mt-4 pt-4 border-t border-border flex items-start gap-2 relative z-10">
-              <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Tổng số tiền mà Hệ thống đang "mang nợ" người dùng có trong tất cả các ví hợp lệ.
-              </p>
-            </div>
           </div>
 
           {/* Vốn nền tảng (Equity/Revenue) */}
-          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden">
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden flex flex-col justify-center">
             <div className="absolute -top-6 -right-6 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600"><Scale className="w-6 h-6" /></div>
               <div>
-                <h3 className="font-bold text-lg leading-tight">Doanh Thu Hệ Thống</h3>
-                <p className="text-xs text-muted-foreground uppercase font-semibold">Vốn (Equity/Revenue)</p>
+                <h3 className="font-bold text-base leading-tight">Doanh Thu Hệ Thống</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Vốn (Equity)</p>
               </div>
             </div>
-            <p className="text-4xl font-black font-heading text-emerald-600 relative z-10">
+            <p className="text-3xl font-black font-heading text-emerald-600 relative z-10">
               {formatBalance(report.totalEquity_SYSTEM_REVENUE)}
             </p>
-            <div className="mt-4 pt-4 border-t border-border flex items-start gap-2 relative z-10">
-              <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Tiền hoa hồng, phí dịch vụ đọng lại trên nền tảng đang giữ.
-              </p>
+          </div>
+
+          {/* Thuế (Tax Payable) */}
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden flex flex-col justify-center">
+            <div className="absolute -top-6 -right-6 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl" />
+            <div className="flex items-center gap-3 mb-4 relative z-10">
+              <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600"><ShieldCheck className="w-6 h-6" /></div>
+              <div>
+                <h3 className="font-bold text-base leading-tight">Thuế Thu Hộ</h3>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Nợ (Liabilities)</p>
+              </div>
             </div>
+            <p className="text-3xl font-black font-heading text-purple-600 relative z-10">
+              {formatBalance(report.totalLiabilities_TAX_PAYABLE ?? 0)}
+            </p>
           </div>
         </div>
       </div>

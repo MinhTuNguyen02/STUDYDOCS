@@ -5,14 +5,25 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { LedgerService } from './ledger.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { IsNumber, IsNotEmpty, IsObject, IsIn, IsString, IsOptional } from 'class-validator';
 
 export class RequestWithdrawalDto {
+  @IsNumber()
+  @IsNotEmpty()
   amount!: number;
+
+  @IsObject()
+  @IsNotEmpty()
   bankInfo: any;
 }
 
 export class ProcessWithdrawalDto {
+  @IsIn(['PAID', 'REJECTED'])
+  @IsNotEmpty()
   status!: 'PAID' | 'REJECTED';
+
+  @IsString()
+  @IsOptional()
   note?: string;
 }
 
@@ -21,7 +32,7 @@ export class WalletsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService
-  ) {}
+  ) { }
 
   async getMyWallets(user: AuthUser) {
     if (!user.customerId) throw new NotFoundException('Tai khoan khong hop le.');
@@ -67,7 +78,7 @@ export class WalletsService {
     });
     const configMap = new Map(configs.map((c) => [c.config_key, c.config_value]));
 
-    const minAmount = new Prisma.Decimal(configMap.get('MIN_WITHDRAWAL') ?? '100000');
+    const minAmount = new Prisma.Decimal(configMap.get('MIN_WITHDRAWAL') ?? '200000');
     if (amount.lt(minAmount)) {
       throw new BadRequestException('So tien rut thap hon muc toi thieu (' + minAmount.toString() + ').');
     }
@@ -77,7 +88,7 @@ export class WalletsService {
     const netAmount = amount.sub(taxAmount);
 
     const created = await this.prisma.$transaction(async (tx) => {
-      const { gatewayPool, systemRevenue } = await this.ledger.getSystemWallets(tx);
+      const { gatewayPool, taxPayable } = await this.ledger.getSystemWallets(tx);
 
       const updatedWallet = await tx.wallets.update({
         where: { wallet_id: wallet.wallet_id },
@@ -100,11 +111,11 @@ export class WalletsService {
       // Credit system wallets directly as part of withdrawal liability 
       await tx.wallets.update({
         where: { wallet_id: gatewayPool.wallet_id },
-        data: { balance: { increment: netAmount } } // GATEWAY owes user bank
+        data: { balance: { decrement: netAmount } } // GATEWAY asset decreases instantly (Escrow lock)
       });
       await tx.wallets.update({
-        where: { wallet_id: systemRevenue.wallet_id },
-        data: { balance: { increment: taxAmount } } // SYSTEM keeps tax
+        where: { wallet_id: taxPayable.wallet_id },
+        data: { balance: { increment: taxAmount } } // TAX_PAYABLE keeps tax for state
       });
 
       await this.ledger.recordTransaction(
@@ -116,7 +127,7 @@ export class WalletsService {
         [
           { wallet_id: wallet.wallet_id, debit_amount: amount, credit_amount: 0 },
           { wallet_id: gatewayPool.wallet_id, debit_amount: 0, credit_amount: netAmount },
-          { wallet_id: systemRevenue.wallet_id, debit_amount: 0, credit_amount: taxAmount }
+          { wallet_id: taxPayable.wallet_id, debit_amount: 0, credit_amount: taxAmount }
         ]
       );
 
@@ -144,13 +155,13 @@ export class WalletsService {
         }
       }
     });
-    
+
     if (!wallet) throw new NotFoundException('Khong tim thay vi lien quan.');
 
     const nextStatus = dto.status;
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const { gatewayPool, systemRevenue } = await this.ledger.getSystemWallets(tx);
+      const { gatewayPool, taxPayable } = await this.ledger.getSystemWallets(tx);
 
       const updatedRequest = await tx.withdrawal_requests.update({
         where: { request_id: id },
@@ -169,10 +180,10 @@ export class WalletsService {
 
         await tx.wallets.update({
           where: { wallet_id: gatewayPool.wallet_id },
-          data: { balance: { decrement: request.net_amount } }
+          data: { balance: { increment: request.net_amount } } // GATEWAY asset restored
         });
         await tx.wallets.update({
-          where: { wallet_id: systemRevenue.wallet_id },
+          where: { wallet_id: taxPayable.wallet_id },
           data: { balance: { decrement: request.tax_amount } }
         });
 
@@ -184,7 +195,7 @@ export class WalletsService {
           'Hoan tien rut that bai',
           [
             { wallet_id: gatewayPool.wallet_id, debit_amount: request.net_amount, credit_amount: 0 },
-            { wallet_id: systemRevenue.wallet_id, debit_amount: request.tax_amount, credit_amount: 0 },
+            { wallet_id: taxPayable.wallet_id, debit_amount: request.tax_amount, credit_amount: 0 },
             { wallet_id: wallet.wallet_id, debit_amount: 0, credit_amount: request.amount }
           ]
         );

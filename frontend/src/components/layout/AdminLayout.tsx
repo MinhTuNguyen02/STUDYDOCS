@@ -5,7 +5,7 @@ import {
   LayoutDashboard, FileCheck, FileText, Users, Tags, AlertTriangle,
   MessageSquareWarning, WalletCards, Calculator, BarChart3, Settings,
   ShieldCheck, ScrollText, Package, LogOut, Menu, X, Library,
-  FolderTree
+  FolderTree, Vault
 } from 'lucide-react';
 
 interface Props {
@@ -39,6 +39,7 @@ export default function AdminLayout({ children }: Props) {
         { name: 'Quản lý Tài liệu', path: '/admin/documents', icon: <FileText className="w-5 h-5" />, roles: ['admin', 'mod'] },
         { name: 'Danh mục', path: '/admin/categories', icon: <FolderTree className="w-5 h-5" />, roles: ['admin', 'mod'] },
         { name: 'Quản lý Tags', path: '/admin/tags', icon: <Tags className="w-5 h-5" />, roles: ['admin', 'mod'] },
+        { name: 'Gói Download', path: '/admin/packages', icon: <Package className="w-5 h-5" />, roles: ['admin'] },
       ]
     },
     {
@@ -55,7 +56,8 @@ export default function AdminLayout({ children }: Props) {
         { name: 'Quản lý Rút tiền', path: '/admin/withdrawals', icon: <WalletCards className="w-5 h-5" />, roles: ['admin', 'accountant'] },
         { name: 'Đối soát Tài chính', path: '/admin/reconciliation', icon: <Calculator className="w-5 h-5" />, roles: ['admin', 'accountant'] },
         { name: 'Báo cáo Doanh thu', path: '/admin/revenue', icon: <BarChart3 className="w-5 h-5" />, roles: ['admin', 'accountant'] },
-        { name: 'Gói Download', path: '/admin/packages', icon: <Package className="w-5 h-5" />, roles: ['admin'] },
+        { name: 'Theo Dõi Tài Sản', path: '/admin/gateway', icon: <Vault className="w-5 h-5" />, roles: ['admin', 'accountant'] },
+        { name: 'Thuế TNCN', path: '/admin/tax', icon: <ShieldCheck className="w-5 h-5" />, roles: ['admin', 'accountant'] },
       ]
     },
     {

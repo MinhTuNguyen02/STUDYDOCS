@@ -93,73 +93,80 @@ export default function AdminRevenuePage() {
 
   return (
     <div>
-      <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
-            <LineChart className="w-6 h-6 text-primary" /> Báo cáo Doanh thu Hệ thống
+            <LineChart className="w-7 h-7 text-primary" /> Báo cáo Doanh thu Hệ thống
           </h1>
         </div>
-      </div>
-
-      {/* Filter and Export Container */}
-      <div className="bg-card border border-border p-5 rounded-2xl shadow-sm mb-8 flex flex-col md:flex-row items-end justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-          <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Từ ngày</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-muted-foreground mb-1">Đến ngày</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-              />
-            </div>
-          </div>
-          <button
-            onClick={fetchRevenue}
-            className="btn bg-primary text-white hover:bg-primary-hover px-6 py-2 rounded-xl text-sm font-semibold h-[38px] mt-auto shadow-sm"
-          >
-            Lọc dữ liệu
-          </button>
-        </div>
-
         <button
           onClick={handleExportCSV}
-          className="btn bg-success text-white hover:bg-emerald-600 px-6 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 h-[38px] shrink-0 shadow-sm"
+          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 h-[38px] shrink-0 shadow-sm transition-colors"
         >
-          <Download className="w-4 h-4" /> Xuất Excel / CSV
+          <Download className="w-4 h-4" /> Xuất CSV
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-card border-l-4 border-l-success p-6 rounded-r-2xl border-y border-r border-border shadow-sm flex flex-col justify-center">
-          <p className="text-sm text-muted-foreground font-semibold mb-1">Tổng thu (Credits)</p>
-          <p className="text-3xl font-black font-heading text-success">{formatBalance(totalCredit)}</p>
-        </div>
-        <div className="bg-card border-l-4 border-l-danger p-6 rounded-r-2xl border-y border-r border-border shadow-sm flex flex-col justify-center">
-          <p className="text-sm text-muted-foreground font-semibold mb-1">Tổng chi / Hoàn tiền (Debits)</p>
-          <p className="text-3xl font-black font-heading text-danger">{formatBalance(totalDebit)}</p>
-        </div>
-        <div className="bg-primary/5 border border-primary/20 p-6 rounded-2xl shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-sm text-primary font-semibold mb-1 uppercase tracking-wide">Lợi Nhận Ròng (Net)</p>
-            <p className="text-3xl font-black font-heading text-primary">{formatBalance(netRevenue)}</p>
+      {/* Filter Container */}
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-end gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Từ ngày</label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm font-semibold outline-none cursor-pointer focus:border-primary"
+            />
           </div>
-          <div className="p-4 bg-primary/10 rounded-full text-primary">
-            <TrendingUp className="w-8 h-8" />
+        </div>
+        <span className="text-muted-foreground font-bold pb-2">→</span>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Đến ngày</label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm font-semibold outline-none cursor-pointer focus:border-primary"
+            />
+          </div>
+        </div>
+        <button
+          onClick={fetchRevenue}
+          className="btn bg-primary text-white hover:bg-primary-hover px-5 py-2 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm h-[38px]"
+        >
+          Lọc dữ liệu
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+          <div className="absolute -right-3 -top-3 w-20 h-20 bg-success/10 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Tổng thu (Credits)</p>
+            <p className="text-2xl font-black text-success">{formatBalance(totalCredit)}</p>
+          </div>
+        </div>
+        <div className="bg-card border border-border p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+          <div className="absolute -right-3 -top-3 w-20 h-20 bg-danger/10 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Tổng chi / Hoàn tiền (Debits)</p>
+            <p className="text-2xl font-black text-danger">{formatBalance(totalDebit)}</p>
+          </div>
+        </div>
+        <div className="bg-primary/5 border border-primary/20 p-5 rounded-2xl shadow-sm relative overflow-hidden group">
+          <div className="absolute -right-3 -top-3 w-20 h-20 bg-primary/10 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Lợi Nhận Ròng (Net)</p>
+              <p className="text-2xl font-black text-primary">{formatBalance(netRevenue)}</p>
+            </div>
+            <div className="p-3 bg-primary/10 rounded-full text-primary shrink-0 relative z-20">
+              <TrendingUp className="w-6 h-6" />
+            </div>
           </div>
         </div>
       </div>
@@ -176,36 +183,40 @@ export default function AdminRevenuePage() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs sticky top-0 z-10 shadow-sm leading-relaxed">
+                <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-4">Thời gian</th>
-                    <th className="px-6 py-4">Mã Giao Dịch</th>
-                    <th className="px-6 py-4">Mô tả</th>
-                    <th className="px-6 py-4 text-right text-success border-x border-border">Thu (+)</th>
-                    <th className="px-6 py-4 text-right text-danger border-r border-border rounded-tr-2xl">Chi (-)</th>
+                    <th className="p-4 font-semibold w-40">Thời gian</th>
+                    <th className="p-4 font-semibold">Mã Giao Dịch</th>
+                    <th className="p-4 font-semibold">Mô tả</th>
+                    <th className="p-4 font-semibold text-right text-success">Thu (+)</th>
+                    <th className="p-4 font-semibold text-right text-danger">Chi (-)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {paginatedItems.map((item) => (
-                    <tr key={item.entry_id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 text-muted-foreground text-xs whitespace-nowrap">
-                        {formatDateTime(item.created_at)}
-                      </td>
-                      <td className="px-6 py-4 font-mono font-bold text-xs">TXN-{item.transaction_id}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold">{item.ledger_transactions.transaction_type}</span>
-                          <span className="text-xs text-muted-foreground mt-0.5">{item.ledger_transactions.description}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-right font-mono font-bold text-success border-x border-border/50">
-                        {Number(item.credit_amount) > 0 ? `+${formatBalance(item.credit_amount)}` : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-right font-mono font-bold text-danger border-r border-border/50">
-                        {Number(item.debit_amount) > 0 ? `-${formatBalance(item.debit_amount)}` : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {paginatedItems.map((item) => {
+                    const cr = Number(item.credit_amount);
+                    const de = Number(item.debit_amount);
+                    return (
+                      <tr key={item.entry_id} className="hover:bg-muted/30 transition-colors">
+                        <td className="p-4 text-muted-foreground text-sm whitespace-nowrap">
+                          {formatDateTime(item.created_at)}
+                        </td>
+                        <td className="p-4 font-mono font-bold text-sm">TXN-{item.transaction_id}</td>
+                        <td className="p-4">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm">{item.ledger_transactions.transaction_type}</span>
+                            <span className="text-xs text-muted-foreground mt-0.5">{item.ledger_transactions.description}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-right">
+                          {cr > 0 ? <span className="font-bold text-success">+{formatBalance(cr)}</span> : <span className="text-muted-foreground/30">-</span>}
+                        </td>
+                        <td className="p-4 text-right">
+                          {de > 0 ? <span className="font-bold text-danger">-{formatBalance(de)}</span> : <span className="text-muted-foreground/30">-</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

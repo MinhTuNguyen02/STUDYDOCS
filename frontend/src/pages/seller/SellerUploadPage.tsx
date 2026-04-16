@@ -25,7 +25,8 @@ function CascadeCategorySelector({ allCategories, value, onChange }: CascadeSele
   const [path, setPath] = useState<number[]>([])
 
   useEffect(() => {
-    if (!value) setPath([])
+    // Removed: do not blindly wipe path when value is empty, because selecting an intermediate
+    // category intentionally sets value = '' preventing the next dropdown from showing.
   }, [value])
 
   const childrenOf = (parentId: number | null) =>

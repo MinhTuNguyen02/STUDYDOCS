@@ -111,4 +111,24 @@ export class AdminController {
     if (!startDate || !endDate) return [];
     return this.adminService.exportRevenueReport(startDate, endDate);
   }
+
+  @Get('wallets/gateway')
+  @Roles('admin', 'accountant')
+  getGatewayWallet(@Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.adminService.getGatewayWalletReport(startDate || today, endDate || today);
+  }
+
+  @Get('wallets/tax')
+  @Roles('admin', 'accountant')
+  getTaxWallet(@Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.adminService.getTaxWalletReport(startDate || today, endDate || today);
+  }
+
+  @Post('wallets/tax/pay')
+  @Roles('admin', 'accountant')
+  payTax(@CurrentUser() user: AuthUser, @Body() body: { amount: number; note: string }) {
+    return this.adminService.payTax(user, body.amount, body.note);
+  }
 }

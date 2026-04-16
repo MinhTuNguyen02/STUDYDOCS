@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { LedgerService } from '../wallets/ledger.service';
 import { StorageService } from '../storage/storage.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -15,7 +16,8 @@ import { hash } from 'bcryptjs';
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storageService: StorageService
+    private readonly storageService: StorageService,
+    private readonly ledger: LedgerService
   ) { }
 
   private formatFileSize(bytes: number) {
@@ -760,6 +762,10 @@ export class AdminService {
       where: { wallet_type: 'SYSTEM_REVENUE' }
     });
 
+    const taxPayable = await this.prisma.wallets.findFirst({
+      where: { wallet_type: 'TAX_PAYABLE' }
+    });
+
     // Aggregate user balances only (exclude SYSTEM_REVENUE and GATEWAY_POOL)
     const userWalletsAgg = await this.prisma.wallets.aggregate({
       where: {
@@ -770,19 +776,21 @@ export class AdminService {
 
     const gatewayBalance = gatewayPool?.balance || new Prisma.Decimal(0);
     const systemBalance = systemRevenue?.balance || new Prisma.Decimal(0);
+    const taxBalance = taxPayable?.balance || new Prisma.Decimal(0);
     const userBalance = (userWalletsAgg._sum.balance || new Prisma.Decimal(0)).plus(userWalletsAgg._sum.pending_balance || new Prisma.Decimal(0));
 
     // GATEWAY_POOL is the total fiat cash in the real bank account.
-    // It should perfectly equal all user liabilities (User Balances + Pending) + accumulated platform earnings (System Revenue).
-    const discrepancy = gatewayBalance.minus(userBalance).minus(systemBalance);
+    // It should perfectly equal all user liabilities (User Balances + Pending) + platform earnings (System) + tax obligations (Tax)
+    const discrepancy = gatewayBalance.minus(userBalance).minus(systemBalance).minus(taxBalance);
 
     return toJsonSafe({
       timestamp: new Date().toISOString(),
       report: {
         totalFiatInBank_GATEWAY_POOL: gatewayBalance,
         totalLiabilities_USER_WALLETS: userBalance,
+        totalLiabilities_TAX_PAYABLE: taxBalance,
         totalEquity_SYSTEM_REVENUE: systemBalance,
-        accountingEquation: 'GATEWAY_POOL = USER_WALLETS + SYSTEM_REVENUE',
+        accountingEquation: 'GATEWAY_POOL = USER_WALLETS + SYSTEM_REVENUE + TAX_PAYABLE',
         discrepancy: discrepancy,
         isSystemSolvent: discrepancy.greaterThanOrEqualTo(0),
         isDoubleEntryMatched: discrepancy.equals(0)
@@ -822,6 +830,153 @@ export class AdminService {
       },
       include: { ledger_transactions: true },
       orderBy: { created_at: 'asc' }
+    });
+  }
+
+  async getGatewayWalletReport(startDate: string, endDate: string) {
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+    const start = new Date(new Date(startDate + 'T00:00:00+07:00').getTime());
+    const end = new Date(new Date(endDate + 'T23:59:59+07:00').getTime());
+
+    const gatewayWallet = await this.prisma.wallets.findFirst({
+      where: { wallet_type: 'GATEWAY_POOL' }
+    });
+
+    if (!gatewayWallet) return { wallet: null, entries: [], summary: null };
+
+    const entries = await this.prisma.ledger_entries.findMany({
+      where: {
+        wallet_id: gatewayWallet.wallet_id,
+        created_at: { gte: start, lte: end }
+      },
+      include: { ledger_transactions: true },
+      orderBy: { created_at: 'desc' }
+    });
+
+    // GATEWAY_POOL is an Asset account: DEBIT = increase (In), CREDIT = decrease (Out)
+    const totalIn = entries.reduce((sum, e) => sum + Number(e.debit_amount), 0);
+    const totalOut = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
+
+    return toJsonSafe({
+      wallet: {
+        wallet_id: gatewayWallet.wallet_id,
+        balance: gatewayWallet.balance,
+        pending_balance: gatewayWallet.pending_balance
+      },
+      summary: { totalIn, totalOut, netFlow: totalIn - totalOut, entryCount: entries.length },
+      entries
+    });
+  }
+
+  async getTaxWalletReport(startDate: string, endDate: string) {
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+    const start = new Date(new Date(startDate + 'T00:00:00+07:00').getTime());
+    const end = new Date(new Date(endDate + 'T23:59:59+07:00').getTime());
+
+    const taxWallet = await this.prisma.wallets.findFirst({
+      where: { wallet_type: 'TAX_PAYABLE' }
+    });
+
+    if (!taxWallet) return { wallet: null, entries: [], summary: null };
+
+    const entries = await this.prisma.ledger_entries.findMany({
+      where: {
+        wallet_id: taxWallet.wallet_id,
+        created_at: { gte: start, lte: end }
+      },
+      include: { ledger_transactions: true },
+      orderBy: { created_at: 'desc' }
+    });
+
+    // TAX_PAYABLE is a Liability account: CREDIT = increase (Thu hộ), DEBIT = decrease (Nộp thuế HOẶC Hoàn tiền)
+    const totalCollected = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
+    
+    // Only count explicit tax payments to the state, not refunds back to the user
+    const totalPaid = entries
+      .filter((e) => e.ledger_transactions.reference_type === 'TAX_PAYMENT')
+      .reduce((sum, e) => sum + Number(e.debit_amount), 0);
+
+    const totalRefunded = entries
+      .filter((e) => e.ledger_transactions.type === 'REFUND')
+      .reduce((sum, e) => sum + Number(e.debit_amount), 0);
+
+    return toJsonSafe({
+      wallet: {
+        wallet_id: taxWallet.wallet_id,
+        balance: taxWallet.balance,
+        pending_balance: taxWallet.pending_balance
+      },
+      summary: { totalCollected, totalPaid, totalRefunded, netFlow: totalCollected - totalPaid - totalRefunded, entryCount: entries.length },
+      entries
+    });
+  }
+
+  async payTax(actor: AuthUser, amount: number, note: string) {
+    if (amount <= 0) throw new BadRequestException('Số tiền không hợp lệ.');
+
+    const taxAmount = new Prisma.Decimal(amount);
+
+    return await this.prisma.$transaction(async (tx) => {
+      const { gatewayPool, taxPayable } = await this.ledger.getSystemWallets(tx);
+
+      if (taxPayable.balance.lt(taxAmount)) {
+        throw new BadRequestException('Số tiền nộp thuế vượt quá số dư Thuế Thu Hộ.');
+      }
+      if (gatewayPool.balance.lt(taxAmount)) {
+        throw new BadRequestException('Số dư cổng thanh toán không đủ để thực hiện lệnh rút nộp thuế.');
+      }
+
+      await tx.wallets.update({
+        where: { wallet_id: taxPayable.wallet_id },
+        data: { balance: { decrement: taxAmount } }
+      });
+
+      await tx.wallets.update({
+        where: { wallet_id: gatewayPool.wallet_id },
+        data: { balance: { decrement: taxAmount } }
+      });
+
+      const ledgerTx = await tx.ledger_transactions.create({
+        data: {
+          type: 'WITHDRAW',
+          reference_type: 'TAX_PAYMENT',
+          reference_id: taxPayable.wallet_id,
+          status: 'COMPLETED',
+          description: `Nộp thuế TNCN - ${note}`,
+          created_at: new Date()
+        }
+      });
+
+      await tx.ledger_entries.createMany({
+        data: [
+          {
+            transaction_id: ledgerTx.id,
+            wallet_id: taxPayable.wallet_id,
+            debit_amount: taxAmount,
+            credit_amount: 0,
+            created_at: new Date()
+          },
+          {
+            transaction_id: ledgerTx.id,
+            wallet_id: gatewayPool.wallet_id,
+            debit_amount: 0,
+            credit_amount: taxAmount,
+            created_at: new Date()
+          }
+        ]
+      });
+
+      await tx.audit_logs.create({
+        data: {
+          account_id: actor.staffId ? Number(actor.staffId) : Number(actor.accountId),
+          action: 'TAX_PAYMENT',
+          target_id: ledgerTx.id,
+          target_table: 'ledger_transactions',
+          new_value: { amount, note, wallet_id: taxPayable.wallet_id } as Prisma.InputJsonValue
+        }
+      });
+
+      return toJsonSafe(ledgerTx);
     });
   }
 }

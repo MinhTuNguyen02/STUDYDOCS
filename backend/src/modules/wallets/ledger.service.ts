@@ -21,14 +21,30 @@ export class LedgerService {
       }
     });
 
+    let taxPayable = await tx.wallets.findFirst({
+      where: {
+        wallet_type: 'TAX_PAYABLE'
+      }
+    });
+
+    if (!taxPayable) {
+      taxPayable = await tx.wallets.create({
+        data: {
+          wallet_type: 'TAX_PAYABLE',
+          balance: 0,
+          pending_balance: 0
+        }
+      });
+    }
+
     // 3. Bắt lỗi chi tiết nếu lỡ mất ví
-    if (!gatewayPool || !systemRevenue) {
+    if (!gatewayPool || !systemRevenue || !taxPayable) {
       throw new InternalServerErrorException(
-        `System wallets missing! GATEWAY_POOL: ${!!gatewayPool}, SYSTEM_REVENUE: ${!!systemRevenue}.`
+        `System wallets missing! GATEWAY_POOL: ${!!gatewayPool}, SYSTEM_REVENUE: ${!!systemRevenue}, TAX_PAYABLE: ${!!taxPayable}.`
       );
     }
 
-    return { gatewayPool, systemRevenue };
+    return { gatewayPool, systemRevenue, taxPayable };
   }
 
   async recordTransaction(

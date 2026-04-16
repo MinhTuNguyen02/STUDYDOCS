@@ -51,9 +51,11 @@ import AdminDisputesPage from '@/pages/admin/AdminDisputesPage'
 import AdminConfigsPage from '@/pages/admin/AdminConfigsPage'
 import AdminPackagesPage from '@/pages/admin/AdminPackagesPage'
 import AdminRevenuePage from '@/pages/admin/AdminRevenuePage'
+import AdminGatewayPage from '@/pages/admin/AdminGatewayPage'
 import AdminPoliciesPage from '@/pages/admin/AdminPoliciesPage'
 import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage'
 import AdminProfilePage from '@/pages/admin/AdminProfilePage'
+import AdminTaxPage from '@/pages/admin/AdminTaxPage'
 import PlaceholderAdminPage from '@/pages/admin/PlaceholderAdminPage'
 
 import { useEffect } from 'react'
@@ -206,9 +208,19 @@ function App() {
                     <AdminRevenuePage />
                   </RequireRole>
                 } />
+                <Route path="/gateway" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminGatewayPage />
+                  </RequireRole>
+                } />
                 <Route path="/reconciliation" element={
                   <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
                     <AdminReconciliationPage />
+                  </RequireRole>
+                } />
+                <Route path="/tax" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminTaxPage />
                   </RequireRole>
                 } />
                 <Route path="/packages" element={

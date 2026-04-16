@@ -85,6 +85,8 @@ export default function AdminWithdrawalsPage() {
                   <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
                     <th className="p-4 font-semibold">Tài khoản Yêu cầu</th>
                     <th className="p-4 font-semibold">Số tiền</th>
+                    <th className="p-4 font-semibold">Thuế</th>
+                    <th className="p-4 font-semibold">Thực nhận</th>
                     <th className="p-4 font-semibold">Ngân hàng</th>
                     <th className="p-4 font-semibold">Trạng thái</th>
                     <th className="p-4 font-semibold">Ngày tạo</th>
@@ -95,26 +97,30 @@ export default function AdminWithdrawalsPage() {
                   {filteredWithdrawals.length === 0 ? (
                     <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
                   ) : paginatedItems.map((w) => (
-                    <tr key={w.id} className="hover:bg-muted/10">
+                    <tr key={w.request_id} className="hover:bg-muted/10">
                       <td className="p-4">
-                        <div className="font-semibold text-sm">{w.accountName || w.user?.fullName}</div>
+                        <div className="font-semibold text-sm">{w.customer_profiles.full_name}</div>
+                        <p className="text-muted-foreground">{w.customer_profiles.accounts.email}</p>
                       </td>
                       <td className="p-4 font-bold text-primary">{formatBalance(w.amount)}</td>
+                      <td className="p-4 font-bold text-primary">{formatBalance(w.tax_amount)}</td>
+                      <td className="p-4 font-bold text-success">{formatBalance(w.net_amount)}</td>
                       <td className="p-4 text-sm">
-                        <p className="font-semibold">{w.bankName}</p>
-                        <p className="text-muted-foreground">{w.accountNumber}</p>
+                        <p className="font-semibold">{w.bank_info.bank}</p>
+                        <p className="text-muted-foreground">{w.bank_info.account}</p>
+                        <p className="text-muted-foreground">{w.bank_info.accountName}</p>
                       </td>
                       <td className="p-4">
                         {w.status === 'PENDING' && <span className="bg-warning/10 text-warning px-2 py-1 rounded text-xs font-bold">Chờ duyệt</span>}
                         {w.status === 'PAID' && <span className="bg-success/10 text-success px-2 py-1 rounded text-xs font-bold">Hoàn tất</span>}
                         {w.status === 'REJECTED' && <span className="bg-danger/10 text-danger px-2 py-1 rounded text-xs font-bold">Từ chối</span>}
                       </td>
-                      <td className="p-4 text-sm text-muted-foreground">{formatDate(w.createdAt)}</td>
+                      <td className="p-4 text-sm text-muted-foreground">{formatDate(w.created_at)}</td>
                       <td className="p-4 text-right">
                         {w.status === 'PENDING' ? (
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => handleAction(w.id, 'PAID')} className="p-2 bg-success text-white rounded-lg hover:bg-success/90 cursor-pointer" title="Duyệt"><ShieldCheck className="w-4 h-4" /></button>
-                            <button onClick={() => handleAction(w.id, 'REJECTED')} className="p-2 bg-danger/10 text-danger rounded-lg hover:bg-danger/20 cursor-pointer" title="Từ chối"><XCircle className="w-4 h-4" /></button>
+                            <button onClick={() => handleAction(w.request_id, 'PAID')} className="p-2 bg-success text-white rounded-lg hover:bg-success/90 cursor-pointer" title="Duyệt"><ShieldCheck className="w-4 h-4" /></button>
+                            <button onClick={() => handleAction(w.request_id, 'REJECTED')} className="p-2 bg-danger/10 text-danger rounded-lg hover:bg-danger/20 cursor-pointer" title="Từ chối"><XCircle className="w-4 h-4" /></button>
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-sm italic">Đã xử lý</span>

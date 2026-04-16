@@ -153,7 +153,7 @@ export default function ProfilePage() {
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault()
     const amountNum = Number(withdrawForm.amount)
-    if (amountNum < 100000) return toast.error('Rút tối thiểu 100,000đ')
+    if (amountNum < 200000) return toast.error('Rút tối thiểu 200,000đ')
     if (!withdrawForm.bank || !withdrawForm.account || !withdrawForm.accountName) return toast.error('Vui lòng điền đủ thông tin ngân hàng')
 
     setIsSubmitting(true)
@@ -509,7 +509,7 @@ export default function ProfilePage() {
                     </select>
 
                     {(txWalletType !== 'ALL' || txSign !== 'ALL') && (
-                      <button 
+                      <button
                         onClick={() => { setTxWalletType('ALL'); setTxSign('ALL'); }}
                         className="text-danger flex items-center gap-1 text-sm font-semibold hover:bg-danger/10 px-2 py-1.5 rounded-lg transition-colors"
                         title="Xóa lọc"
@@ -538,38 +538,38 @@ export default function ProfilePage() {
                     }
 
                     return (
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="bg-muted/50 text-muted-foreground text-xs border-b border-border uppercase tracking-wide">
-                          <th className="p-3 font-semibold">Thời gian</th>
-                          <th className="p-3 font-semibold">Giao dịch</th>
-                          <th className="p-3 font-semibold">Ví</th>
-                          <th className="p-3 font-semibold text-right">Biến động</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {filteredTransactions.map((tx: any, idx) => {
-                          const isCredit = !!tx.credit && tx.credit > 0
-                          const amount = isCredit ? tx.credit : tx.debit
-                          return (
-                            <tr key={idx} className="hover:bg-muted/30 transition-colors">
-                              <td className="p-3 text-sm text-muted-foreground">{formatDate(tx.createdAt || tx.created_at)}</td>
-                              <td className="p-3 text-sm font-medium">{tx.transaction?.description || tx.description || 'Giao dịch'}</td>
-                              <td className="p-3 text-sm font-semibold">
-                                <span className={`px-2 py-0.5 rounded-md text-xs ${tx.walletType === 'PAYMENT' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>{tx.walletType || tx.wallet_type}</span>
-                              </td>
-                              <td className="p-3 text-right font-bold w-32 shrink-0">
-                                {isCredit ? (
-                                  <span className="text-success flex justify-end items-center gap-1"><ArrowUpRight className="w-4 h-4" /> +{formatBalance(amount)}</span>
-                                ) : (
-                                  <span className="text-danger flex justify-end items-center gap-1"><ArrowDownRight className="w-4 h-4" /> -{formatBalance(amount)}</span>
-                                )}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-muted/50 text-muted-foreground text-xs border-b border-border uppercase tracking-wide">
+                            <th className="p-3 font-semibold">Thời gian</th>
+                            <th className="p-3 font-semibold">Giao dịch</th>
+                            <th className="p-3 font-semibold">Ví</th>
+                            <th className="p-3 font-semibold text-right">Biến động</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {filteredTransactions.map((tx: any, idx) => {
+                            const isCredit = !!tx.credit && tx.credit > 0
+                            const amount = isCredit ? tx.credit : tx.debit
+                            return (
+                              <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                                <td className="p-3 text-sm text-muted-foreground">{formatDate(tx.createdAt || tx.created_at)}</td>
+                                <td className="p-3 text-sm font-medium">{tx.transaction?.description || tx.description || 'Giao dịch'}</td>
+                                <td className="p-3 text-sm font-semibold">
+                                  <span className={`px-2 py-0.5 rounded-md text-xs ${tx.walletType === 'PAYMENT' ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>{tx.walletType || tx.wallet_type}</span>
+                                </td>
+                                <td className="p-3 text-right font-bold w-32 shrink-0">
+                                  {isCredit ? (
+                                    <span className="text-success flex justify-end items-center gap-1"><ArrowUpRight className="w-4 h-4" /> +{formatBalance(amount)}</span>
+                                  ) : (
+                                    <span className="text-danger flex justify-end items-center gap-1"><ArrowDownRight className="w-4 h-4" /> -{formatBalance(amount)}</span>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
                     )
                   })()}
                 </div>
@@ -650,7 +650,7 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-foreground mb-1.5">Số tiền rút (VNĐ)</label>
                 <input
                   type="number" value={withdrawForm.amount} onChange={(e) => setWithdrawForm({ ...withdrawForm, amount: e.target.value })}
-                  placeholder="Tối thiểu 100,000" required
+                  placeholder="Tối thiểu 200,000" required
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
@@ -705,7 +705,7 @@ export default function ProfilePage() {
                       <div>
                         <div className="font-bold text-foreground mb-1">{formatBalance(w.amount)}</div>
                         <div className="text-sm text-muted-foreground">
-                          {w.bankName || w.bank} - {w.accountNumber || w.account} ({w.accountName})
+                          {w.bank_info.bank} - {w.bank_info.account} ({w.bank_info.accountName})
                         </div>
                         <div className="text-xs text-muted-foreground mt-2">{formatDate(w.createdAt || w.created_at)}</div>
                       </div>

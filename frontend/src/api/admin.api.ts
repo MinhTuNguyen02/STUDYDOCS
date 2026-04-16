@@ -78,6 +78,18 @@ export const adminApi = {
     const res = await api.get('/admin/reports/revenue', { params });
     return res.data;
   },
+  getGatewayWallet: async (params?: any) => {
+    const res = await api.get('/admin/wallets/gateway', { params });
+    return res.data;
+  },
+  getTaxWallet: async (params?: any) => {
+    const res = await api.get('/admin/wallets/tax', { params });
+    return res.data;
+  },
+  payTax: async (data: { amount: number; note: string }) => {
+    const res = await api.post('/admin/wallets/tax/pay', data);
+    return res.data;
+  },
 
   getConfigs: async () => {
     const res = await api.get('/configs');
@@ -153,6 +165,12 @@ export const adminApi = {
   // ── Audit Logs ──
   getAuditLogs: async (params?: any) => {
     const res = await api.get('/admin/audit-logs', { params });
+    return res.data;
+  },
+
+  // ── Gateway Wallet ──
+  getGatewayWalletReport: async (params?: { startDate?: string; endDate?: string }) => {
+    const res = await api.get('/admin/wallets/gateway', { params });
     return res.data;
   }
 };

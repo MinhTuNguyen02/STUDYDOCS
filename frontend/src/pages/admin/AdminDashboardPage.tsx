@@ -313,7 +313,7 @@ export default function AdminDashboardPage() {
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-success/10 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-muted-foreground font-medium">Tổng File Đang Public</h3>
+                  <h3 className="text-muted-foreground font-medium">Tổng tài liệu</h3>
                   <div className="p-2 bg-success/10 rounded-xl text-success"><Files className="w-5 h-5" /></div>
                 </div>
                 <p className="text-3xl font-bold font-heading mb-1">{stats.totalDocuments || 0}</p>

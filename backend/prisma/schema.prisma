@@ -580,6 +580,7 @@ enum wallet_type {
   REVENUE
   GATEWAY_POOL
   SYSTEM_REVENUE
+  TAX_PAYABLE
 }
 
 enum ledger_transaction_type {
