@@ -32,6 +32,15 @@ export class SellerController {
     return this.sellerService.getMonthlyTrend(user, year);
   }
 
+  @Get('dashboard/daily-trend')
+  getDailyTrend(
+    @CurrentUser() user: AuthUser,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ) {
+    return this.sellerService.getDailyTrend(user, startDate, endDate);
+  }
+
   @Get('documents')
   listMyDocuments(
     @CurrentUser() user: AuthUser, 

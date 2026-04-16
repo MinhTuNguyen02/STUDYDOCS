@@ -34,14 +34,24 @@ export class AdminService {
   async getDashboard(params?: { startDate?: string; endDate?: string }) {
     const now = new Date();
 
-    let startOfDay, endOfDay;
+    // ── Parse startDate/endDate as VN local time (UTC+7) ────────────────────
+    // Client sends "YYYY-MM-DD" strings representing VN local dates.
+    // Parsing with new Date("YYYY-MM-DD") gives midnight UTC → 7:00 VN = wrong boundary.
+    // We add 7h offset manually so the boundary aligns with VN midnight.
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+    let startOfDay: Date, endOfDay: Date;
     if (params?.startDate && params?.endDate) {
-      startOfDay = new Date(params.startDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      endOfDay = new Date(params.endDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Parse as VN midnight: "YYYY-MM-DD" → midnight UTC+7
+      startOfDay = new Date(new Date(params.startDate).getTime() + VN_OFFSET_MS);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      // Subtract back to get UTC equivalent of VN 00:00
+      startOfDay = new Date(startOfDay.getTime() - VN_OFFSET_MS);
+
+      endOfDay = new Date(new Date(params.endDate).getTime() + VN_OFFSET_MS);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      endOfDay = new Date(endOfDay.getTime() - VN_OFFSET_MS);
     } else {
-      // Default to last 7 days
       startOfDay = new Date(now);
       startOfDay.setDate(startOfDay.getDate() - 6);
       startOfDay.setHours(0, 0, 0, 0);
@@ -49,76 +59,183 @@ export class AdminService {
       endOfDay.setHours(23, 59, 59, 999);
     }
 
-    const [pendingApprovals, totalDocuments, payments, orders, documents] = await Promise.all([
+    // Helper: get VN local date string "YYYY-MM-DD" from a UTC Date
+    const toVNDateKey = (d: Date) => {
+      const vnDate = new Date(d.getTime() + VN_OFFSET_MS);
+      const y = vnDate.getUTCFullYear();
+      const m = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(vnDate.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const [pendingApprovals, totalDocuments, payments, orders, documents, commissionItems, packageSales, refundedItems] = await Promise.all([
       this.prisma.documents.count({ where: { status: 'PENDING' } }),
-      this.prisma.documents.count(),
+      // Only count publicly visible APPROVED documents
+      this.prisma.documents.count({ where: { status: 'APPROVED' } }),
+      // Nạp tiền vào ví
       this.prisma.payments.findMany({
         where: { status: 'COMPLETED', created_at: { gte: startOfDay, lte: endOfDay } },
         select: { amount: true, created_at: true }
       }),
+      // Đơn hàng thành công (PAID), không tính REFUNDED
       this.prisma.orders.findMany({
-        where: { status: 'PAID', created_at: { gte: startOfDay, lte: endOfDay } },
+        where: {
+          status: 'PAID',
+          created_at: { gte: startOfDay, lte: endOfDay },
+          order_items: { none: { status: 'REFUNDED' } }
+        },
         select: { created_at: true }
       }),
       this.prisma.documents.findMany({
         where: { created_at: { gte: startOfDay, lte: endOfDay } },
         select: { created_at: true }
+      }),
+      // Doanh thu hoa hồng từ bán tài liệu (commission_fee)
+      this.prisma.order_items.findMany({
+        where: {
+          status: { in: ['HELD', 'RELEASED'] },
+          created_at: { gte: startOfDay, lte: endOfDay }
+        },
+        select: { commission_fee: true, created_at: true }
+      }),
+      // Doanh thu từ bán package (join với packages để lấy giá)
+      this.prisma.user_packages.findMany({
+        where: { purchased_at: { gte: startOfDay, lte: endOfDay } },
+        select: { purchased_at: true, packages: { select: { price: true, package_id: true, name: true } } }
+      }),
+      // Giao dịch bị hoàn tiền (per-day data for chart toggle)
+      this.prisma.order_items.findMany({
+        where: {
+          status: 'REFUNDED',
+          updated_at: { gte: startOfDay, lte: endOfDay }
+        },
+        select: { updated_at: true }
       })
     ]);
 
-    const revenueRange = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const depositRevenue = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const commissionRevenue = commissionItems.reduce((sum, p) => sum + Number(p.commission_fee ?? 0), 0);
+    const pkgRevenue = packageSales.reduce((sum, p) => sum + Number(p.packages?.price ?? 0), 0);
+    // Platform total revenue = deposits + commissions + package sales
+    const revenueRange = depositRevenue + commissionRevenue + pkgRevenue;
     const ordersRange = orders.length;
 
-    // Build chart data
-    const chartMap = new Map<string, { date: string; revenue: number; orders: number; documents: number }>();
+    // ── Build chart data keyed by VN local date ──────────────────────────────
+    const chartMap = new Map<string, {
+      date: string;
+      revenue: number;         // total (all sources)
+      depositRevenue: number;  // nạp ví
+      commissionRevenue: number; // hoa hồng tài liệu
+      packageRevenue: number;  // bán gói
+      orders: number;
+      refunded: number;
+      documents: number;
+    }>();
     let current = new Date(startOfDay);
     while (current <= endOfDay) {
-      // format YYYY-MM-DD
-      const dateStr = current.toISOString().split('T')[0];
-      chartMap.set(dateStr, { date: dateStr, revenue: 0, orders: 0, documents: 0 });
+      const dateKey = toVNDateKey(current);
+      if (!chartMap.has(dateKey)) {
+        chartMap.set(dateKey, { date: dateKey, revenue: 0, depositRevenue: 0, commissionRevenue: 0, packageRevenue: 0, orders: 0, refunded: 0, documents: 0 });
+      }
       current.setDate(current.getDate() + 1);
     }
 
     payments.forEach(p => {
       if (!p.created_at) return;
-      const dateStr = p.created_at.toISOString().split('T')[0];
-      if (chartMap.has(dateStr)) chartMap.get(dateStr)!.revenue += Number(p.amount);
+      const key = toVNDateKey(p.created_at);
+      if (chartMap.has(key)) {
+        const entry = chartMap.get(key)!;
+        const amt = Number(p.amount);
+        entry.depositRevenue += amt;
+        entry.revenue += amt;
+      }
+    });
+    commissionItems.forEach(p => {
+      if (!p.created_at) return;
+      const key = toVNDateKey(p.created_at);
+      if (chartMap.has(key)) {
+        const entry = chartMap.get(key)!;
+        const amt = Number(p.commission_fee ?? 0);
+        entry.commissionRevenue += amt;
+        entry.revenue += amt;
+      }
+    });
+    packageSales.forEach(p => {
+      const key = toVNDateKey(p.purchased_at);
+      if (chartMap.has(key)) {
+        const entry = chartMap.get(key)!;
+        const amt = Number(p.packages?.price ?? 0);
+        entry.packageRevenue += amt;
+        entry.revenue += amt;
+      }
     });
     orders.forEach(o => {
       if (!o.created_at) return;
-      const dateStr = o.created_at.toISOString().split('T')[0];
-      if (chartMap.has(dateStr)) chartMap.get(dateStr)!.orders += 1;
+      const key = toVNDateKey(o.created_at);
+      if (chartMap.has(key)) chartMap.get(key)!.orders += 1;
+    });
+    refundedItems.forEach(r => {
+      if (!r.updated_at) return;
+      const key = toVNDateKey(r.updated_at);
+      if (chartMap.has(key)) chartMap.get(key)!.refunded += 1;
     });
     documents.forEach(d => {
-      const dateStr = d.created_at.toISOString().split('T')[0];
-      if (chartMap.has(dateStr)) chartMap.get(dateStr)!.documents += 1;
+      const key = toVNDateKey(d.created_at);
+      if (chartMap.has(key)) chartMap.get(key)!.documents += 1;
     });
 
     const chartData = Array.from(chartMap.values());
 
-    // Top Uploaders
+    // ── Top Packages by purchase count ───────────────────────────────────────
+    const topPackagesGroup = await this.prisma.user_packages.groupBy({
+      by: ['package_id'],
+      _count: { user_package_id: true },
+      where: { purchased_at: { gte: startOfDay, lte: endOfDay } },
+      orderBy: { _count: { user_package_id: 'desc' } },
+      take: 5
+    });
+    const pkgIds = topPackagesGroup.map(p => p.package_id);
+    const pkgMeta = await this.prisma.packages.findMany({
+      where: { package_id: { in: pkgIds } },
+      select: { package_id: true, name: true, price: true }
+    });
+    const pkgMetaMap = new Map(pkgMeta.map(p => [p.package_id, p]));
+    const topPackages = topPackagesGroup.map(p => ({
+      id: p.package_id,
+      name: pkgMetaMap.get(p.package_id)?.name ?? 'Gói không xác định',
+      price: Number(pkgMetaMap.get(p.package_id)?.price ?? 0),
+      count: p._count.user_package_id
+    }));
+
+    // Top Uploaders (chỉ tính file đã APPROVED)
     const topUploadersGroup = await this.prisma.documents.groupBy({
       by: ['seller_id'],
       _count: { document_id: true },
-      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      where: { created_at: { gte: startOfDay, lte: endOfDay }, status: 'APPROVED' },
       orderBy: { _count: { document_id: 'desc' } },
       take: 5
     });
 
-    // Top Sellers by Quantity
+    // Top Sellers by Quantity (exclude REFUNDED)
     const topSellersGroup = await this.prisma.order_items.groupBy({
       by: ['seller_id'],
       _count: { order_item_id: true },
-      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      where: {
+        created_at: { gte: startOfDay, lte: endOfDay },
+        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+      },
       orderBy: { _count: { order_item_id: 'desc' } },
       take: 5
     });
 
-    // Top Sellers by Revenue
+    // Top Sellers by Revenue (exclude REFUNDED)
     const topRevenueGroup = await this.prisma.order_items.groupBy({
       by: ['seller_id'],
       _sum: { seller_earning: true },
-      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      where: {
+        created_at: { gte: startOfDay, lte: endOfDay },
+        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+      },
       orderBy: { _sum: { seller_earning: 'desc' } },
       take: 5
     });
@@ -139,11 +256,40 @@ export class AdminService {
     const topSellers = topSellersGroup.map(s => ({ id: s.seller_id, name: profileMap.get(s.seller_id), count: s._count.order_item_id }));
     const topRevenueSellers = topRevenueGroup.map(r => ({ id: r.seller_id, name: profileMap.get(r.seller_id), revenue: Number(r._sum.seller_earning || 0) }));
 
-    // Top Documents
+    // Top Buyers by order count (exclude orders where all items are REFUNDED)
+    const topBuyersGroup = await this.prisma.orders.groupBy({
+      by: ['buyer_id'],
+      _count: { order_id: true },
+      _sum: { total_amount: true },
+      where: {
+        status: 'PAID',
+        created_at: { gte: startOfDay, lte: endOfDay },
+        order_items: { none: { status: 'REFUNDED' } }
+      },
+      orderBy: { _count: { order_id: 'desc' } },
+      take: 5
+    });
+    const buyerIds = topBuyersGroup.map(b => b.buyer_id);
+    const buyerProfiles = await this.prisma.customer_profiles.findMany({
+      where: { customer_id: { in: buyerIds } },
+      select: { customer_id: true, full_name: true }
+    });
+    const buyerProfileMap = new Map(buyerProfiles.map(p => [p.customer_id, p.full_name]));
+    const topBuyers = topBuyersGroup.map(b => ({
+      id: b.buyer_id,
+      name: buyerProfileMap.get(b.buyer_id),
+      count: b._count.order_id,
+      totalSpent: Number(b._sum.total_amount || 0)
+    }));
+
+    // Top Documents by purchase count (exclude REFUNDED)
     const topDocsOrderedGroup = await this.prisma.order_items.groupBy({
       by: ['document_id'],
       _count: { order_item_id: true },
-      where: { created_at: { gte: startOfDay, lte: endOfDay } },
+      where: {
+        created_at: { gte: startOfDay, lte: endOfDay },
+        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+      },
       orderBy: { _count: { order_item_id: 'desc' } },
       take: 5
     });
@@ -170,12 +316,19 @@ export class AdminService {
       totalDocuments,
       ordersRange,
       revenueRange,
+      revenueBreakdown: {
+        deposit: depositRevenue,
+        commission: commissionRevenue,
+        package: pkgRevenue
+      },
       chartData,
       topUploaders,
       topSellers,
       topRevenueSellers,
+      topBuyers,
       topBoughtDocs,
-      topDownloadedDocs
+      topDownloadedDocs,
+      topPackages
     };
   }
 

@@ -3,6 +3,7 @@ import ProtectedRoute from '@/components/guards/ProtectedRoute'
 import MainLayout from '@/components/layout/MainLayout'
 import AdminLayout from '@/components/layout/AdminLayout'
 import AdminRoute from '@/components/guards/AdminRoute'
+import RequireRole from '@/components/guards/RequireRole'
 
 // ── Auth Pages ──
 import LoginPage from '@/pages/auth/LoginPage'
@@ -145,21 +146,90 @@ function App() {
           <AdminRoute>
             <AdminLayout>
               <Routes>
-                <Route path="/" element={<AdminDashboardPage />} />
-                <Route path="/approvals" element={<AdminApprovalsPage />} />
-                <Route path="/users" element={<AdminUsersPage />} />
-                <Route path="/documents" element={<AdminDocumentsPage />} />
-                <Route path="/reports" element={<AdminReportsPage />} />
-                <Route path="/withdrawals" element={<AdminWithdrawalsPage />} />
-                <Route path="/categories" element={<AdminCategoriesPage />} />
-                <Route path="/tags" element={<AdminTagsPage />} />
-                <Route path="/disputes" element={<AdminDisputesPage />} />
-                <Route path="/reconciliation" element={<AdminReconciliationPage />} />
-                <Route path="/revenue" element={<AdminRevenuePage />} />
-                <Route path="/configs" element={<AdminConfigsPage />} />
-                <Route path="/policies" element={<AdminPoliciesPage />} />
-                <Route path="/audit-logs" element={<AdminAuditLogsPage />} />
-                <Route path="/packages" element={<AdminPackagesPage />} />
+              {/* Admin-only routes */}
+                <Route path="/" element={
+                  <RequireRole allowedRoles={['admin']} redirectTo="/admin/approvals">
+                    <AdminDashboardPage />
+                  </RequireRole>
+                } />
+
+                {/* Admin + Mod (content moderation) */}
+                <Route path="/approvals" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminApprovalsPage />
+                  </RequireRole>
+                } />
+                <Route path="/reports" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminReportsPage />
+                  </RequireRole>
+                } />
+                <Route path="/disputes" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminDisputesPage />
+                  </RequireRole>
+                } />
+                <Route path="/documents" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminDocumentsPage />
+                  </RequireRole>
+                } />
+                <Route path="/categories" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminCategoriesPage />
+                  </RequireRole>
+                } />
+                <Route path="/tags" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminTagsPage />
+                  </RequireRole>
+                } />
+                <Route path="/policies" element={
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
+                    <AdminPoliciesPage />
+                  </RequireRole>
+                } />
+
+                {/* Admin + Accountant (financial oversight) */}
+                <Route path="/users" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminUsersPage />
+                  </RequireRole>
+                } />
+                <Route path="/withdrawals" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminWithdrawalsPage />
+                  </RequireRole>
+                } />
+                <Route path="/revenue" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminRevenuePage />
+                  </RequireRole>
+                } />
+                <Route path="/reconciliation" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminReconciliationPage />
+                  </RequireRole>
+                } />
+                <Route path="/packages" element={
+                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                    <AdminPackagesPage />
+                  </RequireRole>
+                } />
+
+                {/* Admin only (system config) */}
+                <Route path="/configs" element={
+                  <RequireRole allowedRoles={['admin']} redirectTo="/admin/profile">
+                    <AdminConfigsPage />
+                  </RequireRole>
+                } />
+                <Route path="/audit-logs" element={
+                  <RequireRole allowedRoles={['admin']} redirectTo="/admin/profile">
+                    <AdminAuditLogsPage />
+                  </RequireRole>
+                } />
+
+                {/* All staff */}
                 <Route path="/profile" element={<AdminProfilePage />} />
               </Routes>
             </AdminLayout>

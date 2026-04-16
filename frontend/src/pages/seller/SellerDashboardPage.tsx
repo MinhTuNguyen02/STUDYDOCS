@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import SellerLayout from '@/components/layout/SellerLayout'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts'
 
 type FilterMode = 'DAY' | 'MONTH' | 'YEAR'
 
@@ -75,6 +76,7 @@ export default function SellerDashboardPage() {
   const { user } = useAuthStore()
   const [stats, setStats] = useState<any>(null)
   const [trend, setTrend] = useState<any[]>([])
+  const [chartMode, setChartMode] = useState<'monthly' | 'daily'>('monthly')
   const [loadingStats, setLoadingStats] = useState(true)
   const [loadingTrend, setLoadingTrend] = useState(true)
   const [activeChart, setActiveChart] = useState<'earnings' | 'orders'>('earnings')
@@ -88,8 +90,8 @@ export default function SellerDashboardPage() {
 
   // Applied state (reflects last successful fetch)
   const [appliedLabel, setAppliedLabel] = useState('')
-  const [highlightMonths, setHighlightMonths] = useState<number[]>([currentMonth])
   const [trendYear, setTrendYear] = useState(currentYear)
+  const [highlightMonths, setHighlightMonths] = useState<number[]>([currentMonth])
 
   useEffect(() => {
     applyFilter()
@@ -106,7 +108,16 @@ export default function SellerDashboardPage() {
     setTrendYear(chartYear)
 
     fetchStats(start, end)
-    fetchTrend(chartYear)
+
+    // Choose chart granularity based on filter mode
+    if (filterMode === 'YEAR') {
+      setChartMode('monthly')
+      fetchMonthlyTrend(chartYear)
+    } else {
+      // MONTH or DAY → show daily bars for the exact range
+      setChartMode('daily')
+      fetchDailyTrend(start, end)
+    }
   }
 
   const fetchStats = async (startDate: string, endDate: string) => {
@@ -121,7 +132,7 @@ export default function SellerDashboardPage() {
     }
   }
 
-  const fetchTrend = async (y: number) => {
+  const fetchMonthlyTrend = async (y: number) => {
     setLoadingTrend(true)
     try {
       const res = await sellerApi.getMonthlyTrend(y)
@@ -133,12 +144,32 @@ export default function SellerDashboardPage() {
     }
   }
 
-  const maxEarnings = Math.max(...trend.map(d => d.earnings), 1)
-  const maxOrders = Math.max(...trend.map(d => d.orders), 1)
+  const fetchDailyTrend = async (startDate: string, endDate: string) => {
+    setLoadingTrend(true)
+    try {
+      const res = await sellerApi.getDailyTrend(startDate, endDate)
+      setTrend(res.data || res || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingTrend(false)
+    }
+  }
+
   const topDocs = stats?.topDownloads || []
-  const topViews = stats?.topViews || []
+  const topViewDocs = stats?.topViews || []
+  // Keep aliases for the progress-bar sections below
+  const topViews = topViewDocs
   const maxDownloads = Math.max(...topDocs.map((d: any) => d.download_count), 1)
-  const maxViewCount = Math.max(...topViews.map((d: any) => d.view_count), 1)
+  const maxViewCount = Math.max(...topViewDocs.map((d: any) => d.view_count), 1)
+
+  // Recharts formatters
+  const yAxisFmt = (val: number) => {
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`
+    if (val >= 1_000) return `${(val / 1_000).toFixed(0)}k`
+    return String(val)
+  }
+  const tooltipFmt = (value: any) => [activeChart === 'earnings' ? formatBalance(Number(value)) : `${value} đơn`, activeChart === 'earnings' ? 'Doanh thu' : 'Số đơn']
 
   const convRate = stats?.totalViews > 0
     ? ((stats.totalDownloads / stats.totalViews) * 100).toFixed(1) : '0.0'
@@ -280,9 +311,9 @@ export default function SellerDashboardPage() {
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         {[
+          { label: 'Tổng lượt xem', value: `${stats?.totalViews || 0}`, icon: <Eye className="w-5 h-5" />, grad: 'from-sky-400 to-cyan-500', bg: 'bg-sky-50 border-sky-100' },
+          { label: 'Tổng lượt tải', value: `${stats?.totalDownloads || 0}`, icon: <Download className="w-5 h-5" />, grad: 'from-emerald-400 to-teal-500', bg: 'bg-emerald-50 border-emerald-100' },
           { label: 'Doanh thu', value: formatBalance(stats?.totalEarnings || 0), icon: <DollarSign className="w-5 h-5" />, grad: 'from-violet-500 to-indigo-600', bg: 'bg-violet-50 border-violet-100' },
-          { label: 'Lượt xem', value: `${stats?.totalViews || 0}`, icon: <Eye className="w-5 h-5" />, grad: 'from-sky-400 to-cyan-500', bg: 'bg-sky-50 border-sky-100' },
-          { label: 'Lượt tải', value: `${stats?.totalDownloads || 0}`, icon: <Download className="w-5 h-5" />, grad: 'from-emerald-400 to-teal-500', bg: 'bg-emerald-50 border-emerald-100' },
           { label: 'Đơn hàng', value: `${stats?.totalOrders || 0}`, icon: <ShoppingBag className="w-5 h-5" />, grad: 'from-orange-400 to-amber-500', bg: 'bg-orange-50 border-orange-100' },
         ].map(card => (
           <div key={card.label} className={`border ${card.bg} rounded-3xl p-5 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative`}>
@@ -297,12 +328,14 @@ export default function SellerDashboardPage() {
       {/* ── Chart + Quick Stats ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
-        {/* Bar Chart (always 12 months of selected/relevant year) */}
+        {/* Bar Chart — adapts to filter mode */}
         <div className="lg:col-span-2 bg-card border border-border rounded-3xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <BarChart2 className="w-5 h-5 text-primary" />
-              <h3 className="font-bold text-lg">Biểu đồ năm {trendYear}</h3>
+              <h3 className="font-bold text-lg">
+                {chartMode === 'monthly' ? `Biểu đồ tháng – Năm ${trendYear}` : `Biểu đồ ngày – ${appliedLabel}`}
+              </h3>
             </div>
             <div className="flex rounded-xl overflow-hidden border border-border text-xs">
               {(['earnings', 'orders'] as const).map(mode => (
@@ -316,38 +349,49 @@ export default function SellerDashboardPage() {
               ))}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mb-5">
-            Các tháng được tô sáng tương ứng với khoảng lọc đang chọn. Hover để xem giá trị.
-          </p>
 
           {loadingTrend ? (
-            <div className="h-48 flex items-center justify-center text-muted-foreground text-sm animate-pulse">Đang tải biểu đồ...</div>
+            <div className="h-56 flex items-center justify-center text-muted-foreground text-sm animate-pulse">Đang tải biểu đồ...</div>
           ) : (
-            <div className="flex items-end gap-1 h-44 w-full">
-              {trend.map(d => {
-                const isHighlighted = highlightMonths.includes(d.month)
-                const rawVal = activeChart === 'earnings' ? d.earnings : d.orders
-                const maxVal = activeChart === 'earnings' ? maxEarnings : maxOrders
-                const pct = maxVal === 0 ? 0 : Math.max((rawVal / maxVal) * 100, rawVal > 0 ? 3 : 0)
-                const displayVal = activeChart === 'earnings'
-                  ? (d.earnings >= 1_000_000 ? `${(d.earnings / 1_000_000).toFixed(1)}M` : d.earnings > 0 ? `${(d.earnings / 1000).toFixed(0)}K` : '0')
-                  : `${d.orders} đơn`
-
-                return (
-                  <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group">
-                    <span className="text-[9px] font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {displayVal}
-                    </span>
-                    <div className="w-full flex items-end justify-center" style={{ height: '130px' }}>
-                      <div
-                        className={`w-full rounded-t-md transition-all duration-700 ${isHighlighted ? 'bg-primary shadow-sm shadow-primary/30' : 'bg-primary/15 group-hover:bg-primary/35'}`}
-                        style={{ height: `${pct}%`, minHeight: rawVal > 0 ? '4px' : '0' }}
-                      />
-                    </div>
-                    <span className={`text-[10px] font-semibold ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`}>{d.label}</span>
-                  </div>
-                )
-              })}
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={trend}
+                  margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
+                  barCategoryGap={chartMode === 'daily' ? '10%' : '20%'}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11 }}
+                    tickMargin={6}
+                    axisLine={false}
+                    tickLine={false}
+                    // Daily: show every other tick (odd index = day 1,3,5...)
+                    // Monthly: show all 12 ticks
+                    interval={chartMode === 'daily' ? 1 : 0}
+                  />
+                  <YAxis
+                    tickFormatter={yAxisFmt}
+                    tick={{ fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={45}
+                  />
+                  <RechartsTooltip
+                    formatter={tooltipFmt}
+                    labelFormatter={(label) => `Điểm dữ liệu: ${label}`}
+                  />
+                  <Bar dataKey={activeChart === 'earnings' ? 'earnings' : 'orders'} radius={[4, 4, 0, 0]}>
+                    {trend.map((d, idx) => {
+                      const isHighlighted = chartMode === 'monthly'
+                        ? highlightMonths.includes(d.month)
+                        : true
+                      return <Cell key={idx} fill={isHighlighted ? '#8b5cf6' : '#8b5cf620'} />
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           )}
         </div>

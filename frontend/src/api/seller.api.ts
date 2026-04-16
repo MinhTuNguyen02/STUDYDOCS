@@ -10,6 +10,11 @@ export const sellerApi = {
     const res = await api.get('/seller/dashboard/trend', { params: { year } })
     return res.data
   },
+
+  getDailyTrend: async (startDate: string, endDate: string) => {
+    const res = await api.get('/seller/dashboard/daily-trend', { params: { startDate, endDate } })
+    return res.data
+  },
   
   getMyDocuments: async (params?: { status?: string, search?: string, page?: number, limit?: number }) => {
     const res = await api.get('/seller/documents', { params })

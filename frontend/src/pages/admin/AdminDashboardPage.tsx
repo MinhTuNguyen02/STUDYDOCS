@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '@/api/admin.api';
 import toast from 'react-hot-toast';
-import { FileCheck, Files, ShoppingBag, Banknote, ArrowRight, Download, CalendarDays, Trophy } from 'lucide-react';
+import { FileCheck, Files, ShoppingBag, Banknote, ArrowRight, Download, CalendarDays, Trophy, Package, RefreshCw } from 'lucide-react';
 import { formatBalance } from '@/utils/format';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 type FilterMode = 'DAY' | 'MONTH' | 'YEAR';
+type RevenueFilter = 'all' | 'deposit' | 'commission' | 'package';
 
 function localDateStr(d: Date) {
   const y = d.getFullYear()
@@ -32,7 +33,7 @@ const yearOptions = [2024, 2025, 2026, 2027].filter(y => y <= currentYear)
 
 function getCurrentWeekRange() {
   const d = new Date()
-  const dayOfWeek = d.getDay() || 7 // 1-7 (Mon-Sun)
+  const dayOfWeek = d.getDay() || 7
   const start = new Date(d)
   start.setDate(d.getDate() - dayOfWeek + 1)
   const end = new Date(d)
@@ -43,9 +44,20 @@ function getCurrentWeekRange() {
   }
 }
 
+const REVENUE_FILTER_OPTIONS: { value: RevenueFilter; label: string; color: string; dataKey: string }[] = [
+  { value: 'all', label: 'Tất cả doanh thu', color: '#8b5cf6', dataKey: 'revenue' },
+  { value: 'deposit', label: 'Nạp ví', color: '#3b82f6', dataKey: 'depositRevenue' },
+  { value: 'commission', label: 'Hoa hồng tài liệu', color: '#10b981', dataKey: 'commissionRevenue' },
+  { value: 'package', label: 'Bán gói', color: '#f59e0b', dataKey: 'packageRevenue' },
+]
+
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Chart controls
+  const [revenueFilter, setRevenueFilter] = useState<RevenueFilter>('all');
+  const [showRefunded, setShowRefunded] = useState(false);
 
   // Filter state
   const [filterMode, setFilterMode] = useState<FilterMode>('DAY');
@@ -109,16 +121,12 @@ export default function AdminDashboardPage() {
   const maxMonthForYear = (y: number) => y < currentYear ? 12 : currentMonth;
 
   const exportCSV = (data: any[], filename: string) => {
-    if (!data || !data.length) {
-      toast.error('Không có dữ liệu để xuất');
-      return;
-    }
+    if (!data || !data.length) { toast.error('Không có dữ liệu để xuất'); return; }
     const headers = Object.keys(data[0]);
     const csvContent = [
       headers.join(','),
       ...data.map(row => headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(','))
     ].join('\n');
-
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -131,7 +139,38 @@ export default function AdminDashboardPage() {
 
   const handleExportAll = () => {
     if (!stats) return;
-    exportCSV(stats.chartData, `dashboard_thongke_${appliedQuery.start}_${appliedQuery.end}.csv`);
+    const sections: string[] = [];
+
+    // Helper to convert array to CSV block
+    const toCSVBlock = (title: string, rows: any[]) => {
+      if (!rows?.length) return `=== ${title} ===\nChưa có dữ liệu\n`;
+      const headers = Object.keys(rows[0]);
+      return [
+        `=== ${title} ===`,
+        headers.join(','),
+        ...rows.map(row => headers.map(h => `"${String(row[h] ?? '').replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+    };
+
+    sections.push(toCSVBlock(`Biểu đồ theo ngày (${appliedLabel})`, stats.chartData));
+    sections.push(toCSVBlock('Top Người Bán (Doanh Thu)', (stats.topRevenueSellers ?? []).map((r: any) => ({ id: r.id, ten: r.name ?? 'Ẩn danh', doanh_thu: r.revenue }))));
+    sections.push(toCSVBlock('Top Người Mua', (stats.topBuyers ?? []).map((b: any) => ({ id: b.id, ten: b.name ?? 'Ẩn danh', so_don: b.count, tong_chi: b.totalSpent }))));
+    sections.push(toCSVBlock('Tác Giả Chăm Chỉ (Upload)', (stats.topUploaders ?? []).map((u: any) => ({ id: u.id, ten: u.name ?? 'Ẩn danh', so_file: u.count }))));
+    sections.push(toCSVBlock('Tài Liệu Bán Chạy', (stats.topBoughtDocs ?? []).map((d: any) => ({ id: d.id, ten_tai_lieu: d.title ?? 'Đã xóa', so_don: d.count }))));
+    sections.push(toCSVBlock('Tài Liệu Tải Nhiều', (stats.topDownloadedDocs ?? []).map((d: any) => ({ id: d.id, ten_tai_lieu: d.title ?? 'Đã xóa', luot_tai: d.count }))));
+    sections.push(toCSVBlock('Top Gói Được Mua', (stats.topPackages ?? []).map((p: any) => ({ id: p.id, ten_goi: p.name, don_gia: p.price, luot_mua: p.count, tong_thu: p.price * p.count }))));
+    if (stats.revenueBreakdown) {
+      sections.push(`=== Doanh Thu Theo Nguồn (${appliedLabel}) ===\nNguồn,Số tiền\nNạp ví,${stats.revenueBreakdown.deposit}\nHoa hồng tài liệu,${stats.revenueBreakdown.commission}\nBán gói,${stats.revenueBreakdown.package}\nTổng,${stats.revenueRange ?? 0}`);
+    }
+
+    const blob = new Blob(["\uFEFF" + sections.join('\n\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `dashboard_${appliedQuery.start}_${appliedQuery.end}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const yAxisFormatter = (val: number) => {
@@ -139,6 +178,17 @@ export default function AdminDashboardPage() {
     if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
     return val.toString();
   };
+
+  const xAxisFormatter = (val: string) => {
+    if (!val || !val.includes('-')) return val;
+    const parts = val.split('-');
+    return `${parts[2]}/${parts[1]}`;
+  };
+
+  const activeRevOption = REVENUE_FILTER_OPTIONS.find(o => o.value === revenueFilter)!;
+
+  // Revenue KPI breakdown for tooltip under revenue card
+  const breakdown = stats?.revenueBreakdown;
 
   if (loading && !stats) return <div className="p-8 text-center text-muted-foreground animate-pulse">Đang tải dữ liệu báo cáo...</div>;
 
@@ -245,6 +295,7 @@ export default function AdminDashboardPage() {
 
       {stats && (
         <>
+          {/* ── KPI Cards ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
             <div className="bg-card border border-border p-6 rounded-2xl shadow-sm relative overflow-hidden group">
               <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full group-hover:scale-150 transition-transform duration-500 ease-out" />
@@ -290,79 +341,121 @@ export default function AdminDashboardPage() {
                   <div className="p-2 bg-danger/10 rounded-xl text-danger"><Banknote className="w-5 h-5" /></div>
                 </div>
                 <p className="text-3xl font-bold font-heading mb-1">{formatBalance(stats.revenueRange || 0)}</p>
-                <p className="text-sm text-muted-foreground font-medium mt-4">Tất cả nạp tiền đã lọc</p>
+                {breakdown && (
+                  <div className="mt-3 space-y-1">
+                    <p className="text-xs text-muted-foreground">💳 Nạp ví: <span className="font-semibold text-foreground">{formatBalance(breakdown.deposit)}</span></p>
+                    <p className="text-xs text-muted-foreground">📄 Hoa hồng TL: <span className="font-semibold text-foreground">{formatBalance(breakdown.commission)}</span></p>
+                    <p className="text-xs text-muted-foreground">📦 Bán gói: <span className="font-semibold text-foreground">{formatBalance(breakdown.package)}</span></p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
+          {/* ── Charts ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+
+            {/* Revenue Line Chart */}
             <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
-              <h3 className="text-lg font-bold font-heading mb-6">Biểu đồ Doanh Thu</h3>
-              <div className="h-72 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                <h3 className="text-lg font-bold font-heading">Doanh Thu Nền Tảng</h3>
+                <div className="flex gap-1 bg-muted/60 p-1 rounded-xl border border-border overflow-x-auto">
+                  {REVENUE_FILTER_OPTIONS.map(o => (
+                    <button
+                      key={o.value}
+                      onClick={() => setRevenueFilter(o.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${revenueFilter === o.value ? 'bg-white dark:bg-card shadow-sm border border-border text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={stats.chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="date" tickFormatter={xAxisFormatter} tick={{ fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                    {/* <RechartsTooltip formatter={(value: number) => [formatBalance(value), 'Doanh thu']} /> */}
-                    <RechartsTooltip
-                      formatter={(value: any) => {
-                        // Nếu value không hợp lệ, trả về 0 hoặc một chuỗi mặc định
-                        const formattedValue = value ? formatBalance(Number(value)) : '0';
-                        return [formattedValue, 'Doanh thu'];
-                      }}
-                    />
+                    <RechartsTooltip formatter={(value: any) => [formatBalance(Number(value || 0)), activeRevOption.label]} />
                     <Legend />
-                    <Line type="monotone" dataKey="revenue" name="Doanh thu" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                    <Line
+                      type="monotone"
+                      dataKey={activeRevOption.dataKey}
+                      name={activeRevOption.label}
+                      stroke={activeRevOption.color}
+                      strokeWidth={3}
+                      dot={{ r: 4, strokeWidth: 2 }}
+                      activeDot={{ r: 6 }}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
+            {/* Transactions + Uploads Bar Chart */}
             <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
-              <h3 className="text-lg font-bold font-heading mb-6">Giao dịch & Lượt tải lên</h3>
-              <div className="h-72 w-full">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold font-heading">Giao dịch & Lượt tải lên</h3>
+                <button
+                  onClick={() => setShowRefunded(v => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${showRefunded ? 'bg-danger/10 border-danger/30 text-danger' : 'bg-muted border-border text-muted-foreground hover:text-foreground'}`}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {showRefunded ? 'Ẩn hoàn tiền' : 'Hiện hoàn tiền'}
+                </button>
+              </div>
+              <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="date" tickFormatter={xAxisFormatter} tick={{ fontSize: 12 }} tickMargin={10} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
                     <RechartsTooltip />
                     <Legend />
-                    <Bar dataKey="orders" name="Số đơn hàng" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="orders" name="Đơn thành công" fill="#10b981" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="documents" name="File tải lên mới" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    {showRefunded && (
+                      <Bar dataKey="refunded" name="Hoàn tiền" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </div>
 
+          {/* ── Leaderboards ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* ── Panel 1: Top Người Bán Theo Doanh Thu ── */}
             <div className="bg-card border border-border p-5 rounded-2xl shadow-sm">
-              <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-warning">
-                <Trophy className="w-6 h-6" /> Top Bán Chạy Nhất
+              <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-success">
+                <Trophy className="w-6 h-6" /> Top Người Bán (Doanh Thu)
               </h4>
-              <div className="space-y-4">
-                {stats.topSellers?.length === 0 && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
-                {stats.topSellers?.map((u: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center border-b border-border pb-3 last:border-0">
-                    <span className="text-base font-semibold truncate pr-2 max-w-[250px]" title={u.name}>{idx + 1}. {u.name || 'Người dùng ẩn'}</span>
-                    <span className="text-sm font-mono text-primary bg-primary/10 px-3 py-1 rounded-md">{u.count} đơn</span>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {!stats.topRevenueSellers?.length && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
+                {[...(stats.topRevenueSellers ?? [])]
+                  .sort((a: any, b: any) => b.revenue - a.revenue)
+                  .map((u: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center border-b border-border pb-3 last:border-0">
+                      <span className="text-sm font-semibold truncate flex-1 pr-2" title={u.name}>{idx + 1}. {u.name || 'Người dùng ẩn'}</span>
+                      <span className="text-sm font-mono text-success font-bold">{formatBalance(u.revenue)}</span>
+                    </div>
+                  ))}
               </div>
             </div>
 
+            {/* ── Panel 2: Top Người Mua (Đơn + Tiền) ── */}
             <div className="bg-card border border-border p-5 rounded-2xl shadow-sm">
-              <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-danger">
-                <Trophy className="w-6 h-6" /> Doanh Thu TOP
+              <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-warning">
+                <Trophy className="w-6 h-6" /> Top Người Mua
               </h4>
-              <div className="space-y-4">
-                {stats.topRevenueSellers?.length === 0 && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
-                {stats.topRevenueSellers?.map((u: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center border-b border-border pb-3 last:border-0">
-                    <span className="text-base font-semibold truncate pr-2 max-w-[250px]" title={u.name}>{idx + 1}. {u.name || 'Người dùng ẩn'}</span>
-                    <span className="text-sm font-mono text-success font-bold">{formatBalance(u.revenue)}</span>
+              <div className="space-y-3">
+                {!stats.topBuyers?.length && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
+                {(stats.topBuyers ?? []).map((u: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center border-b border-border pb-3 last:border-0 gap-2">
+                    <span className="text-sm font-semibold truncate flex-1" title={u.name}>{idx + 1}. {u.name || 'Người dùng ẩn'}</span>
+                    <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md whitespace-nowrap">{u.count} đơn</span>
+                    <span className="text-xs font-mono text-warning font-bold whitespace-nowrap">{formatBalance(Number(u.totalSpent ?? 0))}</span>
                   </div>
                 ))}
               </div>
@@ -370,10 +463,10 @@ export default function AdminDashboardPage() {
 
             <div className="bg-card border border-border p-5 rounded-2xl shadow-sm">
               <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-blue-500">
-                <Trophy className="w-6 h-6" /> Tác Giả Chăm Chỉ (File mới)
+                <Trophy className="w-6 h-6" /> Tác Giả Chăm Chỉ
               </h4>
-              <div className="space-y-4">
-                {stats.topUploaders?.length === 0 && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
+              <div className="space-y-3">
+                {!stats.topUploaders?.length && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
                 {stats.topUploaders?.map((u: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-center border-b border-border pb-3 last:border-0">
                     <span className="text-base font-semibold truncate pr-2 max-w-[250px]" title={u.name}>{idx + 1}. {u.name || 'Người dùng ẩn'}</span>
@@ -387,8 +480,8 @@ export default function AdminDashboardPage() {
               <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-primary">
                 <Trophy className="w-6 h-6" /> Tài Liệu Bán Chạy
               </h4>
-              <div className="space-y-4">
-                {stats.topBoughtDocs?.length === 0 && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
+              <div className="space-y-3">
+                {!stats.topBoughtDocs?.length && <p className="text-muted-foreground text-sm text-center">Chưa có số liệu</p>}
                 {stats.topBoughtDocs?.map((d: any, idx: number) => (
                   <div key={idx} className="flex flex-col border-b border-border pb-3 last:border-0">
                     <span className="text-base font-semibold truncate" title={d.title}>{idx + 1}. {d.title || 'Tài liệu bị xóa'}</span>
@@ -396,6 +489,54 @@ export default function AdminDashboardPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* ── Top Packages ── */}
+            <div className="lg:col-span-2 bg-card border border-border p-5 rounded-2xl shadow-sm">
+              <h4 className="font-bold font-heading text-lg flex items-center gap-2 mb-4 text-amber-500">
+                <Package className="w-6 h-6" /> Gói Được Mua Nhiều Nhất
+              </h4>
+              {!stats.topPackages?.length ? (
+                <p className="text-muted-foreground text-sm text-center py-4">Chưa có giao dịch mua gói trong kỳ</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 px-3 font-semibold text-muted-foreground w-10">#</th>
+                        <th className="text-left py-2 px-3 font-semibold text-muted-foreground">Tên gói</th>
+                        <th className="text-right py-2 px-3 font-semibold text-muted-foreground">Đơn giá</th>
+                        <th className="text-right py-2 px-3 font-semibold text-muted-foreground">Số lượt mua</th>
+                        <th className="text-right py-2 px-3 font-semibold text-muted-foreground">Tổng thu</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.topPackages.map((pkg: any, idx: number) => (
+                        <tr key={pkg.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex w-6 h-6 rounded-full text-xs font-black items-center justify-center ${idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-slate-400 text-white' : idx === 2 ? 'bg-orange-400 text-white' : 'bg-muted text-muted-foreground'}`}>{idx + 1}</span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold">{pkg.name}</td>
+                          <td className="py-3 px-3 text-right font-mono text-primary">{formatBalance(pkg.price)}</td>
+                          <td className="py-3 px-3 text-right">
+                            <span className="bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-md">{pkg.count} lượt</span>
+                          </td>
+                          <td className="py-3 px-3 text-right font-bold text-success">{formatBalance(pkg.price * pkg.count)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-border">
+                        <td colSpan={3} className="py-2 px-3 text-sm font-semibold text-muted-foreground">Tổng cộng</td>
+                        <td className="py-2 px-3 text-right font-bold">{stats.topPackages.reduce((s: number, p: any) => s + p.count, 0)} lượt</td>
+                        <td className="py-2 px-3 text-right font-bold text-success">
+                          {formatBalance(stats.topPackages.reduce((s: number, p: any) => s + p.price * p.count, 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </>

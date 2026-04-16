@@ -107,13 +107,20 @@ export class SellerService {
   async getMonthlyTrend(user: AuthUser, yearStr?: string) {
     const sellerId = this.ensureSeller(user);
     const year = yearStr ? Number(yearStr) : new Date().getFullYear();
+    const now = new Date();
 
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
     const results = await Promise.all(
       months.map(async (m) => {
-        const start = new Date(year, m - 1, 1);
-        const end = new Date(year, m, 0, 23, 59, 59, 999);
+        // Use UTC Date constructor so month boundaries are consistent
+        // regardless of server timezone
+        const start = new Date(Date.UTC(year, m - 1, 1, 0, 0, 0, 0));
+        // End = last ms of last day of the month in UTC
+        const end = new Date(Date.UTC(year, m, 0, 23, 59, 59, 999));
+
+        // Cap future months at current time
+        const effectiveEnd = end > now ? now : end;
 
         const [earningsAgg, ordersCount] = await Promise.all([
           this.prisma.order_items.aggregate({
@@ -121,14 +128,14 @@ export class SellerService {
             where: {
               documents: { seller_id: sellerId },
               status: { in: ['PAID', 'HELD', 'RELEASED'] },
-              created_at: { gte: start, lte: end }
+              created_at: { gte: start, lte: effectiveEnd }
             }
           }),
           this.prisma.order_items.count({
             where: {
               documents: { seller_id: sellerId },
               status: { in: ['PAID', 'HELD', 'RELEASED'] },
-              created_at: { gte: start, lte: end }
+              created_at: { gte: start, lte: effectiveEnd }
             }
           })
         ]);
@@ -143,6 +150,67 @@ export class SellerService {
     );
 
     return { year, data: results };
+  }
+
+  async getDailyTrend(user: AuthUser, startDateStr?: string, endDateStr?: string) {
+    const sellerId = this.ensureSeller(user);
+    const now = new Date();
+    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+    const toVNDateKey = (d: Date) => {
+      const vn = new Date(d.getTime() + VN_OFFSET_MS);
+      const y = vn.getUTCFullYear();
+      const m = String(vn.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(vn.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    // Parse VN local date strings to correct UTC boundaries
+    const parseVNStart = (s: string) => {
+      const base = new Date(s + 'T00:00:00+07:00');
+      return base;
+    };
+    const parseVNEnd = (s: string) => {
+      const base = new Date(s + 'T23:59:59+07:00');
+      return base;
+    };
+
+    const start = startDateStr ? parseVNStart(startDateStr) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = endDateStr ? parseVNEnd(endDateStr) : now;
+    const effectiveEnd = end > now ? now : end;
+
+    // Fetch all order_items in the range
+    const items = await this.prisma.order_items.findMany({
+      where: {
+        documents: { seller_id: sellerId },
+        status: { in: ['PAID', 'HELD', 'RELEASED'] },
+        created_at: { gte: start, lte: effectiveEnd }
+      },
+      select: { seller_earning: true, created_at: true }
+    });
+
+    // Build day-keyed map
+    const dayMap = new Map<string, { date: string; label: string; earnings: number; orders: number }>();
+    let cur = new Date(start);
+    while (cur <= effectiveEnd) {
+      const key = toVNDateKey(cur);
+      if (!dayMap.has(key)) {
+        // Short label: dd/MM
+        const parts = key.split('-');
+        dayMap.set(key, { date: key, label: `${parts[2]}/${parts[1]}`, earnings: 0, orders: 0 });
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    items.forEach(item => {
+      const key = toVNDateKey(item.created_at);
+      if (dayMap.has(key)) {
+        dayMap.get(key)!.earnings += Number(item.seller_earning ?? 0);
+        dayMap.get(key)!.orders += 1;
+      }
+    });
+
+    return { data: Array.from(dayMap.values()) };
   }
 
   async listMyDocuments(
