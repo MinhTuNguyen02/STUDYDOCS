@@ -33,6 +33,17 @@ export class PoliciesService {
         updated_by: user.staffId ? Number(user.staffId) : undefined
       }
     });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: user.accountId,
+        action: 'ADMIN_CREATE_POLICY',
+        target_table: 'policies',
+        target_id: result.policy_id,
+        new_value: { title: result.title, is_active: result.is_active }
+      }
+    });
+
     return { message: 'Tạo điều khoản thành công.', data: result };
   }
 
@@ -51,11 +62,37 @@ export class PoliciesService {
         updated_by: user.staffId ? Number(user.staffId) : undefined
       }
     });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: user.accountId,
+        action: 'ADMIN_UPDATE_POLICY',
+        target_table: 'policies',
+        target_id: id,
+        old_value: { title: existing.title, is_active: existing.is_active },
+        new_value: { title: result.title, is_active: result.is_active }
+      }
+    });
+
     return { message: 'Cập nhật điều khoản thành công.', data: result };
   }
 
-  async deletePolicy(id: number) {
+  async deletePolicy(id: number, user: AuthUser) {
+    const policy = await this.prisma.policies.findUnique({ where: { policy_id: id } });
     await this.prisma.policies.delete({ where: { policy_id: id } });
+    
+    if (policy) {
+      await this.prisma.audit_logs.create({
+        data: {
+          account_id: user.accountId,
+          action: 'ADMIN_DELETE_POLICY',
+          target_table: 'policies',
+          target_id: id,
+          old_value: { title: policy.title }
+        }
+      });
+    }
+
     return { message: 'Xóa điều khoản vĩnh viễn thành công.' };
   }
 }

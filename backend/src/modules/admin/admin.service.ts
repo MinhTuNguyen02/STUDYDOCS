@@ -508,10 +508,20 @@ export class AdminService {
   }
 
   async getDocuments(filters: { status?: string; categoryId?: string; search?: string }) {
+    let categoryIds: number[] | undefined = undefined;
+    if (filters.categoryId && filters.categoryId !== 'ALL') {
+      const rootId = Number(filters.categoryId);
+      const childCategories = await this.prisma.categories.findMany({
+        where: { OR: [{ category_id: rootId }, { parent_id: rootId }] },
+        select: { category_id: true }
+      });
+      categoryIds = childCategories.map(c => c.category_id);
+    }
+
     const docs = await this.prisma.documents.findMany({
       where: {
         status: filters.status && filters.status !== 'ALL' ? (filters.status as any) : undefined,
-        category_id: filters.categoryId && filters.categoryId !== 'ALL' ? Number(filters.categoryId) : undefined,
+        category_id: categoryIds ? { in: categoryIds } : undefined,
         OR: filters.search
           ? [
             { title: { contains: filters.search, mode: 'insensitive' } },
@@ -563,6 +573,16 @@ export class AdminService {
       data: { status: 'HIDDEN', delete_at: new Date() }
     });
 
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: _actor.accountId,
+        action: 'STAFF_SOFT_DELETE_DOCUMENT',
+        target_table: 'documents',
+        target_id: id,
+        new_value: { status: 'HIDDEN' }
+      }
+    });
+
     return toJsonSafe(updated);
   }
 
@@ -574,6 +594,16 @@ export class AdminService {
     const updated = await this.prisma.documents.update({
       where: { document_id: id },
       data: { status: 'APPROVED', delete_at: null }
+    });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: _actor.accountId,
+        action: 'STAFF_RESTORE_DOCUMENT',
+        target_table: 'documents',
+        target_id: id,
+        new_value: { status: 'APPROVED' }
+      }
     });
 
     return toJsonSafe(updated);
@@ -679,10 +709,21 @@ export class AdminService {
       data: { is_revoked: true }
     });
 
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: _actor.accountId,
+        action: 'STAFF_TOGGLE_USER_STATUS',
+        target_table: 'accounts',
+        target_id: account.account_id,
+        old_value: { status: account.status },
+        new_value: { status: nextStatus }
+      }
+    });
+
     return toJsonSafe(updated);
   }
 
-  async createStaffAccount(dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) {
+  async createStaffAccount(dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }, _actor: AuthUser) {
     const existing = await this.prisma.accounts.findUnique({ where: { email: dto.email.toLowerCase().trim() } });
     if (existing) throw new ConflictException('Email đã được sử dụng.');
 
@@ -702,6 +743,16 @@ export class AdminService {
         }
       },
       include: { staff_profiles: true, roles: true }
+    });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: _actor.accountId,
+        action: 'ADMIN_CREATE_STAFF',
+        target_table: 'accounts',
+        target_id: account.account_id,
+        new_value: { email: account.email, role: account.roles.name }
+      }
     });
 
     return toJsonSafe({

@@ -261,7 +261,8 @@ export class SellerService {
           category: doc.categories?.name,
           rejectionReason: doc.rejection_reason,
           createdAt: doc.created_at,
-          publishedAt: doc.published_at
+          publishedAt: doc.published_at,
+          isUserHidden: doc.is_user_hidden
         }))
       )
     };
@@ -380,6 +381,26 @@ export class SellerService {
         price: existing.page_count < 10 ? new Prisma.Decimal(0) : nextPrice,
         status: dto.status ?? existing.status,
         rejection_reason: dto.status === 'PENDING' ? null : existing.rejection_reason,
+        updated_at: new Date()
+      }
+    });
+
+    return toJsonSafe(updated);
+  }
+
+  async toggleVisibility(user: AuthUser, documentId: string, isHidden: boolean) {
+    const sellerId = this.ensureSeller(user);
+    const id = Number(documentId);
+
+    const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
+    if (!existing || existing.seller_id !== sellerId) {
+      throw new NotFoundException('Khong tim thay tai lieu cua ban.');
+    }
+
+    const updated = await this.prisma.documents.update({
+      where: { document_id: id },
+      data: {
+        is_user_hidden: isHidden,
         updated_at: new Date()
       }
     });

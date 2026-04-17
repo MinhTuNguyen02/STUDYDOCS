@@ -29,7 +29,7 @@ export class PackagesService {
     };
   }
 
-  async createPackage(dto: any) {
+  async createPackage(dto: any, actor: AuthUser) {
     const pkg = await this.prisma.packages.create({
       data: {
         name: dto.name,
@@ -40,10 +40,20 @@ export class PackagesService {
         status: dto.is_active !== undefined ? (dto.is_active ? 'ACTIVE' : 'INACTIVE') : 'ACTIVE'
       }
     });
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: actor.accountId,
+        action: 'ADMIN_CREATE_PACKAGE',
+        target_table: 'packages',
+        target_id: pkg.package_id,
+        new_value: { name: pkg.name, price: pkg.price }
+      }
+    });
+
     return { message: 'Tạo gói tải thành công.', data: pkg };
   }
 
-  async updatePackage(id: number, dto: any) {
+  async updatePackage(id: number, dto: any, actor: AuthUser) {
     const existing = await this.prisma.packages.findUnique({ where: { package_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy gói này.');
 
@@ -56,6 +66,31 @@ export class PackagesService {
         download_turns: dto.download_turns,
         duration_days: dto.duration_days,
         status: dto.is_active !== undefined ? (dto.is_active ? 'ACTIVE' : 'INACTIVE') : existing.status
+      }
+    });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: actor.accountId,
+        action: 'ADMIN_UPDATE_PACKAGE',
+        target_table: 'packages',
+        target_id: id,
+        old_value: { 
+          name: existing.name, 
+          price: existing.price, 
+          status: existing.status,
+          description: existing.description,
+          download_turns: existing.download_turns,
+          duration_days: existing.duration_days
+        },
+        new_value: { 
+          name: pkg.name, 
+          price: pkg.price, 
+          status: pkg.status,
+          description: pkg.description,
+          download_turns: pkg.download_turns,
+          duration_days: pkg.duration_days
+        }
       }
     });
 
@@ -129,13 +164,23 @@ export class PackagesService {
     return { message: `Mua thành công gói ${pkg.name}.`, data: result };
   }
 
-  async deletePackage(id: number) {
+  async deletePackage(id: number, actor: AuthUser) {
     const existing = await this.prisma.packages.findUnique({ where: { package_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy gói này.');
 
     await this.prisma.packages.update({
       where: { package_id: id },
       data: { delete_at: new Date() }
+    });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: actor.accountId,
+        action: 'ADMIN_DELETE_PACKAGE',
+        target_table: 'packages',
+        target_id: id,
+        old_value: { name: existing.name }
+      }
     });
 
     return { message: 'Đã xóa gói dịch vụ thành công.' };

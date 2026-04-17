@@ -157,6 +157,19 @@ export class ReviewsService {
       where: { review_id: reviewId },
       data: { is_deleted: true }
     });
+
+    if (isStaff) {
+      await this.prisma.audit_logs.create({
+        data: {
+          account_id: user.accountId,
+          action: 'STAFF_DELETE_REVIEW',
+          target_table: 'reviews',
+          target_id: reviewId,
+          old_value: { comment: review.comment, rating: Number(review.rating) }
+        }
+      });
+    }
+
     await this.recalculateDocumentRating(review.document_id);
     return { success: true, message: 'Đã xóa đánh giá.' };
   }
@@ -180,6 +193,18 @@ export class ReviewsService {
         replied_at: null
       }
     });
+
+    if (isStaff) {
+      await this.prisma.audit_logs.create({
+        data: {
+          account_id: user.accountId,
+          action: 'STAFF_DELETE_REPLY',
+          target_table: 'reviews',
+          target_id: reviewId,
+          old_value: { seller_reply: review.seller_reply }
+        }
+      });
+    }
 
     return { success: true, message: 'Đã xóa phản hồi của người bán.' };
   }

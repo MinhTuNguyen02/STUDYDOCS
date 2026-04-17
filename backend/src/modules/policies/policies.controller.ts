@@ -69,7 +69,7 @@ export class PoliciesController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.policiesService.deletePolicy(id);
+  remove(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.policiesService.deletePolicy(id, user);
   }
 }

@@ -5,7 +5,7 @@ import { report_status } from '@prisma/client';
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async createReport(user: AuthUser, dto: { documentId: number; type: string; reason: string }) {
     if (!user.customerId) throw new ForbiddenException('Chỉ khách hàng mới có quyền báo cáo.');
@@ -47,10 +47,21 @@ export class ReportsService {
 
     const updated = await this.prisma.reports.update({
       where: { report_id: reportId },
-      data: { 
+      data: {
         status: status,
         staff_id: user.staffId,
         updated_at: new Date()
+      }
+    });
+
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: user.accountId,
+        action: 'STAFF_RESOLVE_REPORT',
+        target_table: 'reports',
+        target_id: reportId,
+        old_value: { status: report.status },
+        new_value: { status: updated.status }
       }
     });
 
@@ -62,11 +73,11 @@ export class ReportsService {
       orderBy: { created_at: 'desc' },
       include: {
         documents: { select: { title: true } },
-        customer_profiles: { 
-          select: { 
+        customer_profiles: {
+          select: {
             full_name: true,
             accounts: { select: { email: true } }
-          } 
+          }
         }
       }
     });

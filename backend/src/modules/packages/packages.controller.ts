@@ -27,15 +27,15 @@ export class PackagesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  createPackage(@Body() dto: any) {
-    return this.packagesService.createPackage(dto);
+  createPackage(@CurrentUser() user: AuthUser, @Body() dto: any) {
+    return this.packagesService.createPackage(dto, user);
   }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  updatePackage(@Param('id', ParseIntPipe) id: number, @Body() dto: any) {
-    return this.packagesService.updatePackage(id, dto);
+  updatePackage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: any) {
+    return this.packagesService.updatePackage(id, dto, user);
   }
 
   @Post(':id/buy')
@@ -47,7 +47,7 @@ export class PackagesController {
   @Put(':id/delete')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  deletePackage(@Param('id', ParseIntPipe) id: number) {
-    return this.packagesService.deletePackage(id);
+  deletePackage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.packagesService.deletePackage(id, user);
   }
 }

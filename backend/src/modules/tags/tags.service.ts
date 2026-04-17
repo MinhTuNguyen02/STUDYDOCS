@@ -1,13 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
+import { AuthUser } from '../../common/security/auth-user.interface';
 
 @Injectable()
 export class TagsService {
   constructor(private readonly prisma: PrismaService) { }
 
   // 1. Sửa lại hàm create để nhận object chứa tag_name và slug
-  async create(dto: { tag_name: string; slug: string }) {
+  async create(dto: { tag_name: string; slug: string }, actor: AuthUser) {
     if (!dto.tag_name || !dto.slug) {
       throw new BadRequestException('Tên tag và slug không được để trống.');
     }
@@ -28,11 +29,21 @@ export class TagsService {
       data: { tag_name: tagName, slug: slug }
     });
 
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: actor.accountId,
+        action: 'ADMIN_CREATE_TAG',
+        target_table: 'tags',
+        target_id: created.tag_id,
+        new_value: { tag_name: created.tag_name }
+      }
+    });
+
     return toJsonSafe(created);
   }
 
   // 2. Bổ sung thêm hàm update mà FE đang gọi
-  async update(id: number, dto: { tag_name: string; slug: string }) {
+  async update(id: number, dto: { tag_name: string; slug: string }, actor: AuthUser) {
     if (!dto.tag_name || !dto.slug) {
       throw new BadRequestException('Tên tag và slug không được để trống.');
     }
@@ -65,6 +76,17 @@ export class TagsService {
       }
     });
 
+    await this.prisma.audit_logs.create({
+      data: {
+        account_id: actor.accountId,
+        action: 'ADMIN_UPDATE_TAG',
+        target_table: 'tags',
+        target_id: id,
+        old_value: { tag_name: existing.tag_name, slug: existing.slug },
+        new_value: { tag_name: updated.tag_name, slug: updated.slug }
+      }
+    });
+
     return toJsonSafe(updated);
   }
 
@@ -79,11 +101,23 @@ export class TagsService {
     return toJsonSafe(tags);
   }
 
-  async remove(id: number) {
+  async remove(id: number, actor: AuthUser) {
     try {
-      return await this.prisma.tags.delete({
+      const removed = await this.prisma.tags.delete({
         where: { tag_id: id }
       });
+
+      await this.prisma.audit_logs.create({
+        data: {
+          account_id: actor.accountId,
+          action: 'ADMIN_DELETE_TAG',
+          target_table: 'tags',
+          target_id: id,
+          old_value: { tag_name: removed.tag_name }
+        }
+      });
+
+      return removed;
     } catch (error: any) {
       if (error.code === 'P2003') {
         throw new BadRequestException('Không thể xóa thẻ này. Hiện trạng đang có tài liệu sử dụng thẻ này.');

@@ -4,6 +4,8 @@ import { ConfigsService } from './configs.service';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 import { RolesGuard } from '../../common/security/roles.guard';
 import { Roles } from '../../common/security/roles.decorator';
+import { CurrentUser } from '../../common/security/current-user.decorator';
+import { AuthUser } from '../../common/security/auth-user.interface';
 import { IsOptional, IsString } from 'class-validator';
 
 export class UpdateConfigDto {
@@ -35,7 +37,7 @@ export class ConfigsController {
 
   @Put(':key')
   @Roles('admin')
-  updateConfig(@Param('key') key: string, @Body() dto: UpdateConfigDto) {
-    return this.configsService.updateConfig(key, dto.value, dto.description);
+  updateConfig(@CurrentUser() user: AuthUser, @Param('key') key: string, @Body() dto: UpdateConfigDto) {
+    return this.configsService.updateConfig(user, key, dto.value, dto.description);
   }
 }

@@ -82,8 +82,8 @@ export class AdminController {
 
   @Post('users/staff')
   @Roles('admin')
-  createStaffAccount(@Body() dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) {
-    return this.adminService.createStaffAccount(dto);
+  createStaffAccount(@Body() dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }, @CurrentUser() user: AuthUser) {
+    return this.adminService.createStaffAccount(dto, user);
   }
 
   @Patch('users/:id/toggle-active')

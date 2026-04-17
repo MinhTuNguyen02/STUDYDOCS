@@ -8,4 +8,4 @@ import { WalletsModule } from '../wallets/wallets.module';
   controllers: [AdminController],
   providers: [AdminService]
 })
-export class AdminModule {}
+export class AdminModule { }

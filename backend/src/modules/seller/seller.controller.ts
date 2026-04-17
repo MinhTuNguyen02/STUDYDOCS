@@ -85,6 +85,11 @@ export class SellerController {
     return this.sellerService.updateDocument(user, id, dto);
   }
 
+  @Patch('documents/:id/toggle-visibility')
+  toggleVisibility(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body('isHidden') isHidden: boolean) {
+    return this.sellerService.toggleVisibility(user, id, isHidden);
+  }
+
   @Get('sales/order-items')
   listSales(
     @CurrentUser() user: AuthUser,

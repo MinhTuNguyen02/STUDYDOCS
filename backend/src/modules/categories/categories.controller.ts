@@ -4,6 +4,8 @@ import { CategoriesService } from './categories.service';
 import { RolesGuard } from '../../common/security/roles.guard';
 import { Roles } from '../../common/security/roles.decorator';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
+import { CurrentUser } from '../../common/security/current-user.decorator';
+import { AuthUser } from '../../common/security/auth-user.interface';
 
 @ApiTags('Metadata')
 @Controller('categories')
@@ -23,21 +25,21 @@ export class CategoriesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  create(@Body() dto: any) {
-    return this.categoriesService.create(dto);
+  create(@Body() dto: any, @CurrentUser() user: AuthUser) {
+    return this.categoriesService.create(dto, user);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  update(@Param('id') id: string, @Body() dto: any) {
-    return this.categoriesService.update(+id, dto);
+  update(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: AuthUser) {
+    return this.categoriesService.update(+id, dto, user);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  remove(@Param('id') id: string) {
-    return this.categoriesService.remove(+id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.categoriesService.remove(+id, user);
   }
 }
