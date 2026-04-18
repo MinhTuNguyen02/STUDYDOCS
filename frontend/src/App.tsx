@@ -60,9 +60,10 @@ import PlaceholderAdminPage from '@/pages/admin/PlaceholderAdminPage'
 
 import { useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { usersApi } from '@/api/users.api'
 
 function App() {
-  const { loginTimestamp, logout } = useAuthStore()
+  const { loginTimestamp, logout, updateUser } = useAuthStore()
 
   useEffect(() => {
     const TWO_HOURS = 2 * 60 * 60 * 1000
@@ -80,6 +81,26 @@ function App() {
     
     const { user } = useAuthStore.getState()
     if (user) {
+      usersApi.getMe()
+        .then((res) => {
+          const profile = res?.data || res
+          const nextPhoneVerified =
+            profile?.is_phone_verified ??
+            profile?.isPhoneVerified ??
+            false
+
+          const nextFullName =
+            profile?.full_name ??
+            profile?.fullName ??
+            user.fullName
+
+          updateUser({
+            fullName: nextFullName,
+            isPhoneVerified: nextPhoneVerified,
+          })
+        })
+        .catch(() => {})
+
       import('@/store/wishlistStore').then(({ useWishlistStore }) => {
         useWishlistStore.getState().fetchWishlist()
       })
@@ -89,7 +110,7 @@ function App() {
     const interval = setInterval(checkAuth, 60000)
     
     return () => clearInterval(interval)
-  }, [loginTimestamp, logout])
+  }, [loginTimestamp, logout, updateUser])
 
   return (
     <Routes>

@@ -17,7 +17,7 @@ export class SellerService {
 
   private ensureSeller(user: AuthUser) {
     if (!user.customerId) {
-      throw new ForbiddenException('Tai khoan nay khong phai seller.');
+      throw new ForbiddenException('Tài khoản này không phải seller.');
     }
     return user.customerId;
   }
@@ -278,17 +278,17 @@ export class SellerService {
     const extension = this.normalizeExtension(dto.fileExtension);
     const allowedExtensions = ['DOC', 'DOCX', 'PDF', 'PPT', 'PPTX', 'XLS', 'XLSX', 'docx'];
     if (!allowedExtensions.includes(extension)) {
-      throw new BadRequestException(`Dinh dang file khong duoc ho tro. (Extension nhận được: "${extension}", File gửi lên: "${dto.fileExtension}")`);
+      throw new BadRequestException(`Định dạng file không được hỗ trợ. (Extension nhận được: "${extension}", File gửi lên: "${dto.fileExtension}")`);
     }
 
     const category = await this.prisma.categories.findUnique({ where: { category_id: Number(dto.categoryId) } });
     if (!category || category.delete_at) {
-      throw new NotFoundException('Danh muc khong ton tai.');
+      throw new NotFoundException('Danh mục không tồn tại.');
     }
 
     const duplicateSlug = await this.prisma.documents.findUnique({ where: { slug: dto.slug } });
     if (duplicateSlug) {
-      throw new BadRequestException('Slug tai lieu da ton tai.');
+      throw new BadRequestException('Slug tài liệu đã tồn tại.');
     }
 
     const parsedPrice = new Prisma.Decimal(dto.price);
@@ -322,7 +322,7 @@ export class SellerService {
       // Call penalty service
       await this.penaltyService.evaluateUserViolations(sellerId);
 
-      throw new BadRequestException('Tai lieu nay da ton tai tren he thong (trung file).');
+      throw new BadRequestException('Tài liệu này đã tồn tại trên hệ thống (trùng file).');
     }
 
     const tagIdsArray = dto.tagIds
@@ -362,11 +362,11 @@ export class SellerService {
 
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing || existing.seller_id !== sellerId) {
-      throw new NotFoundException('Khong tim thay tai lieu cua ban.');
+      throw new NotFoundException('Không tìm thấy tài liệu của bạn.');
     }
 
     if (existing.status === 'PENDING' && dto.status !== 'PENDING') {
-      throw new BadRequestException('Tai lieu dang cho duyet, khong duoc sua trang thai nay.');
+      throw new BadRequestException('Tài liệu đang chờ duyệt, không được sửa trạng thái này.');
     }
 
     const nextCategoryId = dto.categoryId ? Number(dto.categoryId) : existing.category_id;
@@ -394,7 +394,7 @@ export class SellerService {
 
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing || existing.seller_id !== sellerId) {
-      throw new NotFoundException('Khong tim thay tai lieu cua ban.');
+      throw new NotFoundException('Không tìm thấy tài liệu của bạn.');
     }
 
     const updated = await this.prisma.documents.update({

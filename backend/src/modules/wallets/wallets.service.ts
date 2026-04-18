@@ -6,6 +6,7 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { LedgerService } from './ledger.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { IsNumber, IsNotEmpty, IsObject, IsIn, IsString, IsOptional } from 'class-validator';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export class RequestWithdrawalDto {
   @IsNumber()
@@ -31,11 +32,12 @@ export class ProcessWithdrawalDto {
 export class WalletsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notificationsService: NotificationsService
   ) { }
 
   async getMyWallets(user: AuthUser) {
-    if (!user.customerId) throw new NotFoundException('Tai khoan khong hop le.');
+    if (!user.customerId) throw new NotFoundException('Tài khoản không hợp lệ.');
 
     const wallets = await this.prisma.wallets.findMany({
       where: { customer_id: user.customerId }
@@ -55,7 +57,7 @@ export class WalletsService {
 
   async requestWithdrawal(user: AuthUser, dto: RequestWithdrawalDto) {
     const customerId = user.customerId;
-    if (!customerId) throw new NotFoundException('Khong ro khach hang.');
+    if (!customerId) throw new NotFoundException('Không rõ khách hàng.');
 
     const wallet = await this.prisma.wallets.findUnique({
       where: {
@@ -66,11 +68,11 @@ export class WalletsService {
       }
     });
 
-    if (!wallet) throw new BadRequestException('Khach hang chua co vi doanh thu.');
+    if (!wallet) throw new BadRequestException('Khách hàng chưa có ví doanh thu.');
 
     const amount = new Prisma.Decimal(dto.amount);
     if (wallet.balance.lt(amount)) {
-      throw new BadRequestException('So du kha dung khong du de thuc hien lenh rut tien.');
+      throw new BadRequestException('Số dư khả dụng không đủ để thực hiện lệnh rút tiền.');
     }
 
     const configs = await this.prisma.configs.findMany({
@@ -123,7 +125,7 @@ export class WalletsService {
         'WITHDRAW',
         'WITHDRAWAL_REQUEST',
         request.request_id,
-        'Lenh rut tien dang cho duyet',
+        'Lệnh rút tiền đang chờ duyệt',
         [
           { wallet_id: wallet.wallet_id, debit_amount: amount, credit_amount: 0 },
           { wallet_id: gatewayPool.wallet_id, debit_amount: 0, credit_amount: netAmount },
@@ -134,6 +136,15 @@ export class WalletsService {
       return request;
     });
 
+    await this.notificationsService.createNotification({
+      accountId: user.accountId,
+      type: 'WITHDRAWAL_REQUESTED',
+      title: 'Đã gửi yêu cầu rút tiền',
+      message: `Yêu cầu rút ${dto.amount.toLocaleString('vi-VN')} đ đã được tạo và đang chờ duyệt.`,
+      link: '/profile',
+      metadata: { requestId: created.request_id }
+    });
+
     return toJsonSafe(created);
   }
 
@@ -141,10 +152,10 @@ export class WalletsService {
     const id = Number(requestId);
 
     const request = await this.prisma.withdrawal_requests.findUnique({ where: { request_id: id } });
-    if (!request) throw new NotFoundException('Khong tim thay lenh rut tien.');
+    if (!request) throw new NotFoundException('Không tìm thấy lệnh rút tiền.');
 
     if (!['PENDING'].includes(request.status)) {
-      throw new BadRequestException('Lenh rut tien da duoc xu ly hoac khong hop le.');
+      throw new BadRequestException('Lệnh rút tiền đã được xử lý hoặc không hợp lệ.');
     }
 
     const wallet = await this.prisma.wallets.findUnique({
@@ -156,7 +167,7 @@ export class WalletsService {
       }
     });
 
-    if (!wallet) throw new NotFoundException('Khong tim thay vi lien quan.');
+    if (!wallet) throw new NotFoundException('Không tìm thấy ví liên quan.');
 
     const nextStatus = dto.status;
 
@@ -204,6 +215,24 @@ export class WalletsService {
       return updatedRequest;
     });
 
+    const customer = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: request.customer_id },
+      select: { account_id: true }
+    });
+
+    if (customer) {
+      await this.notificationsService.createNotification({
+        accountId: customer.account_id,
+        type: nextStatus === 'PAID' ? 'WITHDRAWAL_PAID' : 'WITHDRAWAL_REJECTED',
+        title: nextStatus === 'PAID' ? 'Rút tiền đã được duyệt' : 'Rút tiền bị từ chối',
+        message: nextStatus === 'PAID'
+          ? `Yêu cầu rút tiền #${id} đã được duyệt và đang được xử lý thanh toán.`
+          : `Yêu cầu rút tiền #${id} đã bị từ chối. Số tiền đã được hoàn lại vào ví doanh thu của bạn.`,
+        link: '/profile',
+        metadata: { requestId: id }
+      });
+    }
+
     return toJsonSafe(result);
   }
 
@@ -213,6 +242,14 @@ export class WalletsService {
       where: {
         status: 'HELD',
         hold_until: { lte: now }
+      },
+      include: {
+        documents: {
+          select: { title: true }
+        },
+        customer_profiles: {
+          select: { account_id: true }
+        }
       }
     });
 
@@ -254,6 +291,17 @@ export class WalletsService {
 
     console.log(`[Cron] Đã release thành công ${heldItems.length} khoản tiền bị hold vào số dư khả dụng.`);
 
+    await this.notificationsService.createMany(
+      heldItems.map((item) => ({
+        accountId: item.customer_profiles.account_id,
+        type: 'HELD_FUNDS_RELEASED',
+        title: 'Tiền bán hàng đã được giải ngân',
+        message: `Khoản doanh thu từ tài liệu "${item.documents.title}" đã được chuyển vào số dư khả dụng của bạn.`,
+        link: '/seller/sales',
+        metadata: { orderItemId: item.order_item_id }
+      }))
+    );
+
     return { releasedCount: heldItems.length };
   }
 
@@ -265,7 +313,7 @@ export class WalletsService {
   }
 
   async getLedgerHistory(user: AuthUser) {
-    if (!user.customerId) throw new BadRequestException('Khong phai khach hang.');
+    if (!user.customerId) throw new BadRequestException('Không phải khách hàng.');
 
     const wallets = await this.prisma.wallets.findMany({
       where: { customer_id: user.customerId }

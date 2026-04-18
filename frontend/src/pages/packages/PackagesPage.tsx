@@ -31,30 +31,35 @@ export default function PackagesPage() {
   const handleBuy = async (pkg: any) => {
     if (!user) {
       toast.error('Vui lòng đăng nhập để mua gói')
-      return navigate('/login')
+      navigate('/login')
+      return
     }
 
-    const role = user.roleNames?.[0]?.toLowerCase() || '';
+    const role = user.roleNames?.[0]?.toLowerCase() || ''
     if (['admin', 'mod', 'accountant'].includes(role)) {
-      return toast.error('Nhân viên quản trị không thực hiện mua gói tải.');
+      toast.error('Nhân viên quản trị không thực hiện mua gói tại đây.')
+      return
     }
 
-    // Check if phone verified (you can refine this condition if user state has it)
+    if (!window.confirm(`Bạn có chắc chắn muốn mua gói "${pkg.name}" với giá ${formatBalance(pkg.price)}? Tiền sẽ được trừ vào Ví Thanh toán.`)) {
+      return
+    }
 
-    if (window.confirm(`Bạn có chắc chắn muốn mua gói "${pkg.name}" với giá ${formatBalance(pkg.price)}? Tiền sẽ được trừ vào Ví Thanh toán.`)) {
-      setBuying(pkg.package_id || pkg.id)
-      try {
-        await packagesApi.buyPackage(pkg.package_id || pkg.id)
-        toast.success(`Mua gói "${pkg.name}" thành công! Lượt tải đã được cộng vào tài khoản.`)
-      } catch (err: any) {
-        toast.error(err?.response?.data?.message || 'Mua gói thất bại. Hãy kiểm tra lại số dư Ví thanh toán.')
-      } finally {
-        setBuying(null)
-      }
+    setBuying(pkg.package_id || pkg.id)
+    try {
+      await packagesApi.buyPackage(pkg.package_id || pkg.id)
+      window.dispatchEvent(new Event('user-package-updated'))
+      toast.success(`Mua gói "${pkg.name}" thành công! Lượt tải đã được cộng vào tài khoản.`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Mua gói thất bại. Hãy kiểm tra lại số dư Ví thanh toán.')
+    } finally {
+      setBuying(null)
     }
   }
 
-  if (loading) return <div className="py-24 text-center">Đang tải danh sách gói...</div>
+  if (loading) {
+    return <div className="py-24 text-center">Đang tải danh sách gói...</div>
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4">
@@ -75,14 +80,16 @@ export default function PackagesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {packages.map((pkg: any, index: number) => {
-            const isPopular = index === 1 || pkg.price > 50000 && pkg.price < 200000;
+            const isPopular = index === 1 || (pkg.price > 50000 && pkg.price < 200000)
+
             return (
               <div
                 key={pkg.package_id || pkg.id}
-                className={`relative flex flex-col bg-card rounded-3xl p-8 transition-all duration-300 hover:-translate-y-2 ${isPopular
-                  ? 'border-2 border-primary shadow-[0_0_40px_rgba(108,92,231,0.15)] scale-105 z-10 bg-background'
-                  : 'border border-border shadow-sm'
-                  }`}
+                className={`relative flex flex-col bg-card rounded-3xl p-8 transition-all duration-300 hover:-translate-y-2 ${
+                  isPopular
+                    ? 'border-2 border-primary shadow-[0_0_40px_rgba(108,92,231,0.15)] scale-105 z-10 bg-background'
+                    : 'border border-border shadow-sm'
+                }`}
               >
                 {isPopular && (
                   <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-linear-to-r from-primary to-primary-light text-white px-4 py-1 rounded-full text-xs font-bold tracking-widest uppercase flex items-center gap-1 shadow-md">
@@ -133,10 +140,11 @@ export default function PackagesPage() {
                 <button
                   onClick={() => handleBuy(pkg)}
                   disabled={buying === (pkg.package_id || pkg.id)}
-                  className={`w-full py-4 rounded-xl font-bold text-base transition-all ${isPopular
-                    ? 'bg-primary text-white hover:bg-primary-hover shadow-lg disabled:bg-primary/50'
-                    : 'bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:bg-muted disabled:text-muted-foreground'
-                    }`}
+                  className={`w-full py-4 rounded-xl font-bold text-base transition-all ${
+                    isPopular
+                      ? 'bg-primary text-white hover:bg-primary-hover shadow-lg disabled:bg-primary/50'
+                      : 'bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:bg-muted disabled:text-muted-foreground'
+                  }`}
                 >
                   {buying === (pkg.package_id || pkg.id) ? 'Đang xử lý...' : 'Mua gói ngay'}
                 </button>

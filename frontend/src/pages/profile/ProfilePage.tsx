@@ -3,12 +3,13 @@ import { useAuthStore } from '@/store/authStore'
 import { usersApi } from '@/api/users.api'
 import { authApi } from '@/api/auth.api'
 import { walletsApi } from '@/api/wallets.api'
-import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X } from 'lucide-react'
+import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X, ChevronDown, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 import QRCode from 'react-qr-code'
 import { formatBalance, formatDate } from '@/utils/format'
 import { Link, useSearchParams } from 'react-router-dom'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
+import { getSharedPackageSummary } from '@/utils/packageSummary'
 
 export default function ProfilePage() {
   const { user } = useAuthStore()
@@ -48,6 +49,7 @@ export default function ProfilePage() {
   // Withdraw
   const [showWithdraw, setShowWithdraw] = useState(false)
   const [showWithdrawHistory, setShowWithdrawHistory] = useState(false)
+  const [showQueuedPackages, setShowQueuedPackages] = useState(false)
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bank: '', account: '', accountName: '' })
 
   // 2FA
@@ -185,7 +187,24 @@ export default function ProfilePage() {
   const role = profile?.accounts?.roles?.[0]?.name || user?.roleNames?.[0] || '';
   const isStaff = ['admin', 'mod', 'accountant'].includes(role.toLowerCase());
 
-  const activePackage = profile?.user_packages?.[0];
+  const activePackage = getSharedPackageSummary(profile?.user_packages);
+  const queuedPackages = Array.isArray(profile?.user_packages)
+    ? [...profile.user_packages]
+        .filter((pkg: any) => {
+          const expiresAt = new Date(pkg?.expires_at || 0).getTime()
+          return expiresAt > Date.now() && Number(pkg?.turns_remaining || 0) > 0
+        })
+        .sort((a: any, b: any) => {
+          const expiresA = new Date(a?.expires_at || 0).getTime()
+          const expiresB = new Date(b?.expires_at || 0).getTime()
+          if (expiresA !== expiresB) return expiresA - expiresB
+
+          const purchasedA = new Date(a?.purchased_at || 0).getTime()
+          const purchasedB = new Date(b?.purchased_at || 0).getTime()
+          return purchasedA - purchasedB
+        })
+        .slice(1)
+    : [];
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -364,18 +383,60 @@ export default function ProfilePage() {
                         <div className="space-y-4">
                           <div className="bg-background border border-border p-4 rounded-xl">
                             <div className="flex justify-between items-center mb-2">
-                              <span className="font-bold text-foreground">{activePackage.packages?.name || 'Gói tải'}</span>
+                              <span className="font-bold text-foreground">{activePackage.name}</span>
                               <span className="bg-success/10 text-success px-2 py-0.5 rounded-md text-xs font-bold">Đang kích hoạt</span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Còn lại:</span>
-                              <span className="font-semibold text-primary">{activePackage.turns_remaining} lượt</span>
+                              <span className="font-semibold text-primary">{activePackage.turnsRemaining} lượt</span>
                             </div>
                             <div className="flex justify-between text-sm mt-1">
                               <span className="text-muted-foreground">Hết hạn:</span>
-                              <span className="font-semibold">{formatDate(activePackage.expires_at)}</span>
+                              <span className="font-semibold">{formatDate(activePackage.expiresAt)}</span>
                             </div>
                           </div>
+                          {queuedPackages.length > 0 && (
+                            <div className="bg-background border border-border rounded-xl overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => setShowQueuedPackages((prev) => !prev)}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/60 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Package className="w-4 h-4 text-primary" />
+                                  <span className="text-sm font-semibold text-foreground">
+                                    Còn {queuedPackages.length} gói chưa dùng
+                                  </span>
+                                </div>
+                                <ChevronDown
+                                  className={`w-4 h-4 text-muted-foreground transition-transform ${showQueuedPackages ? 'rotate-180' : ''}`}
+                                />
+                              </button>
+
+                              {showQueuedPackages && (
+                                <div className="border-t border-border px-4 py-3 space-y-3 bg-muted/20">
+                                  {queuedPackages.map((pkg: any) => (
+                                    <div key={pkg.user_package_id} className="rounded-lg border border-border bg-card px-3 py-3">
+                                      <div className="flex items-center justify-between gap-3 mb-2">
+                                        <span className="font-semibold text-foreground">{pkg?.packages?.name || 'Gói tải'}</span>
+                                        <span className="bg-warning/10 text-warning px-2 py-0.5 rounded-md text-[11px] font-bold">
+                                          Chờ kích hoạt
+                                        </span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">Lượt sẵn có:</span>
+                                        <span className="font-semibold text-primary">{pkg.turns_remaining} lượt</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm mt-1">
+                                        <span className="text-muted-foreground">Hết hạn:</span>
+                                        <span className="font-semibold">{formatDate(pkg.expires_at)}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <Link to="/packages">
                             <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Mua thêm gói khác</button>
                           </Link>

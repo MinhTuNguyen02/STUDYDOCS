@@ -28,6 +28,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { DownloadsModule } from './modules/downloads/downloads.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { DisputesModule } from './modules/disputes/disputes.module';
     DownloadsModule,
     ReportsModule,
     DisputesModule,
+    NotificationsModule,
     MailerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

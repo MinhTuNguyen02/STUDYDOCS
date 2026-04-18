@@ -15,11 +15,11 @@ export class ModerationService {
   ) {}
 
   async createReport(user: AuthUser, dto: CreateReportDto) {
-    if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong the tao report.');
+    if (!user.customerId) throw new ForbiddenException('Tài khoản này không thể tạo report.');
 
     const documentId = Number(dto.documentId);
     const document = await this.prisma.documents.findUnique({ where: { document_id: documentId } });
-    if (!document) throw new NotFoundException('Khong tim thay tai lieu.');
+    if (!document) throw new NotFoundException('Không tìm thấy tài liệu.');
 
     const type = dto.type.toUpperCase();
     if (type === 'DISPUTE') {
@@ -37,7 +37,7 @@ export class ModerationService {
       });
 
       if (!order) {
-        throw new BadRequestException('Khong tim thay don hang de khiu nai.');
+        throw new BadRequestException('Không tìm thấy đơn hàng để khiếu nại.');
       }
 
       const deadline = new Date(order.created_at.getTime() + 48 * 60 * 60 * 1000);
@@ -91,7 +91,7 @@ export class ModerationService {
       include: { documents: true }
     });
 
-    if (!report) throw new NotFoundException('Khong tim thay report.');
+    if (!report) throw new NotFoundException('Không tìm thấy report.');
 
     const newStatus: report_status = dto.status;
 
@@ -179,7 +179,7 @@ export class ModerationService {
              'REFUND',
              'ORDER_ITEM',
              orderItem.order_item_id,
-             'Hoan phan tien mua tai lieu do khiu nai',
+             'Hoàn phần tiền mua tài liệu do khiếu nại',
              [
                 { wallet_id: sellerWallet!.wallet_id, debit_amount: orderItem.seller_earning, credit_amount: 0 },
                 { wallet_id: systemRevenue.wallet_id, debit_amount: orderItem.commission_fee, credit_amount: 0 },

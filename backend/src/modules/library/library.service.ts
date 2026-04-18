@@ -12,7 +12,7 @@ export class LibraryService {
   ) { }
 
   async listAccessibleDocuments(user: AuthUser) {
-    if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong co thu vien tai lieu.');
+    if (!user.customerId) throw new ForbiddenException('Tài khoản này không có thư viện tài liệu.');
 
     // 1. Get documents from PAID orders
     const orderItems = await this.prisma.order_items.findMany({

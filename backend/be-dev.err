@@ -1,0 +1,13 @@
+[31m[Nest] 4412  - [39m04/17/2026, 4:21:57 PM [31m  ERROR[39m [38;5;3m[ExceptionHandler] [39m[31mFailed to parse private key: Error: Invalid PEM formatted message.[39m
+Error: Failed to parse private key: Error: Invalid PEM formatted message.
+    at new ServiceAccount (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\firebase-admin\lib\app\credential-internal.js:182:19)
+    at new ServiceAccountCredential (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\firebase-admin\lib\app\credential-internal.js:118:15)
+    at Object.cert (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\firebase-admin\lib\app\credential-factory.js:105:54)
+    at new FirebaseAdminService (D:\PTTKHT_TMDT\STUDYDOCS\backend\src\modules\auth\firebase.service.ts:15:40)
+    at Injector.instantiateClass (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\@nestjs\core\injector\injector.js:373:19)
+    at callback (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\@nestjs\core\injector\injector.js:65:45)
+    at async Injector.resolveConstructorParams (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\@nestjs\core\injector\injector.js:145:24)
+    at async Injector.loadInstance (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\@nestjs\core\injector\injector.js:70:13)
+    at async Injector.loadProvider (D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\@nestjs\core\injector\injector.js:98:9)
+    at async D:\PTTKHT_TMDT\STUDYDOCS\backend\node_modules\@nestjs\core\injector\instance-loader.js:56:13
+^C

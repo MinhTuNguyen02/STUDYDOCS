@@ -29,7 +29,11 @@ export class UsersService {
         wallets: true,
         user_packages: {
           where: { status: 'ACTIVE', expires_at: { gt: new Date() } },
-          include: { packages: true }
+          include: { packages: true },
+          orderBy: [
+            { purchased_at: 'desc' },
+            { expires_at: 'desc' }
+          ]
         }
       }
     });
@@ -39,7 +43,7 @@ export class UsersService {
   }
 
   async updateProfile(user: AuthUser, dto: UpdateProfileDto) {
-    if (!user.customerId) throw new BadRequestException('Khong the cap nhat hobo staff tu endpoint nay.');
+    if (!user.customerId) throw new BadRequestException('Không thể cập nhật hồ sơ staff từ endpoint này.');
 
     const updated = await this.prisma.customer_profiles.update({
       where: { customer_id: user.customerId },
@@ -58,7 +62,7 @@ export class UsersService {
     });
 
     if (!account || !account.password_hash) {
-      throw new BadRequestException('Khong the doi mat khau cho tai khoan nay.');
+      throw new BadRequestException('Không thể đổi mật khẩu cho tài khoản này.');
     }
 
     const { currentPassword, newPassword } = dto;
@@ -67,7 +71,7 @@ export class UsersService {
       : account.password_hash === currentPassword;
 
     if (!isMatched) {
-      throw new BadRequestException('Mat khau hien tai khong xac.');
+      throw new BadRequestException('Mật khẩu hiện tại không chính xác.');
     }
 
     const newHash = await hash(newPassword, 10);
@@ -76,6 +80,6 @@ export class UsersService {
       data: { password_hash: newHash }
     });
 
-    return { message: 'Doi mat khau thanh cong.' };
+    return { message: 'Đổi mật khẩu thành công.' };
   }
 }

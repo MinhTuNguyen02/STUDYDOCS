@@ -102,7 +102,7 @@ export class DocumentsService {
     });
 
     if (!document) {
-      throw new NotFoundException('Khong tim thay tai lieu.');
+      throw new NotFoundException('Không tìm thấy tài liệu.');
     }
 
     let hasPurchased = false;

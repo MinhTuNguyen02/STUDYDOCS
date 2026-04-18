@@ -57,7 +57,7 @@ export class DocumentUploadService {
         reviewBuffer = processed.reviewBuffer;
       } catch (e) {
         if (extension === 'pdf') {
-          throw new BadRequestException('Khong the doc file PDF nay.');
+          throw new BadRequestException('Không thể đọc file PDF này.');
         } else {
           console.error('Pdf parse error on converted file:', e);
         }

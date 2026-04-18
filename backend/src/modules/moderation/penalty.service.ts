@@ -30,7 +30,7 @@ export class PenaltyService {
 
     if (violationCount === 3) {
       // Third violation: Deduct 50,000 from REVENUE wallet as fine
-      await this.applyFine(profile.account_id, customerId, 50000, 'Phat 50,000 VND do vi pham ban quyen nhieu lan.');
+      await this.applyFine(profile.account_id, customerId, 50000, 'Phạt 50,000 VND do vi phạm bản quyền nhiều lần.');
     } else if (violationCount >= 5) {
       // Fifth violation: Block account
       await this.prisma.accounts.update({
@@ -54,7 +54,7 @@ export class PenaltyService {
       });
 
       if (!sellerWallet) {
-        throw new BadRequestException('Khong tim thay vi REVENUE cua user de phat.');
+        throw new BadRequestException('Không tìm thấy ví REVENUE của user để phạt.');
       }
 
       const fineAmount = new Prisma.Decimal(amount);
@@ -104,9 +104,9 @@ export class PenaltyService {
     const profile = await this.prisma.customer_profiles.findUnique({
       where: { customer_id: targetCustomerId }
     });
-    if (!profile) throw new BadRequestException('Khach hang khong hop le.');
+    if (!profile) throw new BadRequestException('Khách hàng không hợp lệ.');
     
     await this.applyFine(profile.account_id, targetCustomerId, amount, reason);
-    return { message: 'Da xu phat thanh cong.' };
+    return { message: 'Đã xử phạt thành công.' };
   }
 }

@@ -27,12 +27,12 @@ export class TwoFactorAuthService {
   }
 
   verifyTwoFactorAuthCode(code: string, secret: string): boolean {
-    if (!secret || !code) throw new UnauthorizedException('Khong duoc bo thieu 2FA Code/Secret.');
+    if (!secret || !code) throw new UnauthorizedException('Không được bỏ thiếu mã/secret 2FA.');
     const isCodeValid = this.authenticator.verify({
       token: code,
       secret: secret
     });
-    if (!isCodeValid) throw new UnauthorizedException('Ma 2FA khong dung thao tac that bai.');
+    if (!isCodeValid) throw new UnauthorizedException('Mã 2FA không đúng, thao tác thất bại.');
     return true;
   }
 }

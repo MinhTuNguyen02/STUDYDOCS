@@ -66,11 +66,11 @@ export class AuthService {
     });
 
     if (!account || !account.password_hash) {
-      throw new UnauthorizedException('Thong tin dang nhap khong hop le.');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
     if (account.status === 'BANNED' || account.delete_at !== null) {
-      throw new ForbiddenException('Tai khoan da bi vo hieu hoa.');
+      throw new ForbiddenException('Tài khoản đã bị vô hiệu hóa.');
     }
 
     const isLegacyPlain = account.password_hash === rawPassword;
@@ -83,7 +83,7 @@ export class AuthService {
 
     const passwordMatched = isLegacyPlain || isBcryptAsync || isBcryptSync;
     if (!passwordMatched) {
-      throw new UnauthorizedException('Thong tin dang nhap khong hop le.');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
     const profileName = account.customer_profiles?.full_name ?? account.staff_profiles?.full_name ?? null;
@@ -97,7 +97,7 @@ export class AuthService {
       : false;
 
     return {
-      message: 'Dang nhap thanh cong.',
+      message: 'Đăng nhập thành công.',
       user: toJsonSafe({
         accountId: account.account_id,
         customerId: account.customer_profiles?.customer_id ?? null,
@@ -156,7 +156,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Dang ky thanh cong.',
+      message: 'Đăng ký thành công.',
       user: toJsonSafe({
         accountId: account.account_id,
         customerId: account.customer_profiles?.customer_id,
@@ -175,11 +175,11 @@ export class AuthService {
     });
 
     if (!session || session.is_revoked || session.expires_at < new Date()) {
-      throw new UnauthorizedException('Refresh token khong hop le hoac da het han.');
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn.');
     }
 
     if (session.accounts.status === 'BANNED' || session.accounts.delete_at !== null) {
-      throw new ForbiddenException('Tai khoan da bi vo hieu hoa.');
+      throw new ForbiddenException('Tài khoản đã bị vô hiệu hóa.');
     }
 
     const payload = {
@@ -193,7 +193,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Lam moi access token thanh cong.',
+      message: 'Làm mới access token thành công.',
       accessToken
     };
   }
@@ -205,12 +205,12 @@ export class AuthService {
       data: { is_revoked: true }
     });
 
-    return { message: 'Dang xuat thanh cong.' };
+    return { message: 'Đăng xuất thành công.' };
   }
 
   async sendOtp(user: AuthUser, dto: SendOtpDto) {
     if (!user.customerId) {
-      throw new ForbiddenException('Chi khach hang moi co the xac minh OTP.');
+      throw new ForbiddenException('Chỉ khách hàng mới có thể xác minh OTP.');
     }
 
     const { phoneNumber } = dto;
@@ -221,7 +221,7 @@ export class AuthService {
     // Mode 1: Firebase Production — Frontend gọi Firebase Auth SDK để gửi OTP qua SMS thật
     if (firebaseProjectId && firebaseProjectId !== 'placeholder') {
       return {
-        message: 'Hay su dung Firebase SDK tren Frontend de gui OTP den so dien thoai.',
+        message: 'Hãy sử dụng Firebase SDK trên frontend để gửi OTP đến số điện thoại.',
         mode: 'FIREBASE',
         phoneNumber
       };
@@ -250,7 +250,7 @@ export class AuthService {
 
   async verifyOtp(user: AuthUser, dto: VerifyOtpDto) {
     if (!user.customerId) {
-      throw new ForbiddenException('Chi khach hang moi co the xac minh OTP.');
+      throw new ForbiddenException('Chỉ khách hàng mới có thể xác minh OTP.');
     }
 
     const firebaseProjectId = this.configService.get<string>('FIREBASE_PROJECT_ID', '');
@@ -269,7 +269,7 @@ export class AuthService {
         }
       });
 
-      return { message: 'Xac minh OTP qua Firebase thanh cong.' };
+      return { message: 'Xác minh OTP qua Firebase thành công.' };
     }
 
 
@@ -279,7 +279,7 @@ export class AuthService {
     });
 
     if (!account || !account.phone_otp_code || !account.phone_otp_expires_at) {
-      throw new BadRequestException('Chua gui ma OTP hoac xac minh khong hop le.');
+      throw new BadRequestException('Chưa gửi mã OTP hoặc xác minh không hợp lệ.');
     }
 
     if (account.phone_otp_expires_at < new Date()) {
@@ -287,7 +287,7 @@ export class AuthService {
     }
 
     if (account.phone_otp_code !== dto.otpCode) {
-      throw new BadRequestException('Ma OTP khong chinh xac.');
+      throw new BadRequestException('Mã OTP không chính xác.');
     }
 
     // Validated, now approve
@@ -302,7 +302,7 @@ export class AuthService {
       data: { phone_otp_code: null, phone_otp_expires_at: null }
     });
 
-    return { message: 'Xac minh OTP thanh cong (Mock mode).' };
+    return { message: 'Xác minh OTP thành công (Mock mode).' };
   }
 
   async googleLogin(req: any) {
@@ -354,7 +354,7 @@ export class AuthService {
     }
 
     if (account.status === 'BANNED' || account.delete_at !== null) {
-      throw new ForbiddenException('Tai khoan da bi vo hieu hoa.');
+      throw new ForbiddenException('Tài khoản đã bị vô hiệu hóa.');
     }
 
     const profileName = account.customer_profiles?.full_name ?? fullName;
@@ -362,7 +362,7 @@ export class AuthService {
     const tokens = await this.createSessionAndTokens(account.account_id, account.email);
 
     return {
-      message: 'Dang nhap Google thanh cong.',
+      message: 'Đăng nhập Google thành công.',
       user: toJsonSafe({
         accountId: account.account_id,
         customerId: account.customer_profiles?.customer_id ?? null,
@@ -395,7 +395,7 @@ export class AuthService {
 
   async verify2FA(user: AuthUser, code: string) {
     if (!code || code.length !== 6) {
-      throw new BadRequestException('Ma 2FA khong hop le.');
+      throw new BadRequestException('Mã 2FA không hợp lệ.');
     }
 
     const account = await this.prisma.accounts.findUnique({
@@ -416,7 +416,7 @@ export class AuthService {
       data: { is_two_factor_enabled: true }
     });
 
-    return { message: 'Kich hoat 2FA thanh cong va luu vao Database.' };
+    return { message: 'Kích hoạt 2FA thành công và lưu vào database.' };
   }
 
   async forgotPassword(email: string) {
@@ -425,7 +425,7 @@ export class AuthService {
     
     if (!account) {
       // Don't throw 404 to prevent email enumeration, but we'll throw here for UX
-      throw new NotFoundException('Khong tim thay tai khoan voi email nay.');
+      throw new NotFoundException('Không tìm thấy tài khoản với email này.');
     }
 
     const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
@@ -467,12 +467,12 @@ export class AuthService {
 
     console.log(`\n\n[MAIL SENT] Đã gửi mail reset password cho ${formattedEmail}\n\n`);
 
-    return { message: 'Link dat lai mat khau da duoc gui' };
+    return { message: 'Link đặt lại mật khẩu đã được gửi' };
   }
 
   async resetPassword(token: string, newPassword: string) {
     if (!token || !newPassword) {
-      throw new BadRequestException('Thieu token hoac mat khau moi.');
+      throw new BadRequestException('Thiếu token hoặc mật khẩu mới.');
     }
 
     const account = await this.prisma.accounts.findFirst({
@@ -483,7 +483,7 @@ export class AuthService {
     });
 
     if (!account) {
-      throw new BadRequestException('Token khong hop le hoac da het han.');
+      throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn.');
     }
 
     const hashedPassword = await hash(newPassword, 12);
@@ -497,6 +497,6 @@ export class AuthService {
       }
     });
 
-    return { message: 'Doi mat khau thanh cong' };
+    return { message: 'Đổi mật khẩu thành công' };
   }
 }

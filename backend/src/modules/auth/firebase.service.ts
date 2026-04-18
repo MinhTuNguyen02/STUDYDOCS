@@ -27,7 +27,7 @@ export class FirebaseAdminService {
     try {
       const decodedToken = await admin.auth().verifyIdToken(idToken);
       if (!decodedToken.phone_number) {
-        throw new UnauthorizedException('Token khong chua So dien thoai.');
+        throw new UnauthorizedException('Token không chứa số điện thoại.');
       }
       return decodedToken;
     } catch (e: any) {

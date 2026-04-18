@@ -1,0 +1,35 @@
+[31mfailed to load config from D:\PTTKHT_TMDT\STUDYDOCS\frontend\vite.config.ts[39m
+[31merror when starting dev server:
+Error: Build failed with 2 errors:
+
+[31m[UNLOADABLE_DEPENDENCY] Error:[0m Could not load node_modules/@tailwindcss/oxide-win32-x64-msvc/tailwindcss-oxide.win32-x64-msvc.node
+     [38;5;246m╭[0m[38;5;246m─[0m[38;5;246m[[0m node_modules/@tailwindcss/oxide/index.js:131:33 [38;5;246m][0m
+     [38;5;246m│[0m
+ [38;5;246m131 │[0m [38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249m [0m[38;5;249mc[0m[38;5;249mo[0m[38;5;249mn[0m[38;5;249ms[0m[38;5;249mt[0m[38;5;249m [0m[38;5;249mb[0m[38;5;249mi[0m[38;5;249mn[0m[38;5;249md[0m[38;5;249mi[0m[38;5;249mn[0m[38;5;249mg[0m[38;5;249m [0m[38;5;249m=[0m[38;5;249m [0m[38;5;249mr[0m[38;5;249me[0m[38;5;249mq[0m[38;5;249mu[0m[38;5;249mi[0m[38;5;249mr[0m[38;5;249me[0m[38;5;249m([0m'@tailwindcss/oxide-win32-x64-msvc'[38;5;249m)[0m
+ [38;5;240m    │[0m                                 ─────────────────┬─────────────────  
+ [38;5;240m    │[0m                                                  ╰─────────────────── stream did not contain valid UTF-8
+[38;5;246m─────╯[0m
+
+[plugin externalize-deps]
+Error: spawn EPERM
+    at ChildProcess.spawn (node:internal/child_process:420:11)
+    at spawn (node:child_process:753:9)
+    at Object.execFile (node:child_process:346:17)
+    at exec (node:child_process:233:25)
+    at optimizeSafeRealPathSync (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:1954:2)
+    at windowsSafeRealPathSync (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:1940:3)
+    at getRealPath (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:32309:36)
+    at tryResolveRealFileOrType (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:32303:9)
+    at tryCleanFsResolve (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:32047:21)
+    at tryFsResolve (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:32040:14)
+    at aggregateBindingErrorsIntoJsError (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/rolldown/dist/shared/error-BLhcSyeg.mjs:48:18)
+    at unwrapBindingResult (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/rolldown/dist/shared/error-BLhcSyeg.mjs:18:128)
+    at #build (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/rolldown/dist/shared/rolldown-build-CPrIX9V6.mjs:3313:34)
+    at async bundleConfigFile (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:34527:17)
+    at async bundleAndLoadConfigFile (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:34435:18)
+    at async loadConfigFromFile (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:34404:42)
+    at async resolveConfig (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:34028:22)
+    at async _createServer (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/chunks/node.js:25917:65)
+    at async CAC.<anonymous> (file:///D:/PTTKHT_TMDT/STUDYDOCS/frontend/node_modules/vite/dist/node/cli.js:709:18) {
+  errors: [Getter/Setter]
+}[39m

@@ -1,0 +1,7 @@
+
+> studydocs-market-be@0.1.0 start
+> nest start
+
+
+ Error  EPERM: operation not permitted, unlink 'D:\PTTKHT_TMDT\STUDYDOCS\backend\dist\tsconfig.build.tsbuildinfo'
+

@@ -11,7 +11,7 @@ export class PhoneVerifiedGuard implements CanActivate {
     const user = request.user as AuthUser;
 
     if (!user) {
-      throw new UnauthorizedException('Chua dang nhap.');
+      throw new UnauthorizedException('Chưa đăng nhập.');
     }
 
     if (!user.customerId) {
@@ -24,7 +24,7 @@ export class PhoneVerifiedGuard implements CanActivate {
     });
 
     if (!profile || !profile.is_phone_verified) {
-      throw new ForbiddenException('Vui long xac minh so dien thoai de thuc hien chuc nang nay.');
+      throw new ForbiddenException('Vui lòng xác minh số điện thoại để thực hiện chức năng này.');
     }
 
     return true;

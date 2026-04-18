@@ -11,13 +11,15 @@ import { UpdateTagDto } from './dto/update-tag.dto';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { hash } from 'bcryptjs';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notificationsService: NotificationsService
   ) { }
 
   private formatFileSize(bytes: number) {
@@ -431,7 +433,14 @@ export class AdminService {
 
   async approveDocument(documentId: string, actor: AuthUser) {
     const id = Number(documentId);
-    const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
+    const existing = await this.prisma.documents.findUnique({
+      where: { document_id: id },
+      include: {
+        customer_profiles: {
+          select: { account_id: true }
+        }
+      }
+    });
     if (!existing) throw new NotFoundException('Không tìm thấy tài liệu.');
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -466,12 +475,28 @@ export class AdminService {
       await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
     }
 
+    await this.notificationsService.createNotification({
+      accountId: existing.customer_profiles.account_id,
+      type: 'DOCUMENT_APPROVED',
+      title: 'Tài liệu đã được duyệt',
+      message: `Tài liệu "${existing.title}" của bạn đã được duyệt và đang hiển thị trên StudyDocs.`,
+      link: '/seller/documents',
+      metadata: { documentId: updated.document_id }
+    });
+
     return toJsonSafe(updated);
   }
 
   async rejectDocument(documentId: string, dto: RejectDocumentDto, actor: AuthUser) {
     const id = Number(documentId);
-    const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
+    const existing = await this.prisma.documents.findUnique({
+      where: { document_id: id },
+      include: {
+        customer_profiles: {
+          select: { account_id: true }
+        }
+      }
+    });
     if (!existing) throw new NotFoundException('Không tìm thấy tài liệu.');
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -503,6 +528,15 @@ export class AdminService {
       await this.storageService.deleteFile(reviewKey);
       await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
     }
+
+    await this.notificationsService.createNotification({
+      accountId: existing.customer_profiles.account_id,
+      type: 'DOCUMENT_REJECTED',
+      title: 'Tài liệu chưa được duyệt',
+      message: `Tài liệu "${existing.title}" chưa được duyệt. Lý do: ${dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.'}`,
+      link: '/seller/documents',
+      metadata: { documentId: updated.document_id }
+    });
 
     return toJsonSafe(updated);
   }

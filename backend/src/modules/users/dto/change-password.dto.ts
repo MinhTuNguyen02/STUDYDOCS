@@ -10,6 +10,6 @@ export class ChangePasswordDto {
   @ApiProperty({ example: 'Password@123' })
   @IsNotEmpty()
   @IsString()
-  @MinLength(6, { message: 'Mat khau moi phai co it nhat 6 ky tu' })
+  @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
   newPassword!: string;
 }

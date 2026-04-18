@@ -62,11 +62,11 @@ export class ReviewsService {
   }
 
   async upsertMyReview(user: AuthUser, documentId: string, dto: UpsertReviewDto) {
-    if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong the danh gia.');
+    if (!user.customerId) throw new ForbiddenException('Tài khoản này không thể đánh giá.');
 
     const docId = Number(documentId);
     const document = await this.prisma.documents.findUnique({ where: { document_id: docId } });
-    if (!document) throw new NotFoundException('Khong tim thay tai lieu.');
+    if (!document) throw new NotFoundException('Không tìm thấy tài liệu.');
 
     const eligibleOrderItems = await this.prisma.order_items.findMany({
       where: {
@@ -81,7 +81,7 @@ export class ReviewsService {
     });
 
     if (eligibleOrderItems.length === 0) {
-      throw new ForbiddenException('Ban chi co the danh gia tai lieu da mua.');
+      throw new ForbiddenException('Bạn chỉ có thể đánh giá tài liệu đã mua.');
     }
 
     const existingByDoc = await this.prisma.reviews.findFirst({
@@ -127,7 +127,7 @@ export class ReviewsService {
       include: { documents: true }
     });
 
-    if (!review) throw new NotFoundException('Khong tim thay danh gia nay.');
+    if (!review) throw new NotFoundException('Không tìm thấy đánh giá này.');
 
     if (review.documents.seller_id !== user.customerId) {
       throw new ForbiddenException('Bạn không phải là người bán của tài liệu này.');

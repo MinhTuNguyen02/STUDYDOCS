@@ -5,6 +5,6 @@ export class SendOtpDto {
   @ApiProperty({ example: '0901234567' })
   @IsNotEmpty()
   @IsString()
-  @Matches(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, { message: 'So dien thoai khong hop le' })
+  @Matches(/(84|0[3|5|7|8|9])+([0-9]{8})\b/, { message: 'Số điện thoại không hợp lệ' })
   phoneNumber!: string;
 }

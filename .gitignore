@@ -21,3 +21,5 @@ npm-debug.log*
 # Gemini / AI agent
 .gemini/
 .agent/
+.env
+.env copy

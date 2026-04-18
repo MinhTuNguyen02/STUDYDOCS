@@ -8,13 +8,15 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { LedgerService } from '../wallets/ledger.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CheckoutService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notificationsService: NotificationsService
   ) { }
 
   // Giống hàm sortObject() trong demo chính thức của VNPAY
@@ -51,7 +53,7 @@ export class CheckoutService {
 
   async createOrder(user: AuthUser, dto: CreateCheckoutDto) {
     if (!user.customerId) {
-      throw new ForbiddenException('Tai khoan nay khong co quyen mua hang.');
+      throw new ForbiddenException('Tài khoản này không có quyền mua hàng.');
     }
 
     const docIds = dto.documentIds.map((id) => Number(id));
@@ -64,18 +66,24 @@ export class CheckoutService {
       select: {
         document_id: true,
         seller_id: true,
-        price: true
+        title: true,
+        price: true,
+        customer_profiles: {
+          select: {
+            account_id: true
+          }
+        }
       }
     });
 
     if (docs.length !== docIds.length) {
-      throw new BadRequestException('Mot hoac nhieu tai lieu khong hop le de mua.');
+      throw new BadRequestException('Một hoặc nhiều tài liệu không hợp lệ để mua.');
     }
 
     // Chặn seller tự mua tài liệu của chính mình
     const selfOwned = docs.find(doc => doc.seller_id === user.customerId);
     if (selfOwned) {
-      throw new BadRequestException('Khong the mua tai lieu cua chinh minh.');
+      throw new BadRequestException('Không thể mua tài liệu của chính mình.');
     }
 
     // Chặn mua trùng tài liệu đã mua
@@ -90,7 +98,7 @@ export class CheckoutService {
       }
     });
     if (alreadyBought) {
-      throw new BadRequestException('Ban da mua tai lieu nay roi. Khong can mua lai.');
+      throw new BadRequestException('Bạn đã mua tài liệu này rồi. Không cần mua lại.');
     }
 
     const totalAmount = docs.reduce((sum, doc) => sum.add(doc.price), new Prisma.Decimal(0));
@@ -192,7 +200,7 @@ export class CheckoutService {
         'PURCHASE',
         'ORDER',
         createdOrder.order_id,
-        'Thanh toan mua tai lieu',
+        'Thanh toán mua tài liệu',
         ledgerEntries
       );
 
@@ -211,10 +219,21 @@ export class CheckoutService {
         timeout: 30000 // Tăng thời gian sống lên 30 giây (hoặc 60000 nếu máy chạy chậm)
       });
 
+    await this.notificationsService.createMany(
+      docs.map((doc) => ({
+        accountId: doc.customer_profiles.account_id,
+        type: 'SELLER_DOCUMENT_SOLD',
+        title: 'Tài liệu của bạn vừa được mua',
+        message: `Tài liệu "${doc.title}" vừa được mua. Doanh thu đang được giữ tạm thời trước khi giải ngân.`,
+        link: '/seller/sales',
+        metadata: { documentId: doc.document_id, orderId: order.order_id }
+      }))
+    );
+
     return {
       orderId: order.order_id.toString(),
       status: order.status,
-      message: 'Thanh toan don hang thanh cong bang vi PAYMENT.'
+      message: 'Thanh toán đơn hàng thành công bằng ví PAYMENT.'
     };
   }
 
@@ -223,7 +242,7 @@ export class CheckoutService {
   // ──────────────────────────────────────────────
 
   async createTopup(user: AuthUser, amount: number) {
-    if (!user.customerId) throw new ForbiddenException('Khong the nap tien vao tai khoan nay.');
+    if (!user.customerId) throw new ForbiddenException('Không thể nạp tiền vào tài khoản này.');
 
     if (amount < 10000) throw new BadRequestException('So tien nap toi thieu la 10,000 VND.');
 
@@ -256,7 +275,7 @@ export class CheckoutService {
       vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
       vnp_TxnRef: payment.payment_id.toString(), // Truyen payment_id vao TxnRef
-      vnp_OrderInfo: `Nap tien vao vi PAYMENT ${user.customerId}`,
+      vnp_OrderInfo: `Nạp tiền vào ví PAYMENT ${user.customerId}`,
       vnp_OrderType: 'other',
       vnp_Amount: amount * 100,
       vnp_ReturnUrl: returnUrl,
@@ -289,7 +308,7 @@ export class CheckoutService {
       where: { payment_id: paymentId }
     });
 
-    if (!payment) throw new NotFoundException('Khong tim thay giao dich nap tien.');
+    if (!payment) throw new NotFoundException('Không tìm thấy giao dịch nạp tiền.');
     if (payment.status === 'COMPLETED') return { message: 'Da xu ly roi.', idempotent: true };
 
     const mappedStatus: payment_status = status === 'SUCCESS' ? 'COMPLETED' : 'FAILED';
@@ -334,7 +353,7 @@ export class CheckoutService {
           'DEPOSIT',
           'PAYMENT',
           payment.payment_id,
-          'Nap tien vao vi qua VNPay',
+          'Nạp tiền vào ví qua VNPay',
           [
             { wallet_id: gatewayPool.wallet_id, debit_amount: payment.amount, credit_amount: 0 },
             { wallet_id: buyerWallet.wallet_id, debit_amount: 0, credit_amount: payment.amount }
@@ -346,7 +365,7 @@ export class CheckoutService {
       timeout: 30000
     });
 
-    return { message: 'Nap tien Wallet thanh cong.' };
+    return { message: 'Nạp tiền ví thành công.' };
   }
 
   async getOrderStatus(user: AuthUser, orderId: string) {
@@ -370,11 +389,11 @@ export class CheckoutService {
       }
     });
 
-    if (!order) throw new NotFoundException('Khong tim thay don hang.');
+    if (!order) throw new NotFoundException('Không tìm thấy đơn hàng.');
 
     const isInternal = user.roleNames.some((role) => ['admin', 'mod', 'accountant'].includes(role));
     if (!isInternal && order.buyer_id !== user.customerId) {
-      throw new ForbiddenException('Ban khong co quyen xem don hang nay.');
+      throw new ForbiddenException('Bạn không có quyền xem đơn hàng này.');
     }
 
     const payment = order.payments[0];
