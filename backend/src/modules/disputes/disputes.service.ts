@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { LedgerService } from '../wallets/ledger.service';
 import { dispute_status } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class DisputesService {
@@ -10,7 +11,8 @@ export class DisputesService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService
   ) { }
 
   async createDispute(user: AuthUser, dto: { orderItemId: number; reason: string; description: string }) {
@@ -57,6 +59,22 @@ export class DisputesService {
         description: dto.description,
         status: 'OPEN'
       }
+    });
+
+    // Notify staff: có khiếu nại mới
+    this.notifications.notifyRole('admin', {
+      type: 'DISPUTE_NEW',
+      title: 'Khiếu nại mới',
+      message: `Khiếu nại mới #${dispute.id}: ${dto.reason}`,
+      referenceId: dispute.id,
+      referenceType: 'DISPUTE'
+    });
+    this.notifications.notifyRole('mod', {
+      type: 'DISPUTE_NEW',
+      title: 'Khiếu nại mới',
+      message: `Khiếu nại mới #${dispute.id}: ${dto.reason}`,
+      referenceId: dispute.id,
+      referenceType: 'DISPUTE'
     });
 
     return { message: 'Đã gửi khiếu nại thành công.', dispute };
@@ -112,6 +130,23 @@ export class DisputesService {
           staff_id: user.staffId
         }
       });
+
+      // Notify buyer: khiếu nại bị từ chối
+      const buyerProfile = await this.prisma.customer_profiles.findUnique({
+        where: { customer_id: dispute.customer_id },
+        select: { account_id: true }
+      });
+      if (buyerProfile) {
+        this.notifications.notify({
+          accountId: buyerProfile.account_id,
+          type: 'DISPUTE_REJECTED',
+          title: 'Khiếu nại bị từ chối',
+          message: `Khiếu nại #${disputeId} của bạn đã bị từ chối. Lý do: ${dto.resolution}`,
+          referenceId: disputeId,
+          referenceType: 'DISPUTE'
+        });
+      }
+
       return { message: 'Đã từ chối khiếu nại.', data: updated };
     }
 
@@ -192,6 +227,22 @@ export class DisputesService {
           }
         });
       });
+
+      // Notify buyer: khiếu nại được chấp thuận, hoàn tiền (SAU transaction commit)
+      const resolvedBuyerProfile = await this.prisma.customer_profiles.findUnique({
+        where: { customer_id: dispute.customer_id },
+        select: { account_id: true }
+      });
+      if (resolvedBuyerProfile) {
+        this.notifications.notify({
+          accountId: resolvedBuyerProfile.account_id,
+          type: 'DISPUTE_RESOLVED',
+          title: 'Khiếu nại được chấp thuận',
+          message: `Khiếu nại #${disputeId} đã được giải quyết. Bạn đã được hoàn ${Number(orderItem.unit_price).toLocaleString('vi-VN')}đ.`,
+          referenceId: disputeId,
+          referenceType: 'DISPUTE'
+        });
+      }
 
       return { message: 'Đã hoàn tiền và chấp thuận khiếu nại.', data: res };
     }

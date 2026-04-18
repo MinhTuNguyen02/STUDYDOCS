@@ -7,6 +7,7 @@ import {
   ShieldCheck, ScrollText, Package, LogOut, Menu, X, Library,
   FolderTree, Vault
 } from 'lucide-react';
+import NotificationBell from '@/components/common/NotificationBell';
 
 interface Props {
   children: ReactNode;
@@ -157,14 +158,23 @@ export default function AdminLayout({ children }: Props) {
       </aside>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="lg:hidden h-16 bg-card border-b border-border flex items-center px-4 shrink-0">
-          <button
-            className="text-foreground p-2 hover:bg-muted rounded-lg"
-            onClick={() => setIsSidebarOpen(true)}
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-          <span className="ml-4 font-heading font-bold text-lg">Admin Panel</span>
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-8 shrink-0">
+          <div className="flex items-center">
+            <button
+              className="lg:hidden text-foreground p-2 hover:bg-muted rounded-lg mr-4"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <span className="font-heading font-bold text-lg hidden lg:block">Quản trị viên</span>
+            <span className="font-heading font-bold text-lg lg:hidden">Admin Panel</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell />
+            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm shrink-0 shadow-sm border border-primary/20">
+              {user?.fullName?.charAt(0).toUpperCase()}
+            </div>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar">

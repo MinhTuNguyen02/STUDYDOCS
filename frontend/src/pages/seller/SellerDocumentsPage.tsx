@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { sellerApi } from '@/api/seller.api'
-import { FileText, Plus, Search, Filter } from 'lucide-react'
+import { FileText, Plus, Search, Filter, EyeOff, Eye } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { formatBalance, formatDate } from '@/utils/format'
 import SellerLayout from '@/components/layout/SellerLayout'
 
@@ -49,7 +50,15 @@ export default function SellerDocumentsPage() {
     }
   }
 
-
+  const handleToggleVisibility = async (id: number, isHidden: boolean) => {
+    try {
+      await sellerApi.toggleDocumentVisibility(id, !isHidden);
+      toast.success(!isHidden ? 'Đã ẩn tài liệu thành công' : 'Đã hiện tài liệu thành công');
+      fetchDocs();
+    } catch (err) {
+      toast.error('Có lỗi xảy ra khi thay đổi trạng thái hiển thị');
+    }
+  }
 
   return (
     <SellerLayout>
@@ -121,8 +130,13 @@ export default function SellerDocumentsPage() {
                     {doc.status === 'REJECTED' && doc.rejectionReason && (
                       <div className="text-xs text-danger mt-1">Lý do: {doc.rejectionReason}</div>
                     )}
+                    {doc.isUserHidden && <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><EyeOff className="w-3 h-3" /> Đã ẩn (Người bán)</div>}
+                    {doc.status === 'HIDDEN' && <div className="text-xs text-danger mt-1 flex items-center gap-1"><EyeOff className="w-3 h-3" /> Đã bị ẩn (Admin)</div>}
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="p-4 text-right flex items-center justify-end gap-3">
+                    <button onClick={() => handleToggleVisibility(doc.id, doc.isUserHidden)} title={doc.isUserHidden ? 'Hiển thị lại' : 'Tạm ẩn tài liệu'} className="text-muted-foreground hover:text-primary transition-colors">
+                      {doc.isUserHidden ? <span className="text-success text-sm font-semibold">Công khai</span> : <span className="text-danger text-sm font-semibold">Ẩn</span>}
+                    </button>
                     <Link to={`/documents/${doc.id}`} className="text-primary hover:underline text-sm font-semibold">Xem</Link>
                   </td>
                 </tr>

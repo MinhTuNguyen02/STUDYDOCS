@@ -7,12 +7,14 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateSellerDocumentDto } from './dto/create-seller-document.dto';
 import { UpdateSellerDocumentDto } from './dto/update-seller-document.dto';
 import { PenaltyService } from '../moderation/penalty.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SellerService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly penaltyService: PenaltyService
+    private readonly penaltyService: PenaltyService,
+    private readonly notifications: NotificationsService
   ) { }
 
   private ensureSeller(user: AuthUser) {
@@ -351,6 +353,22 @@ export class SellerService {
           }
         })
       }
+    });
+
+    // Notify staff: có tài liệu mới cần duyệt
+    this.notifications.notifyRole('admin', {
+      type: 'DOC_PENDING',
+      title: 'Tài liệu chờ duyệt',
+      message: `Tài liệu mới "${document.title}" đang chờ được kiểm duyệt.`,
+      referenceId: document.document_id,
+      referenceType: 'DOCUMENT'
+    });
+    this.notifications.notifyRole('mod', {
+      type: 'DOC_PENDING',
+      title: 'Tài liệu chờ duyệt',
+      message: `Tài liệu mới "${document.title}" đang chờ được kiểm duyệt.`,
+      referenceId: document.document_id,
+      referenceType: 'DOCUMENT'
     });
 
     return toJsonSafe(document);

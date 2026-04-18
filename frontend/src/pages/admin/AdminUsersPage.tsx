@@ -138,58 +138,58 @@ export default function AdminUsersPage() {
   const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filtered, 15);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-heading">Quản lý Người dùng</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Tổng cộng <strong>{allUsers.length}</strong> tài khoản ({customerCount} khách hàng, {staffCount} nhân viên)
-          </p>
+    <>
+      <div className="space-y-6 animate-in fade-in duration-200">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold font-heading">Quản lý Người dùng</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Tổng cộng <strong>{allUsers.length}</strong> tài khoản ({customerCount} khách hàng, {staffCount} nhân viên)
+            </p>
+          </div>
+          {activeTab === 'staff' && isAdmin && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm"
+            >
+              <Plus className="w-4 h-4" /> Tạo tài khoản nhân viên
+            </button>
+          )}
         </div>
-        {activeTab === 'staff' && isAdmin && (
+
+        {/* Tabs */}
+        <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm"
+            onClick={() => setActiveTab('customers')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'customers'
+              ? 'bg-card shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
-            <Plus className="w-4 h-4" /> Tạo tài khoản nhân viên
+            <Users className="w-4 h-4" />
+            Khách hàng
+            <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
+              {customerCount}
+            </span>
           </button>
-        )}
-      </div>
+          <button
+            onClick={() => setActiveTab('staff')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'staff'
+              ? 'bg-card shadow-sm text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            Nhân viên & Admin
+            <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
+              {staffCount}
+            </span>
+          </button>
+        </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
-        <button
-          onClick={() => setActiveTab('customers')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'customers'
-            ? 'bg-card shadow-sm text-foreground'
-            : 'text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <Users className="w-4 h-4" />
-          Khách hàng
-          <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
-            {customerCount}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('staff')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'staff'
-            ? 'bg-card shadow-sm text-foreground'
-            : 'text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          Nhân viên & Admin
-          <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
-            {staffCount}
-          </span>
-        </button>
-      </div>
-
-      {/* Table card */}
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-muted/30 flex flex-col md:flex-row gap-4 items-center justify-between">
+        {/* ── Filter ── */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
@@ -234,6 +234,9 @@ export default function AdminUsersPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
 
         {loading ? (
           <div className="p-12 text-center text-muted-foreground animate-pulse">Đang tải dữ liệu...</div>
@@ -243,8 +246,8 @@ export default function AdminUsersPage() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
+                <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
+                  <tr>
                     <th className="p-4 font-semibold">Tên / Email</th>
                     <th className="p-4 font-semibold">Vai trò</th>
                     <th className="p-4 font-semibold">Tình trạng</th>
@@ -423,6 +426,6 @@ export default function AdminUsersPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

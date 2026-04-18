@@ -83,6 +83,14 @@ function App() {
       import('@/store/wishlistStore').then(({ useWishlistStore }) => {
         useWishlistStore.getState().fetchWishlist()
       })
+      import('@/store/notificationStore').then(({ useNotificationStore }) => {
+        useNotificationStore.getState().connect()
+        useNotificationStore.getState().fetchInitial()
+      })
+    } else {
+      import('@/store/notificationStore').then(({ useNotificationStore }) => {
+        useNotificationStore.getState().disconnect()
+      })
     }
 
     // Setup periodic check every minute

@@ -41,11 +41,12 @@ export default function AdminReportsPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-      <h1 className="text-2xl font-bold font-heading">Chi tiết Báo cáo</h1>
+    <>
+      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+        <h1 className="text-2xl font-bold font-heading">Chi tiết Báo cáo</h1>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        {/* ── Filter ── */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
             <select
               value={statusFilter}
@@ -56,7 +57,7 @@ export default function AdminReportsPage() {
               <option value="PENDING">Đang chờ</option>
               <option value="RESOLVED">Đã giải quyết</option>
             </select>
-            
+
             {statusFilter !== 'ALL' && (
               <button
                 onClick={() => setStatusFilter('ALL')}
@@ -68,11 +69,14 @@ export default function AdminReportsPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
+            <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
+              <tr>
                 <th className="p-4 font-semibold">Ngày tạo</th>
                 <th className="p-4 font-semibold">Người gửi</th>
                 <th className="p-4 font-semibold">Lý do</th>
@@ -111,6 +115,6 @@ export default function AdminReportsPage() {
         </div>
         <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
       </div>
-    </div>
+    </>
   );
 }

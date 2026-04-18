@@ -39,6 +39,14 @@ export const adminApi = {
     const res = await api.get('/admin/documents', { params });
     return res.data;
   },
+  softDeleteDocument: async (id: number) => {
+    const res = await api.patch(`/admin/documents/${id}/soft-delete`);
+    return res.data;
+  },
+  restoreDocument: async (id: number) => {
+    const res = await api.patch(`/admin/documents/${id}/restore`);
+    return res.data;
+  },
 
   getWithdrawals: async () => {
     const res = await api.get('/admin/withdrawals');

@@ -8,13 +8,15 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { LedgerService } from '../wallets/ledger.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CheckoutService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService
   ) { }
 
   // Giống hàm sortObject() trong demo chính thức của VNPAY
@@ -211,6 +213,32 @@ export class CheckoutService {
         timeout: 30000 // Tăng thời gian sống lên 30 giây (hoặc 60000 nếu máy chạy chậm)
       });
 
+    // ── Notification (SAU transaction commit) ──
+    // Notify từng seller có tài liệu được mua
+    const sellerAccountMap = new Map<number, string[]>();
+    for (const doc of docs) {
+      const sellerProfile = await this.prisma.customer_profiles.findUnique({
+        where: { customer_id: doc.seller_id },
+        select: { account_id: true }
+      });
+      if (sellerProfile) {
+        const existing = sellerAccountMap.get(sellerProfile.account_id) || [];
+        const docData = await this.prisma.documents.findUnique({ where: { document_id: doc.document_id }, select: { title: true } });
+        existing.push(docData?.title ?? `#${doc.document_id}`);
+        sellerAccountMap.set(sellerProfile.account_id, existing);
+      }
+    }
+    for (const [sellerAccountId, titles] of sellerAccountMap) {
+      this.notifications.notify({
+        accountId: sellerAccountId,
+        type: 'ORDER_NEW',
+        title: 'Có đơn hàng mới',
+        message: `Tài liệu "${titles.join(', ')}" vừa được mua. Đơn hàng #${order.order_id}.`,
+        referenceId: order.order_id,
+        referenceType: 'ORDER'
+      });
+    }
+
     return {
       orderId: order.order_id.toString(),
       status: order.status,
@@ -345,6 +373,25 @@ export class CheckoutService {
       maxWait: 5000,
       timeout: 30000
     });
+
+    // ── Notification: Nạp tiền thành công ──
+    if (mappedStatus === 'COMPLETED') {
+      const reqPayload = payment.request_payload as any;
+      const profile = await this.prisma.customer_profiles.findUnique({
+        where: { customer_id: reqPayload.customerId },
+        select: { account_id: true }
+      });
+      if (profile) {
+        this.notifications.notify({
+          accountId: profile.account_id,
+          type: 'TOPUP_SUCCESS',
+          title: 'Nạp tiền thành công',
+          message: `Bạn đã nạp thành công ${Number(payment.amount).toLocaleString('vi-VN')}đ vào ví thanh toán.`,
+          referenceId: payment.payment_id,
+          referenceType: 'PAYMENT'
+        });
+      }
+    }
 
     return { message: 'Nap tien Wallet thanh cong.' };
   }

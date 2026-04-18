@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
@@ -6,6 +6,7 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { LedgerService } from './ledger.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { IsNumber, IsNotEmpty, IsObject, IsIn, IsString, IsOptional } from 'class-validator';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export class RequestWithdrawalDto {
   @IsNumber()
@@ -31,7 +32,9 @@ export class ProcessWithdrawalDto {
 export class WalletsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notifications: NotificationsService
   ) { }
 
   async getMyWallets(user: AuthUser) {
@@ -134,6 +137,22 @@ export class WalletsService {
       return request;
     });
 
+    // Notify staff: có yêu cầu rút tiền mới
+    this.notifications.notifyRole('admin', {
+      type: 'WITHDRAWAL_NEW',
+      title: 'Yêu cầu rút tiền mới',
+      message: `Có yêu cầu rút tiền mới #${created.request_id}, số tiền ${Number(created.amount).toLocaleString('vi-VN')}đ.`,
+      referenceId: created.request_id,
+      referenceType: 'WITHDRAWAL'
+    });
+    this.notifications.notifyRole('accountant', {
+      type: 'WITHDRAWAL_NEW',
+      title: 'Yêu cầu rút tiền mới',
+      message: `Có yêu cầu rút tiền mới #${created.request_id}, số tiền ${Number(created.amount).toLocaleString('vi-VN')}đ.`,
+      referenceId: created.request_id,
+      referenceType: 'WITHDRAWAL'
+    });
+
     return toJsonSafe(created);
   }
 
@@ -204,6 +223,25 @@ export class WalletsService {
       return updatedRequest;
     });
 
+    // Notify seller: kết quả rút tiền
+    const sellerProfile = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: request.customer_id },
+      select: { account_id: true }
+    });
+    if (sellerProfile) {
+      const isApproved = nextStatus === 'PAID';
+      this.notifications.notify({
+        accountId: sellerProfile.account_id,
+        type: isApproved ? 'WITHDRAWAL_PAID' : 'WITHDRAWAL_REJECTED',
+        title: isApproved ? 'Rút tiền thành công' : 'Yêu cầu rút tiền bị từ chối',
+        message: isApproved
+          ? `Yêu cầu rút ${Number(request.net_amount).toLocaleString('vi-VN')}đ đã được duyệt và chuyển khoản.`
+          : `Yêu cầu rút ${Number(request.amount).toLocaleString('vi-VN')}đ bị từ chối.${dto.note ? ' Lý do: ' + dto.note : ''}`,
+        referenceId: id,
+        referenceType: 'WITHDRAWAL'
+      });
+    }
+
     return toJsonSafe(result);
   }
 
@@ -253,6 +291,26 @@ export class WalletsService {
     });
 
     console.log(`[Cron] Đã release thành công ${heldItems.length} khoản tiền bị hold vào số dư khả dụng.`);
+
+    // Notify từng seller có tiền được release
+    const sellerIds = [...new Set(heldItems.map(i => i.seller_id))];
+    for (const sellerId of sellerIds) {
+      const profile = await this.prisma.customer_profiles.findUnique({
+        where: { customer_id: sellerId },
+        select: { account_id: true }
+      });
+      if (profile) {
+        const sellerItems = heldItems.filter(i => i.seller_id === sellerId);
+        const totalEarning = sellerItems.reduce((sum, i) => sum + Number(i.seller_earning), 0);
+        this.notifications.notify({
+          accountId: profile.account_id,
+          type: 'FUNDS_RELEASED',
+          title: 'Tiền đã được giải phóng',
+          message: `${totalEarning.toLocaleString('vi-VN')}đ đã chuyển từ số dư chờ sang khả dụng (${sellerItems.length} đơn hàng).`,
+          referenceType: 'ORDER'
+        });
+      }
+    }
 
     return { releasedCount: heldItems.length };
   }

@@ -64,7 +64,7 @@ export default function AdminAuditLogsPage() {
   const renderJson = (data: any) => {
     if (!data) return <span className="text-muted-foreground italic">Không có dữ liệu</span>
     return (
-      <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed text-foreground/80 break-words">
+      <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed text-foreground/80 wrap-break-word">
         {JSON.stringify(data, null, 2)}
       </pre>
     )
@@ -89,7 +89,8 @@ export default function AdminAuditLogsPage() {
         </div>
       </div>
 
-      <div className="bg-card border border-border p-4 rounded-2xl shadow-sm mb-6 flex flex-wrap gap-4 items-center w-full">
+      {/* ── Filter ── */}
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4 w-full">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
@@ -143,7 +144,7 @@ export default function AdminAuditLogsPage() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+                <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                   <tr>
                     <th className="px-6 py-4 rounded-tl-2xl w-[15%]">TG Thực hiện</th>
                     <th className="px-6 py-4 w-[20%]">Tác nhân</th>
@@ -203,7 +204,7 @@ export default function AdminAuditLogsPage() {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
                   <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Thời gian</p>
                   <p className="font-mono text-sm">{formatDateTimeSec(selectedLog.created_at)}</p>

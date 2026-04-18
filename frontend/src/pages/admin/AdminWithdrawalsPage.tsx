@@ -44,13 +44,14 @@ export default function AdminWithdrawalsPage() {
   const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredWithdrawals);
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold font-heading">Quản lý Rút tiền</h1>
-      </div>
+    <>
+      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold font-heading">Quản lý Rút tiền</h1>
+        </div>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
+        {/* ── Filter ── */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
             <select
               value={statusFilter}
@@ -74,6 +75,9 @@ export default function AdminWithdrawalsPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
 
         {loading ? (
           <div className="p-8 text-center text-muted-foreground">Đang tải...</div>
@@ -81,8 +85,8 @@ export default function AdminWithdrawalsPage() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
+                <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
+                  <tr>
                     <th className="p-4 font-semibold">Tài khoản Yêu cầu</th>
                     <th className="p-4 font-semibold">Số tiền</th>
                     <th className="p-4 font-semibold">Thuế</th>
@@ -135,6 +139,6 @@ export default function AdminWithdrawalsPage() {
           </>
         )}
       </div>
-    </div>
+    </>
   );
 }

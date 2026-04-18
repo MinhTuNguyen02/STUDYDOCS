@@ -32,6 +32,7 @@ model accounts {
   customer_profiles customer_profiles?
   staff_profiles    staff_profiles?
   user_sessions     user_sessions[]
+  notifications     notifications[]
 }
 
 // ─── Bảng Staff_Profile ─────────────────────────────────────────
@@ -493,6 +494,24 @@ model disputes {
   staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
 }
 
+// ─── Bảng Notifications ─────────────────────────────────────────
+model notifications {
+  id             Int               @id @default(autoincrement())
+  account_id     Int
+  type           notification_type
+  title          String            @db.VarChar(255)
+  message        String
+  reference_id   Int?
+  reference_type String?           @db.VarChar(50)
+  is_read        Boolean           @default(false)
+  created_at     DateTime          @default(now()) @db.Timestamptz(6)
+
+  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([account_id, is_read], map: "idx_notifications_account_read")
+  @@index([created_at], map: "idx_notifications_created_at")
+}
+
 // ═══════════════════════════════════════════════════════════════
 // ENUMS
 // ═══════════════════════════════════════════════════════════════
@@ -608,4 +627,25 @@ enum dispute_status {
   INVESTIGATING
   RESOLVED
   REJECTED
+}
+
+enum notification_type {
+  ORDER_NEW
+  DOC_APPROVED
+  DOC_REJECTED
+  DOC_HIDDEN
+  DOC_PENDING
+  TOPUP_SUCCESS
+  FUNDS_RELEASED
+  WITHDRAWAL_PAID
+  WITHDRAWAL_REJECTED
+  WITHDRAWAL_NEW
+  NEW_REVIEW
+  REVIEW_REPLY
+  DISPUTE_NEW
+  DISPUTE_RESOLVED
+  DISPUTE_REJECTED
+  REPORT_HANDLED
+  ACCOUNT_BANNED
+  SYSTEM
 }

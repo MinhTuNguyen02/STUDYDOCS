@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { documentsApi } from '@/api/documents.api'
 import { adminApi } from '@/api/admin.api'
-import { Plus, Edit2, Trash2, Tag, AlertCircle } from 'lucide-react'
+import { Plus, Edit2, Trash2, Tag, AlertCircle, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface TagItem {
@@ -126,23 +126,28 @@ export default function AdminTagsPage() {
           <h1 className="text-2xl font-bold font-heading">Quản lý Tags</h1>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <form onSubmit={handleSearch} className="flex-1 md:w-64">
+        <button
+          onClick={() => handleOpenModal()}
+          className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm shrink-0 h-[38px]"
+        >
+          <Plus className="w-5 h-5" /> Thêm Tag
+        </button>
+      </div>
+
+
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
+        <form onSubmit={handleSearch} className="flex-1 w-full sm:max-w-sm">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Tìm kiếm tag..."
-              className="w-full px-4 py-2 border border-border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+              className="w-full pl-9 pr-4 py-2 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
-          </form>
-          <button
-            onClick={() => handleOpenModal()}
-            className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm shrink-0"
-          >
-            <Plus className="w-5 h-5" /> Thêm Tag
-          </button>
-        </div>
+          </div>
+        </form>
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
@@ -151,7 +156,7 @@ export default function AdminTagsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+              <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-6 py-4 rounded-tl-2xl">ID</th>
                   <th className="px-6 py-4">Tên Tag</th>
