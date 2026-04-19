@@ -15,13 +15,13 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   app.setGlobalPrefix('api');
-  
+
   // Security Headers
   app.use(helmet());
 
   // Strict CORS
   app.enableCors({
-    origin: config.get<string>('FRONTEND_URL', 'http://localhost:3000'),
+    origin: config.get<string>('FRONTEND_URL'),
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type, Accept, Authorization',

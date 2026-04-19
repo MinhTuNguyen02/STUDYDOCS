@@ -270,7 +270,7 @@ export class CheckoutService {
     const tmnCode = this.config.get<string>('VNPAY_TMN_CODE', '');
     const secretKey = this.config.get<string>('VNPAY_HASH_SECRET', '');
     const vnpUrl = this.config.get<string>('VNPAY_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
-    const returnUrl = 'http://localhost:5173/payment/vnpay-return';
+    const returnUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/payment/vnpay-return`;
 
     const date = new Date();
     const createDate =

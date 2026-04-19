@@ -149,7 +149,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 gap-4">
               <button
                 type="button"
-                onClick={() => window.location.href = 'http://localhost:5173/api/auth/google'}
+                onClick={() => window.location.href = `${import.meta.env.VITE_API_URL || '/api'}/auth/google`}
                 className="flex items-center justify-center gap-3 py-3.5 border border-border rounded-xl hover:bg-accent hover:shadow-sm transition-all font-medium text-foreground bg-background"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">

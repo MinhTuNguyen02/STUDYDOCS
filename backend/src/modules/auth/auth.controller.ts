@@ -57,7 +57,8 @@ export class AuthController {
   async googleAuthRedirect(@Req() req: any, @Res() res: any) {
     const tokens = await this.authService.googleLogin(req);
     // Redirect back to frontend with tokens
-    return res.redirect(`http://localhost:5173/login?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}&user=${encodeURIComponent(JSON.stringify(tokens.user))}`);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return res.redirect(`${frontendUrl}/login?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}&user=${encodeURIComponent(JSON.stringify(tokens.user))}`);
   }
 
   @Post('2fa/setup')

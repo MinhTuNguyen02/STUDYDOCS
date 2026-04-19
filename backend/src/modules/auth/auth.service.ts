@@ -439,7 +439,8 @@ export class AuthService {
       }
     });
 
-    const resetLink = `http://localhost:5173/reset-password?token=${token}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
     
     // Gửi email thực tế thông qua thư viện nodemailer / mailer
     await this.mailerService.sendMail({
