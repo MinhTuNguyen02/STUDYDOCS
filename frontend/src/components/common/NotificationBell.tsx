@@ -48,7 +48,7 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-border rounded-xl shadow-xl z-[100] overflow-hidden flex flex-col max-h-[500px]">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-border rounded-xl shadow-xl z-100 overflow-hidden flex flex-col max-h-[500px]">
           <div className="p-3 border-b border-border bg-secondary flex justify-between items-center shrink-0">
             <h3 className="font-bold text-foreground">Thông báo</h3>
             {unreadCount > 0 && (
@@ -96,7 +96,7 @@ export default function NotificationBell() {
               ))
             )}
             
-            {hasMore && (
+            {hasMore && notifications.length > 0 && (
               <div className="text-center p-2">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
               </div>

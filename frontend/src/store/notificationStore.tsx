@@ -111,19 +111,20 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       set({ isLoading: true, page: 1, hasMore: true });
       const [notifsRes, countRes] = await Promise.all([
-        api.get('/api/notifications?page=1&limit=20'),
-        api.get('/api/notifications/unread-count')
+        api.get('/notifications?page=1&limit=20'),
+        api.get('/notifications/unread-count')
       ]);
       
+      const items = notifsRes.data?.data || [];
       set({ 
-        notifications: notifsRes.data?.data?.data || [], 
-        unreadCount: countRes.data?.data?.unreadCount || 0,
-        hasMore: (notifsRes.data?.data?.data || []).length === 20,
+        notifications: items, 
+        unreadCount: countRes.data?.unreadCount || 0,
+        hasMore: items.length === 20,
         isLoading: false
       });
     } catch (error) {
       console.error('[NotificationStore] Fetch initial error:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, hasMore: false });
     }
   },
 
@@ -133,9 +134,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     try {
       set({ isLoading: true });
       const nextPage = get().page + 1;
-      const res = await api.get(`/api/notifications?page=${nextPage}&limit=20`);
+      const res = await api.get(`/notifications?page=${nextPage}&limit=20`);
       
-      const newItems = res.data?.data?.data || [];
+      const newItems = res.data?.data || [];
       set(state => ({
         notifications: [...state.notifications, ...newItems],
         page: nextPage,
@@ -144,13 +145,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       }));
     } catch (error) {
       console.error('[NotificationStore] Fetch more error:', error);
-      set({ isLoading: false });
+      set({ isLoading: false, hasMore: false });
     }
   },
 
   markAsRead: async (id: number) => {
     try {
-      await api.patch(`/api/notifications/${id}/read`);
+      await api.patch(`/notifications/${id}/read`);
       set(state => ({
         notifications: state.notifications.map(n => 
           n.id === id ? { ...n, isRead: true } : n
@@ -164,7 +165,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   markAllAsRead: async () => {
     try {
-      await api.patch('/api/notifications/read-all');
+      await api.patch('/notifications/read-all');
       set(state => ({
         notifications: state.notifications.map(n => ({ ...n, isRead: true })),
         unreadCount: 0
