@@ -411,7 +411,8 @@ export class CheckoutService {
                 title: true,
                 slug: true
               }
-            }
+            },
+            disputes: { select: { id: true }, take: 1 }
           }
         }
       }
@@ -429,11 +430,14 @@ export class CheckoutService {
     return toJsonSafe({
       orderId: order.order_id,
       status: order.status,
+      createdAt: order.created_at,
       paymentStatus: payment?.status ?? null,
       items: order.order_items.map((item) => ({
         id: item.order_item_id,
         status: item.status,
         unitPrice: item.unit_price,
+        holdUntil: item.hold_until,
+        hasDispute: item.disputes && item.disputes.length > 0,
         document: item.documents
       }))
     });

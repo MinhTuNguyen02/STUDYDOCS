@@ -3,11 +3,25 @@ import { Link, useNavigate } from 'react-router-dom'
 import { packagesApi } from '@/api/packages.api'
 import { useAuthStore } from '@/store/authStore'
 import { formatBalance } from '@/utils/format'
-import { PackageOpen, Check, Zap, Download } from 'lucide-react'
+import { PackageOpen, Check, Zap, Download, Clock, Hourglass, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+interface UserPackage {
+  userPackageId: number
+  packageId: number
+  name: string
+  turnsRemaining: number
+  totalTurns: number
+  durationDays: number
+  status: 'ACTIVE' | 'PENDING'
+  purchasedAt: string
+  expiresAt: string | null
+  queuePosition: number
+}
 
 export default function PackagesPage() {
   const [packages, setPackages] = useState<any[]>([])
+  const [myPackages, setMyPackages] = useState<UserPackage[]>([])
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState<number | null>(null)
   const { user } = useAuthStore()
@@ -19,8 +33,12 @@ export default function PackagesPage() {
 
   const fetchPackages = async () => {
     try {
-      const res = await packagesApi.getPackages()
-      setPackages(res.data || res || [])
+      const [pkgsRes, myRes] = await Promise.all([
+        packagesApi.getPackages(),
+        user ? packagesApi.getMyPackages().catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+      ])
+      setPackages(pkgsRes.data || pkgsRes || [])
+      setMyPackages(myRes.data || [])
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Không thể tải danh sách gói')
     } finally {
@@ -39,13 +57,13 @@ export default function PackagesPage() {
       return toast.error('Nhân viên quản trị không thực hiện mua gói tải.');
     }
 
-    // Check if phone verified (you can refine this condition if user state has it)
-
     if (window.confirm(`Bạn có chắc chắn muốn mua gói "${pkg.name}" với giá ${formatBalance(pkg.price)}? Tiền sẽ được trừ vào Ví Thanh toán.`)) {
       setBuying(pkg.package_id || pkg.id)
       try {
-        await packagesApi.buyPackage(pkg.package_id || pkg.id)
-        toast.success(`Mua gói "${pkg.name}" thành công! Lượt tải đã được cộng vào tài khoản.`)
+        const res = await packagesApi.buyPackage(pkg.package_id || pkg.id)
+        toast.success(res.message || `Mua gói "${pkg.name}" thành công!`)
+        // Refresh lại danh sách gói của user
+        await fetchPackages()
       } catch (err: any) {
         toast.error(err?.response?.data?.message || 'Mua gói thất bại. Hãy kiểm tra lại số dư Ví thanh toán.')
       } finally {
@@ -54,11 +72,26 @@ export default function PackagesPage() {
     }
   }
 
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('vi-VN', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    })
+  }
+
+  const getDaysLeft = (expiresAt: string) => {
+    const diff = new Date(expiresAt).getTime() - Date.now()
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
+  }
+
   if (loading) return <div className="py-24 text-center">Đang tải danh sách gói...</div>
+
+  const activePackage = myPackages.find(p => p.status === 'ACTIVE')
+  const pendingPackages = myPackages.filter(p => p.status === 'PENDING')
 
   return (
     <div className="max-w-7xl mx-auto px-4">
-      <div className="text-center max-w-2xl mx-auto mb-16">
+      {/* Header */}
+      <div className="text-center max-w-2xl mx-auto mb-12">
         <div className="inline-flex items-center justify-center p-3 bg-primary/10 rounded-2xl mb-4">
           <PackageOpen className="w-8 h-8 text-primary" />
         </div>
@@ -68,6 +101,95 @@ export default function PackagesPage() {
         </p>
       </div>
 
+      {/* ── My Packages Panel (hiển thị nếu user đăng nhập và có gói) ── */}
+      {user && myPackages.length > 0 && (
+        <div className="mb-12 bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+          <div className="p-5 border-b border-border bg-primary/5 flex items-center gap-3">
+            <PackageOpen className="w-5 h-5 text-primary" />
+            <h2 className="font-bold text-foreground text-lg">Gói của bạn</h2>
+          </div>
+
+          <div className="divide-y divide-border">
+            {myPackages.map((up, idx) => (
+              <div
+                key={up.userPackageId}
+                className={`p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${up.status === 'ACTIVE' ? 'bg-white' : 'bg-secondary/30'
+                  }`}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Queue badge */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${up.status === 'ACTIVE'
+                      ? 'bg-success/15 text-success'
+                      : 'bg-muted text-muted-foreground'
+                    }`}>
+                    {up.status === 'ACTIVE' ? <Zap className="w-5 h-5" /> : `#${idx + 1}`}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-foreground">{up.name}</span>
+                      {up.status === 'ACTIVE' ? (
+                        <span className="text-xs px-2 py-0.5 bg-success/10 text-success rounded-full font-medium">
+                          Đang hoạt động
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full font-medium flex items-center gap-1">
+                          <Hourglass className="w-3 h-3" /> Đang chờ kích hoạt
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                      {/* Lượt tải còn lại */}
+                      <span className="flex items-center gap-1">
+                        <Download className="w-3.5 h-3.5" />
+                        <strong className="text-foreground">{up.turnsRemaining}</strong>/{up.totalTurns} lượt
+                      </span>
+
+                      {/* Hạn dùng */}
+                      {up.status === 'ACTIVE' && up.expiresAt ? (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          Hết hạn: <strong className="text-foreground">{formatDate(up.expiresAt)}</strong>
+                          <span className="text-warning">({getDaysLeft(up.expiresAt)} ngày nữa)</span>
+                        </span>
+                      ) : up.status === 'PENDING' ? (
+                        <span className="flex items-center gap-1 text-muted-foreground italic">
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Tự kích hoạt khi gói trước hết hạn / hết lượt
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {/* Progress bar cho lượt tải */}
+                    {up.status === 'ACTIVE' && (
+                      <div className="mt-2 w-48 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${(up.turnsRemaining / up.totalTurns) * 100}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  Mua lúc {formatDate(up.purchasedAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {pendingPackages.length > 0 && (
+            <div className="px-5 py-3 bg-primary/5 border-t border-primary/10 text-xs text-primary flex items-center gap-2">
+              <Hourglass className="w-3.5 h-3.5 shrink-0" />
+              Bạn có <strong>{pendingPackages.length}</strong> gói đang chờ kích hoạt trong hàng chờ. Các gói sẽ tự động bắt đầu đếm ngày hạn khi gói trước kết thúc.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Package List ── */}
       {packages.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-2xl">
           Hiện tại chưa có gói lượt tải nào khả dụng.
@@ -117,6 +239,7 @@ export default function PackagesPage() {
                       </div>
                       <span className="text-muted-foreground">
                         Thời hạn: <strong className="text-foreground">{pkg.duration_days || pkg.durationDays} ngày</strong>
+                        <span className="text-xs block text-muted-foreground/70">(tính từ lúc kích hoạt)</span>
                       </span>
                     </li>
                     <li className="flex items-start gap-3">
@@ -130,16 +253,30 @@ export default function PackagesPage() {
                   </ul>
                 </div>
 
-                <button
-                  onClick={() => handleBuy(pkg)}
-                  disabled={buying === (pkg.package_id || pkg.id)}
-                  className={`w-full py-4 rounded-xl font-bold text-base transition-all ${isPopular
-                    ? 'bg-primary text-white hover:bg-primary-hover shadow-lg disabled:bg-primary/50'
-                    : 'bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:bg-muted disabled:text-muted-foreground'
-                    }`}
-                >
-                  {buying === (pkg.package_id || pkg.id) ? 'Đang xử lý...' : 'Mua gói ngay'}
-                </button>
+                {user ? (
+                  <button
+                    onClick={() => handleBuy(pkg)}
+                    disabled={buying === (pkg.package_id || pkg.id)}
+                    className={`w-full py-4 rounded-xl font-bold text-base transition-all ${isPopular
+                      ? 'bg-primary text-white hover:bg-primary-hover shadow-lg disabled:bg-primary/50'
+                      : 'bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:bg-muted disabled:text-muted-foreground'
+                      }`}
+                  >
+                    {buying === (pkg.package_id || pkg.id)
+                      ? 'Đang xử lý...'
+                      : activePackage ? 'Thêm vào hàng chờ' : 'Mua gói ngay'}
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    className={`w-full py-4 rounded-xl font-bold text-base text-center transition-all block ${isPopular
+                      ? 'bg-primary text-white hover:bg-primary-hover shadow-lg'
+                      : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'
+                      }`}
+                  >
+                    Đăng nhập để mua
+                  </Link>
+                )}
               </div>
             )
           })}

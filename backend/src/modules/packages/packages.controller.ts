@@ -17,6 +17,12 @@ export class PackagesController {
     return this.packagesService.getActivePackages();
   }
 
+  @Get('my')
+  @UseGuards(JwtAuthGuard)
+  getMyPackages(@CurrentUser() user: AuthUser) {
+    return this.packagesService.getMyPackages(user);
+  }
+
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')

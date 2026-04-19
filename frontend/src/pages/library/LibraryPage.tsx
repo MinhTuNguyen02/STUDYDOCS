@@ -98,11 +98,21 @@ export default function LibraryPage() {
 
             return (
               <div key={doc.id || doc.document_id || index} className="bg-card border border-border rounded-xl overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1 flex flex-col h-full group">
-                <div className={`h-40 ${imageColor} flex items-center justify-center relative shrink-0`}>
-                  <FileText className="w-16 h-16 text-white/90 group-hover:scale-110 transition-transform duration-300" />
-                  <div className="absolute bottom-0 w-full bg-black/30 backdrop-blur-sm text-white text-center text-xs py-1.5 font-bold tracking-widest uppercase">
-                    {ext}
-                  </div>
+                <div className={`h-40 ${imageColor} flex items-center justify-center relative shrink-0 overflow-hidden`}>
+                  {doc.previewUrl && doc.previewUrl !== 'previews/placeholder.png' ? (
+                    <object
+                      data={`${import.meta.env.VITE_STORAGE_URL || '/api/storage'}/${doc.previewUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                      type="application/pdf"
+                      className="w-full h-full pointer-events-none opacity-90 group-hover:opacity-100 transition-opacity scale-[1.3] group-hover:scale-[1.35] duration-500 origin-top"
+                    />
+                  ) : (
+                    <>
+                      <FileText className="w-16 h-16 text-white/90 group-hover:scale-110 transition-transform duration-300" />
+                      <div className="absolute bottom-0 w-full bg-black/30 backdrop-blur-sm text-white text-center text-xs py-1.5 font-bold tracking-widest uppercase">
+                        {ext}
+                      </div>
+                    </>
+                  )}
 
                   {/* Badge */}
                   <div className="absolute top-3 left-3">

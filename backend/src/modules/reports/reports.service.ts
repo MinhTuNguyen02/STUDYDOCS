@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { report_status } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) { }
 
   async createReport(user: AuthUser, dto: { documentId: number; type: string; reason: string }) {
     if (!user.customerId) throw new ForbiddenException('Chỉ khách hàng mới có quyền báo cáo.');
@@ -21,6 +25,15 @@ export class ReportsService {
         reason: dto.reason,
         status: 'PENDING'
       }
+    });
+
+    // Notify staff: có report mới cần xử lý
+    this.notifications.notifyStaffRoles(['admin', 'mod'], {
+      type: 'REPORT_NEW',
+      title: 'Báo cáo vi phạm mới',
+      message: `Report mới #${report.report_id}: "${dto.reason}" cho tài liệu "${doc.title}".`,
+      referenceId: report.report_id,
+      referenceType: 'REPORT'
     });
 
     return { message: 'Đã gửi báo cáo vi phạm thành công.', report };
@@ -64,6 +77,23 @@ export class ReportsService {
         new_value: { status: updated.status }
       }
     });
+
+    // Notify user: report has been handled
+    const customerAccount = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: report.customer_id },
+      select: { account_id: true }
+    });
+
+    if (customerAccount) {
+      this.notifications.notify({
+        accountId: customerAccount.account_id,
+        type: 'REPORT_HANDLED',
+        title: 'Báo cáo đã được xử lý',
+        message: `Báo cáo vi phạm #${reportId} của bạn đã được quản trị viên xử lý.`,
+        referenceId: reportId,
+        referenceType: 'REPORT'
+      });
+    }
 
     return { message: `Đã xử lý báo cáo thành công với trạng thái: ${status}`, data: updated };
   }

@@ -146,7 +146,7 @@ export default function DocumentDetailPage() {
   if (loading) return <div className="text-center py-24 text-muted-foreground">Đang tải...</div>
   if (!doc) return <div className="text-center py-24 text-muted-foreground">Không tìm thấy tài liệu</div>
 
-  const isFree = !doc.price || doc.price === 0
+  const isFree = !doc.price || Number(doc.price) === 0
   const isOwner = user?.customerId && Number(doc.sellerId || doc.seller_id || 0) === Number(user.customerId)
   const isWishlisted = doc.isWishlisted || wishlistIds.includes(Number(id))
 

@@ -119,8 +119,8 @@ export default function AdminConfigsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                 <tr>
-                  <th className="px-6 py-4 rounded-tl-2xl w-1/4">Tham số (Key)</th>
-                  <th className="px-6 py-4 w-1/4">Giá trị (Value)</th>
+                  <th className="px-6 py-4 rounded-tl-2xl w-1/4">Tham số</th>
+                  <th className="px-6 py-4 w-1/4">Giá trị</th>
                   <th className="px-6 py-4 w-1/3">Mô tả</th>
                   <th className="px-6 py-4 text-right rounded-tr-2xl">Hành động</th>
                 </tr>

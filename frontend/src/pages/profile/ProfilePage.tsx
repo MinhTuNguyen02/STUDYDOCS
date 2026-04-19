@@ -3,7 +3,8 @@ import { useAuthStore } from '@/store/authStore'
 import { usersApi } from '@/api/users.api'
 import { authApi } from '@/api/auth.api'
 import { walletsApi } from '@/api/wallets.api'
-import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X } from 'lucide-react'
+import { packagesApi } from '@/api/packages.api'
+import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X, PackageOpen, Zap, Hourglass, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import QRCode from 'react-qr-code'
 import { formatBalance, formatDate } from '@/utils/format'
@@ -20,6 +21,9 @@ export default function ProfilePage() {
   const [wallets, setWallets] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
   const [withdrawals, setWithdrawals] = useState<any[]>([])
+
+  // My Packages queue
+  const [myPackages, setMyPackages] = useState<any[]>([])
 
   // URL params
   const [searchParams, setSearchParams] = useSearchParams()
@@ -67,11 +71,12 @@ export default function ProfilePage() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [uRes, wRes, tRes, wdRes] = await Promise.all([
+      const [uRes, wRes, tRes, wdRes, pkgRes] = await Promise.all([
         usersApi.getMe().catch(() => null),
         walletsApi.getMyWallets().catch(() => ({ data: [] })),
         walletsApi.getTransactions().catch(() => []),
-        walletsApi.getWithdrawals().catch(() => ({ data: [] }))
+        walletsApi.getWithdrawals().catch(() => ({ data: [] })),
+        packagesApi.getMyPackages().catch(() => ({ data: [] }))
       ])
 
       const data = uRes?.data || uRes
@@ -81,6 +86,7 @@ export default function ProfilePage() {
       setWallets(wRes?.data || [])
       setTransactions(tRes?.data || tRes || [])
       setWithdrawals(wdRes?.data || wdRes || [])
+      setMyPackages(pkgRes?.data || [])
     } catch (err) {
       toast.error('Lỗi tải thông tin cá nhân')
     } finally {
@@ -184,8 +190,6 @@ export default function ProfilePage() {
 
   const role = profile?.accounts?.roles?.[0]?.name || user?.roleNames?.[0] || '';
   const isStaff = ['admin', 'mod', 'accountant'].includes(role.toLowerCase());
-
-  const activePackage = profile?.user_packages?.[0];
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -359,34 +363,79 @@ export default function ProfilePage() {
                       </p>
                     </div>
                     <div className="bg-muted/50 border border-border rounded-2xl p-6">
-                      <h3 className="font-bold mb-4">Quản lý Gói đăng ký</h3>
-                      {activePackage ? (
-                        <div className="space-y-4">
-                          <div className="bg-background border border-border p-4 rounded-xl">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="font-bold text-foreground">{activePackage.packages?.name || 'Gói tải'}</span>
-                              <span className="bg-success/10 text-success px-2 py-0.5 rounded-md text-xs font-bold">Đang kích hoạt</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Còn lại:</span>
-                              <span className="font-semibold text-primary">{activePackage.turns_remaining} lượt</span>
-                            </div>
-                            <div className="flex justify-between text-sm mt-1">
-                              <span className="text-muted-foreground">Hết hạn:</span>
-                              <span className="font-semibold">{formatDate(activePackage.expires_at)}</span>
-                            </div>
-                          </div>
-                          <Link to="/packages">
-                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Mua thêm gói khác</button>
-                          </Link>
-                        </div>
-                      ) : (
+                      <div className="flex items-center gap-3 mb-4">
+                        <PackageOpen className="w-5 h-5 text-primary" />
+                        <h3 className="font-bold">Quản lý Gói đăng ký</h3>
+                      </div>
+
+                      {myPackages.length === 0 ? (
                         <>
-                          <p className="text-sm text-muted-foreground mb-4">Bạn chưa đăng ký gói lượt tải nào hoặc gói đã bị quá hạn.</p>
+                          <p className="text-sm text-muted-foreground mb-4">Bạn chưa đăng ký gói lượt tải nào.</p>
                           <Link to="/packages">
-                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Tất cả gói tải</button>
+                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Xem tất cả gói tải</button>
                           </Link>
                         </>
+                      ) : (
+                        <div className="space-y-3">
+                          {myPackages.map((up: any, idx: number) => {
+                            const isActive = up.status === 'ACTIVE'
+                            const daysLeft = up.expiresAt
+                              ? Math.max(0, Math.ceil((new Date(up.expiresAt).getTime() - Date.now()) / 86400000))
+                              : null
+                            const progress = Math.round((up.turnsRemaining / up.totalTurns) * 100)
+
+                            return (
+                              <div
+                                key={up.userPackageId}
+                                className={`rounded-xl p-4 border ${
+                                  isActive
+                                    ? 'bg-background border-primary/30 shadow-sm'
+                                    : 'bg-muted/40 border-border'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start mb-2">
+                                  <div className="flex items-center gap-2">
+                                    {isActive
+                                      ? <Zap className="w-4 h-4 text-success" />
+                                      : <Hourglass className="w-4 h-4 text-muted-foreground" />
+                                    }
+                                    <span className="font-semibold text-sm text-foreground">{up.name}</span>
+                                  </div>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                    isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {isActive ? 'Đang dùng' : `#${idx + 1} Chờ kích hoạt`}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between text-xs text-muted-foreground mb-2">
+                                  <span><strong className="text-foreground">{up.turnsRemaining}</strong>/{up.totalTurns} lượt còn lại</span>
+                                  {isActive && daysLeft !== null && (
+                                    <span className="text-warning font-medium">Còn {daysLeft} ngày</span>
+                                  )}
+                                  {!isActive && (
+                                    <span className="flex items-center gap-1 italic">
+                                      <RefreshCw className="w-3 h-3" /> Tự kích hoạt
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isActive && (
+                                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-primary rounded-full transition-all"
+                                      style={{ width: `${progress}%` }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+
+                          <Link to="/packages">
+                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold mt-1">Mua thêm gói</button>
+                          </Link>
+                        </div>
                       )}
                     </div>
                   </div>

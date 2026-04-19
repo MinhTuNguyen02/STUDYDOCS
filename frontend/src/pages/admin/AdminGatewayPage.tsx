@@ -83,6 +83,7 @@ export default function AdminGatewayPage() {
   const txTypeLabel: Record<string, string> = {
     DEPOSIT: 'Nạp ví',
     WITHDRAW: 'Rút tiền',
+    REFUND: 'Hoàn tiền',
   }
 
   return (

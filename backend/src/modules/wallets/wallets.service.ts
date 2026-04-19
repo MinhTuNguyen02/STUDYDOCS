@@ -137,15 +137,8 @@ export class WalletsService {
       return request;
     });
 
-    // Notify staff: có yêu cầu rút tiền mới
-    this.notifications.notifyRole('admin', {
-      type: 'WITHDRAWAL_NEW',
-      title: 'Yêu cầu rút tiền mới',
-      message: `Có yêu cầu rút tiền mới #${created.request_id}, số tiền ${Number(created.amount).toLocaleString('vi-VN')}đ.`,
-      referenceId: created.request_id,
-      referenceType: 'WITHDRAWAL'
-    });
-    this.notifications.notifyRole('accountant', {
+    // Notify staff: có yêu cầu rút tiền mới (admin + accountant, mỗi account chỉ 1 bản ghi)
+    this.notifications.notifyStaffRoles(['admin', 'accountant'], {
       type: 'WITHDRAWAL_NEW',
       title: 'Yêu cầu rút tiền mới',
       message: `Có yêu cầu rút tiền mới #${created.request_id}, số tiền ${Number(created.amount).toLocaleString('vi-VN')}đ.`,

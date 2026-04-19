@@ -638,6 +638,9 @@ export class AdminService {
       }
     });
 
+    // Notify seller: tài liệu được admin khôi phục
+    this.notifyDocumentSeller(id, 'DOC_APPROVED', 'Tài liệu đã được mở lại', `Tài liệu "${existing.title}" đã được quản trị viên mở lại trên hệ thống.`);
+
     return toJsonSafe(updated);
   }
 

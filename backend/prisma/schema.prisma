@@ -431,7 +431,7 @@ model user_packages {
   package_id      Int
   turns_remaining Int
   purchased_at    DateTime            @default(now()) @db.Timestamptz(6)
-  expires_at      DateTime            @db.Timestamptz(6)
+  expires_at      DateTime?           @db.Timestamptz(6)
   status          user_package_status
 
   customer_profiles customer_profiles  @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
@@ -590,6 +590,7 @@ enum report_status {
 }
 
 enum user_package_status {
+  PENDING
   ACTIVE
   EXPIRED
   EXHAUSTED
@@ -646,6 +647,7 @@ enum notification_type {
   DISPUTE_RESOLVED
   DISPUTE_REJECTED
   REPORT_HANDLED
+  REPORT_NEW
   ACCOUNT_BANNED
   SYSTEM
 }

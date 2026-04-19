@@ -20,7 +20,7 @@ export default function DocumentCard({ document }: Props) {
 
   const isWishlisted = document.isWishlisted || wishlistIds.includes(document.id)
   const [loadingWishlist, setLoadingWishlist] = useState(false)
-  const isFree = !document.price || document.price === 0
+  const isFree = !document.price || Number(document.price) === 0
   const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
 
   const handleDownloadFree = async (e: React.MouseEvent) => {
@@ -97,7 +97,7 @@ export default function DocumentCard({ document }: Props) {
             {ext}
           </div>
         )}
-        {(!document.price || document.price === 0) && (
+        {isFree && (
           <div className="absolute top-3 right-3 bg-success text-white px-3 py-1 text-sm font-semibold rounded-full shadow-sm z-10">
             Miễn phí
           </div>
@@ -134,7 +134,7 @@ export default function DocumentCard({ document }: Props) {
         <div className="flex items-center justify-between mt-auto">
           <div className="flex flex-col">
             <span className="text-lg font-bold text-foreground">
-              {document.price > 0 ? formatPrice(document.price) : 'Miễn phí'}
+              {!isFree ? formatPrice(document.price) : 'Miễn phí'}
             </span>
           </div>
           <button

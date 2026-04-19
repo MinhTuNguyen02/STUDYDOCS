@@ -14,7 +14,7 @@ export class ModerationService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly notifications: NotificationsService
-  ) {}
+  ) { }
 
   async createReport(user: AuthUser, dto: CreateReportDto) {
     if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong the tao report.');
@@ -39,12 +39,12 @@ export class ModerationService {
       });
 
       if (!order) {
-        throw new BadRequestException('Khong tim thay don hang de khiu nai.');
+        throw new BadRequestException('Khong tim thay don hang de khieu nai.');
       }
 
       const deadline = new Date(order.created_at.getTime() + 48 * 60 * 60 * 1000);
       if (new Date() > deadline) {
-        throw new BadRequestException('Qua thoi han khiu nai 48h.');
+        throw new BadRequestException('Qua thoi han khieu nai 48h.');
       }
     }
 
@@ -56,6 +56,15 @@ export class ModerationService {
         reason: dto.reason,
         status: 'PENDING'
       }
+    });
+
+    // Notify staff: có report mới cần xử lý
+    this.notifications.notifyStaffRoles(['admin', 'mod'], {
+      type: 'REPORT_NEW',
+      title: 'Báo cáo vi phạm mới',
+      message: `Report mới #${created.report_id}: "${dto.reason}" cho tài liệu "${document.title}".`,
+      referenceId: created.report_id,
+      referenceType: 'REPORT'
     });
 
     return toJsonSafe(created);
@@ -134,66 +143,66 @@ export class ModerationService {
 
       if (dto.action === 'REFUND_DOCUMENT' && report.type === 'DISPUTE') {
         const orderItem = await tx.order_items.findFirst({
-           where: {
-             document_id: report.document_id,
-             orders: { buyer_id: report.customer_id, status: 'PAID' },
-             status: { in: ['HELD', 'RELEASED'] }
-           },
-           orderBy: { created_at: 'desc' }
+          where: {
+            document_id: report.document_id,
+            orders: { buyer_id: report.customer_id, status: 'PAID' },
+            status: { in: ['HELD', 'RELEASED'] }
+          },
+          orderBy: { created_at: 'desc' }
         });
 
         if (orderItem) {
-           const { systemRevenue } = await this.ledger.getSystemWallets(tx);
+          const { systemRevenue } = await this.ledger.getSystemWallets(tx);
 
-           // 1. Deduct from Seller
-           if (orderItem.status === 'HELD') {
-             await tx.wallets.update({
-               where: { customer_id_wallet_type: { customer_id: orderItem.seller_id, wallet_type: 'REVENUE' } },
-               data: { pending_balance: { decrement: orderItem.seller_earning } }
-             });
-           } else {
-             await tx.wallets.update({
-               where: { customer_id_wallet_type: { customer_id: orderItem.seller_id, wallet_type: 'REVENUE' } },
-               data: { balance: { decrement: orderItem.seller_earning } }
-             });
-           }
+          // 1. Deduct from Seller
+          if (orderItem.status === 'HELD') {
+            await tx.wallets.update({
+              where: { customer_id_wallet_type: { customer_id: orderItem.seller_id, wallet_type: 'REVENUE' } },
+              data: { pending_balance: { decrement: orderItem.seller_earning } }
+            });
+          } else {
+            await tx.wallets.update({
+              where: { customer_id_wallet_type: { customer_id: orderItem.seller_id, wallet_type: 'REVENUE' } },
+              data: { balance: { decrement: orderItem.seller_earning } }
+            });
+          }
 
-           const sellerWallet = await tx.wallets.findUnique({
-              where: { customer_id_wallet_type: { customer_id: orderItem.seller_id, wallet_type: 'REVENUE' } }
-           });
+          const sellerWallet = await tx.wallets.findUnique({
+            where: { customer_id_wallet_type: { customer_id: orderItem.seller_id, wallet_type: 'REVENUE' } }
+          });
 
-           // 2. Deduct from SYSTEM_REVENUE
-           await tx.wallets.update({
-             where: { wallet_id: systemRevenue.wallet_id },
-             data: { balance: { decrement: orderItem.commission_fee } }
-           });
+          // 2. Deduct from SYSTEM_REVENUE
+          await tx.wallets.update({
+            where: { wallet_id: systemRevenue.wallet_id },
+            data: { balance: { decrement: orderItem.commission_fee } }
+          });
 
-           // 3. Add to Buyer PAYMENT
-           const buyerWallet = await tx.wallets.upsert({
-              where: { customer_id_wallet_type: { customer_id: report.customer_id, wallet_type: 'PAYMENT' } },
-              create: { customer_id: report.customer_id, wallet_type: 'PAYMENT', balance: orderItem.unit_price, pending_balance: 0 },
-              update: { balance: { increment: orderItem.unit_price } }
-           });
+          // 3. Add to Buyer PAYMENT
+          const buyerWallet = await tx.wallets.upsert({
+            where: { customer_id_wallet_type: { customer_id: report.customer_id, wallet_type: 'PAYMENT' } },
+            create: { customer_id: report.customer_id, wallet_type: 'PAYMENT', balance: orderItem.unit_price, pending_balance: 0 },
+            update: { balance: { increment: orderItem.unit_price } }
+          });
 
-           // 4. Ledger Double Entry
-           await this.ledger.recordTransaction(
-             tx,
-             'REFUND',
-             'ORDER_ITEM',
-             orderItem.order_item_id,
-             'Hoan phan tien mua tai lieu do khiu nai',
-             [
-                { wallet_id: sellerWallet!.wallet_id, debit_amount: orderItem.seller_earning, credit_amount: 0 },
-                { wallet_id: systemRevenue.wallet_id, debit_amount: orderItem.commission_fee, credit_amount: 0 },
-                { wallet_id: buyerWallet.wallet_id, debit_amount: 0, credit_amount: orderItem.unit_price }
-             ]
-           );
+          // 4. Ledger Double Entry
+          await this.ledger.recordTransaction(
+            tx,
+            'REFUND',
+            'ORDER_ITEM',
+            orderItem.order_item_id,
+            'Hoan phan tien mua tai lieu do khieu nai',
+            [
+              { wallet_id: sellerWallet!.wallet_id, debit_amount: orderItem.seller_earning, credit_amount: 0 },
+              { wallet_id: systemRevenue.wallet_id, debit_amount: orderItem.commission_fee, credit_amount: 0 },
+              { wallet_id: buyerWallet.wallet_id, debit_amount: 0, credit_amount: orderItem.unit_price }
+            ]
+          );
 
-           // 5. Update orderItem status
-           await tx.order_items.update({
-             where: { order_item_id: orderItem.order_item_id },
-             data: { status: 'REFUNDED' }
-           });
+          // 5. Update orderItem status
+          await tx.order_items.update({
+            where: { order_item_id: orderItem.order_item_id },
+            data: { status: 'REFUNDED' }
+          });
         }
       }
 

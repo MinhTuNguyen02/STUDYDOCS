@@ -152,25 +152,25 @@ export default function AdminPoliciesPage() {
       {/* ── Filter ── */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-3">
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Bị ẩn</option>
+          </select>
+
+          {statusFilter !== 'ALL' && (
+            <button
+              onClick={() => setStatusFilter('ALL')}
+              className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+              title="Xóa bộ lọc"
             >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Hoạt động</option>
-              <option value="INACTIVE">Bị ẩn</option>
-            </select>
-            
-            {statusFilter !== 'ALL' && (
-              <button
-                onClick={() => setStatusFilter('ALL')}
-                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
-                title="Xóa bộ lọc"
-              >
-                Xóa lọc
-              </button>
-            )}
+              Xóa lọc
+            </button>
+          )}
         </div>
       </div>
 
@@ -204,11 +204,11 @@ export default function AdminPoliciesPage() {
                       <td className="px-6 py-4">
                         {pol.is_active ? (
                           <div className="flex items-center gap-1.5 text-success font-bold text-xs bg-success/10 py-1.5 px-3 rounded-full border border-success/20 w-fit">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> ONLINE
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Hoạt động
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 text-muted-foreground font-bold text-xs bg-muted py-1.5 px-3 rounded-full border border-border w-fit">
-                            <XCircle className="w-3.5 h-3.5" /> DRAFT
+                            <XCircle className="w-3.5 h-3.5" /> Bị ẩn
                           </div>
                         )}
                       </td>
@@ -301,7 +301,7 @@ export default function AdminPoliciesPage() {
                   onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
                   className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary"
                 />
-                <label htmlFor="isActivePol" className="text-sm font-semibold text-foreground cursor-pointer">Xuất bản bài viết này (Online)</label>
+                <label htmlFor="isActivePol" className="text-sm font-semibold text-foreground cursor-pointer">Xuất bản bài viết này</label>
               </div>
 
               <div className="pt-4 flex gap-3 border-t border-border mt-2 shrink-0">

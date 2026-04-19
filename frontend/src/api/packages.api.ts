@@ -5,6 +5,10 @@ export const packagesApi = {
     const res = await api.get('/packages')
     return res.data
   },
+  getMyPackages: async () => {
+    const res = await api.get('/packages/my')
+    return res.data
+  },
   buyPackage: async (packageId: number) => {
     const res = await api.post(`/packages/${packageId}/buy`)
     return res.data

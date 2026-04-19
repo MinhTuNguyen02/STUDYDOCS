@@ -49,6 +49,7 @@ export class LibraryService {
         category: item.documents.categories?.name || 'Tài liệu',
         fileExtension: item.documents.file_extension,
         fileUrl: item.documents.file_url,
+        previewUrl: item.documents.preview_url,
         accessId: `order_${item.order_item_id}`,
         createdAt: item.created_at,
         sourceType: 'ORDER_ITEM'
@@ -65,6 +66,7 @@ export class LibraryService {
           category: dl.documents.categories?.name || 'Tài liệu',
           fileExtension: dl.documents.file_extension,
           fileUrl: dl.documents.file_url,
+          previewUrl: dl.documents.preview_url,
           accessId: `dl_${dl.id}`,
           createdAt: dl.download_at,
           sourceType: dl.download_type

@@ -355,15 +355,8 @@ export class SellerService {
       }
     });
 
-    // Notify staff: có tài liệu mới cần duyệt
-    this.notifications.notifyRole('admin', {
-      type: 'DOC_PENDING',
-      title: 'Tài liệu chờ duyệt',
-      message: `Tài liệu mới "${document.title}" đang chờ được kiểm duyệt.`,
-      referenceId: document.document_id,
-      referenceType: 'DOCUMENT'
-    });
-    this.notifications.notifyRole('mod', {
+    // Notify staff: có tài liệu mới cần duyệt (admin + mod, mỗi account chỉ 1 bản ghi)
+    this.notifications.notifyStaffRoles(['admin', 'mod'], {
       type: 'DOC_PENDING',
       title: 'Tài liệu chờ duyệt',
       message: `Tài liệu mới "${document.title}" đang chờ được kiểm duyệt.`,

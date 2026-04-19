@@ -61,15 +61,8 @@ export class DisputesService {
       }
     });
 
-    // Notify staff: có khiếu nại mới
-    this.notifications.notifyRole('admin', {
-      type: 'DISPUTE_NEW',
-      title: 'Khiếu nại mới',
-      message: `Khiếu nại mới #${dispute.id}: ${dto.reason}`,
-      referenceId: dispute.id,
-      referenceType: 'DISPUTE'
-    });
-    this.notifications.notifyRole('mod', {
+    // Notify staff: có khiếu nại mới (admin + mod nhận, mỗi account chỉ 1 bản ghi)
+    this.notifications.notifyStaffRoles(['admin', 'mod'], {
       type: 'DISPUTE_NEW',
       title: 'Khiếu nại mới',
       message: `Khiếu nại mới #${dispute.id}: ${dto.reason}`,

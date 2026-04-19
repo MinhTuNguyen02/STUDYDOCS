@@ -102,7 +102,11 @@ export default function AdminReportsPage() {
                   <td className="p-4 text-sm font-semibold text-primary" title={`ID: ${rep.document_id}`}>
                     {rep.documents?.title || `Tài liệu ID: ${rep.document_id}`}
                   </td>
-                  <td className="p-4 text-sm font-bold">{rep.status}</td>
+                  <td className="p-4 text-sm font-bold">
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${rep.status === 'RESOLVED' ? 'bg-success/10 text-success' : rep.status === 'PENDING' ? 'bg-warning/10 text-warning' : rep.status === 'REJECTED' ? 'bg-danger/10 text-danger' : 'bg-muted text-muted-foreground'}`}>
+                      {rep.status === 'PENDING' ? 'Đang chờ' : rep.status === 'RESOLVED' ? 'Đã giải quyết' : rep.status === 'REJECTED' ? 'Từ chối' : rep.status === 'REVIEWING' ? 'Đang xử lý' : rep.status}
+                    </span>
+                  </td>
                   <td className="p-4">
                     <button onClick={() => handleResolve(rep.report_id)} className="p-2 bg-success/10 text-success rounded-lg hover:bg-success/20 cursor-pointer" disabled={rep.status === 'RESOLVED'}>
                       <CheckCircle className="w-4 h-4" />

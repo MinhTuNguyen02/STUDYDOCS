@@ -96,7 +96,7 @@ export default function OrderDetailPage() {
             </h1>
             <p className="text-muted-foreground mt-2 flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              {formatDate(order.created_at || order.createdAt || new Date().toISOString())}
+              {order.createdAt ? formatDate(order.createdAt) : 'Không có ngày'}
             </p>
           </div>
           <div>
@@ -133,24 +133,46 @@ export default function OrderDetailPage() {
                     </div>
                   </div>
 
-                  {(status === 'PAID' && item.status !== 'REFUNDED') && (
-                    <div className="flex items-center justify-end shrink-0 gap-2">
-                      <button
-                        onClick={() => setDisputeTarget(item)}
-                        className="p-3 bg-danger/10 text-danger hover:bg-danger hover:text-white rounded-xl transition-colors tooltip-trigger"
-                        title="Khiếu nại / Hoàn tiền"
-                      >
-                        <AlertTriangle className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDownload(doc.id || doc.document_id)}
-                        className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
-                        title="Tải xuống tài liệu"
-                      >
-                        <Download className="w-5 h-5" />
-                      </button>
-                    </div>
-                  )}
+                  {(() => {
+                    const canDispute =
+                      status === 'PAID' &&
+                      item.status !== 'REFUNDED' &&
+                      !item.hasDispute &&
+                      item.holdUntil &&
+                      new Date(item.holdUntil) > new Date()
+
+                    return canDispute ? (
+                      <div className="flex items-center justify-end shrink-0 gap-2">
+                        <button
+                          onClick={() => setDisputeTarget(item)}
+                          className="p-3 bg-danger/10 text-danger hover:bg-danger hover:text-white rounded-xl transition-colors tooltip-trigger"
+                          title="Khiếu nại / Hoàn tiền"
+                        >
+                          <AlertTriangle className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDownload(doc.id || doc.document_id)}
+                          className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
+                          title="Tải xuống tài liệu"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : status === 'PAID' && item.status !== 'REFUNDED' ? (
+                      <div className="flex items-center justify-end shrink-0 gap-2">
+                        {item.hasDispute && (
+                          <span className="text-xs text-muted-foreground italic px-2">Đã khiếu nại</span>
+                        )}
+                        <button
+                          onClick={() => handleDownload(doc.id || doc.document_id)}
+                          className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
+                          title="Tải xuống tài liệu"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : null
+                  })()}
                 </div>
               )
             })}

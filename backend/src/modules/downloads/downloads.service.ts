@@ -1,14 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { download_type, order_status } from '@prisma/client';
+import { PackagesService } from '../packages/packages.service';
 
 @Injectable()
 export class DownloadsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storageService: StorageService
+    private readonly storageService: StorageService,
+    @Inject(forwardRef(() => PackagesService))
+    private readonly packagesService: PackagesService
   ) {}
 
   async requestDownload(user: AuthUser, documentId: string, ipAddress: string) {
@@ -118,6 +121,11 @@ export class DownloadsService {
         status: remaining === 0 ? 'EXHAUSTED' : 'ACTIVE'
       }
     });
+
+    // Nếu gói vừa EXHAUSTED → kích hoạt gói PENDING tiếp theo trong hàng chờ
+    if (remaining === 0) {
+      await this.packagesService.activateNextPending(customerId);
+    }
 
     return pkg;
   }

@@ -57,44 +57,24 @@ export class NotificationsService {
   }
 
   /**
-   * Tạo notification cho nhiều users cùng lúc (batch).
+   * Tạo notification cho nhiều users cùng lúc.
+   * Dùng individual create để có ID cho socket push (tránh dedup failure).
    */
   async notifyMany(accountIds: number[], params: Omit<CreateNotificationParams, 'accountId'>) {
     if (accountIds.length === 0) return;
 
-    // Batch insert
-    await this.prisma.notifications.createMany({
-      data: accountIds.map((accountId) => ({
-        account_id: accountId,
-        type: params.type,
-        title: params.title,
-        message: params.message,
-        reference_id: params.referenceId ?? null,
-        reference_type: params.referenceType ?? null,
-      })),
-    });
+    // Deduplicate account IDs
+    const uniqueIds = [...new Set(accountIds)];
 
-    // Push realtime to each user
-    const payload = {
-      type: params.type,
-      title: params.title,
-      message: params.message,
-      referenceId: params.referenceId,
-      referenceType: params.referenceType,
-      isRead: false,
-      createdAt: new Date(),
-    };
-
-    for (const accountId of accountIds) {
-      this.gateway.sendToUser(accountId, 'notification', payload);
+    for (const accountId of uniqueIds) {
+      await this.notify({ ...params, accountId });
     }
   }
 
   /**
-   * Broadcast notification cho tất cả user thuộc 1 role (admin, mod, accountant).
+   * Broadcast notification cho tất cả user thuộc 1 role.
    */
   async notifyRole(role: string, params: Omit<CreateNotificationParams, 'accountId'>) {
-    // Tìm tất cả account thuộc role
     const accounts = await this.prisma.accounts.findMany({
       where: {
         roles: { name: { equals: role, mode: 'insensitive' } },
@@ -106,29 +86,28 @@ export class NotificationsService {
     if (accounts.length === 0) return;
 
     const accountIds = accounts.map((a) => a.account_id);
+    await this.notifyMany(accountIds, params);
+  }
 
-    // Batch insert
-    await this.prisma.notifications.createMany({
-      data: accountIds.map((account_id) => ({
-        account_id,
-        type: params.type,
-        title: params.title,
-        message: params.message,
-        reference_id: params.referenceId ?? null,
-        reference_type: params.referenceType ?? null,
-      })),
+  /**
+   * Gửi notification cho staff thuộc NHIỀU roles (admin + mod, admin + accountant, etc.)
+   * MỖI ACCOUNT CHỈ NHẬN 1 BẢN GHI dù thuộc nhiều role cùng lúc.
+   * Dùng hàm này thay cho gọi notifyRole() 2 lần riêng lẻ.
+   */
+  async notifyStaffRoles(roles: string[], params: Omit<CreateNotificationParams, 'accountId'>) {
+    const accounts = await this.prisma.accounts.findMany({
+      where: {
+        roles: { name: { in: roles, mode: 'insensitive' } },
+        status: 'ACTIVE',
+      },
+      select: { account_id: true },
     });
 
-    // Broadcast via role room (single emit instead of N emits)
-    this.gateway.sendToRole(role, 'notification', {
-      type: params.type,
-      title: params.title,
-      message: params.message,
-      referenceId: params.referenceId,
-      referenceType: params.referenceType,
-      isRead: false,
-      createdAt: new Date(),
-    });
+    if (accounts.length === 0) return;
+
+    // Deduplicate: mỗi account chỉ nhận 1 notification
+    const uniqueAccountIds = [...new Set(accounts.map((a) => a.account_id))];
+    await this.notifyMany(uniqueAccountIds, params);
   }
 
   // ── REST API methods ──────────────────────────────────────────

@@ -311,7 +311,7 @@ export default function AdminTaxPage() {
                         <td className="p-4 text-sm font-semibold">
                           TXN-{e.transaction_id}
                           <div className={'text-[10px] mt-1 uppercase font-bold inline-block px-1.5 py-0.5 rounded ' + (isCollected ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger')}>
-                            {e.ledger_transactions.type}
+                            {e.ledger_transactions.type === 'DEPOSIT' ? 'Nạp ví' : e.ledger_transactions.type === 'WITHDRAW' ? 'Rút tiền' : e.ledger_transactions.type === 'REFUND' ? 'Hoàn tiền' : e.ledger_transactions.type}
                           </div>
                         </td>
                         <td className="p-4 text-sm text-muted-foreground">

@@ -40,11 +40,11 @@ export default function AdminLayout({ children }: Props) {
         { name: 'Quản lý Tài liệu', path: '/admin/documents', icon: <FileText className="w-5 h-5" />, roles: ['admin', 'mod'] },
         { name: 'Danh mục', path: '/admin/categories', icon: <FolderTree className="w-5 h-5" />, roles: ['admin', 'mod'] },
         { name: 'Quản lý Tags', path: '/admin/tags', icon: <Tags className="w-5 h-5" />, roles: ['admin', 'mod'] },
-        { name: 'Gói Download', path: '/admin/packages', icon: <Package className="w-5 h-5" />, roles: ['admin'] },
+        { name: 'Gói tải xuống', path: '/admin/packages', icon: <Package className="w-5 h-5" />, roles: ['admin'] },
       ]
     },
     {
-      label: 'Cộng đồng & Support',
+      label: 'Cộng đồng & Hỗ trợ',
       items: [
         { name: 'Quản lý Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" />, roles: ['admin', 'mod'] },
         { name: 'Báo cáo Vi phạm', path: '/admin/reports', icon: <AlertTriangle className="w-5 h-5" />, roles: ['admin', 'mod'] },

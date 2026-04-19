@@ -163,7 +163,7 @@ export default function AdminDocumentsPage() {
                   <td className="p-4 text-sm text-primary font-semibold">{formatBalance(doc.price)}</td>
                   <td className="p-4 text-sm">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${doc.status === 'APPROVED' ? 'bg-success/10 text-success' : doc.status === 'PENDING' ? 'bg-warning/10 text-warning' : doc.status === 'REJECTED' ? 'bg-danger/10 text-danger' : 'bg-muted text-muted-foreground'}`}>
-                      {doc.status}
+                      {doc.status === 'APPROVED' ? 'Đã duyệt' : doc.status === 'PENDING' ? 'Chờ duyệt' : doc.status === 'REJECTED' ? 'Từ chối' : doc.status === 'HIDDEN' ? 'Bị gỡ' : doc.status}
                     </span>
                   </td>
                   <td className="p-4">
