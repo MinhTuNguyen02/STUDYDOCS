@@ -25,6 +25,11 @@ export const sellerApi = {
     const res = await api.patch(`/seller/documents/${id}`, data)
     return res.data
   },
+
+  toggleDocumentVisibility: async (id: number, isHidden: boolean) => {
+    const res = await api.patch(`/seller/documents/${id}/toggle-visibility`, { isHidden })
+    return res.data
+  },
   
   uploadDocument: async (formData: FormData) => {
     const res = await api.post('/seller/documents', formData, {

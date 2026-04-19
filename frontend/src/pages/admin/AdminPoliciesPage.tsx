@@ -149,9 +149,9 @@ export default function AdminPoliciesPage() {
         </button>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      {/* ── Filter ── */}
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-3">
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
@@ -171,15 +171,17 @@ export default function AdminPoliciesPage() {
                 Xóa lọc
               </button>
             )}
-          </div>
         </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
 
         {loading ? (
           <div className="text-center py-12 text-muted-foreground animate-pulse">Đang tải biểu mẫu...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+              <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                 <tr>
                   <th className="px-6 py-4 rounded-tl-2xl w-[40%]">Tiêu đề / Slug</th>
                   <th className="px-6 py-4 w-[20%]">Trạng thái</th>

@@ -28,12 +28,16 @@ import { APP_GUARD } from '@nestjs/core';
 import { DownloadsModule } from './modules/downloads/downloads.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { DisputesModule } from './modules/disputes/disputes.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     SecurityModule,
     PrismaModule,
+    GatewayModule,
+    NotificationsModule,
     AuthModule,
     CheckoutModule,
     LibraryModule,

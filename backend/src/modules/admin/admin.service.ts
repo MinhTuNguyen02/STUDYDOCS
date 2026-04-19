@@ -11,13 +11,15 @@ import { UpdateTagDto } from './dto/update-tag.dto';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { hash } from 'bcryptjs';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService
   ) { }
 
   private formatFileSize(bytes: number) {
@@ -466,7 +468,31 @@ export class AdminService {
       await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
     }
 
+    // Notify seller: tài liệu được duyệt
+    this.notifyDocumentSeller(id, 'DOC_APPROVED', 'Tài liệu đã được duyệt', `Tài liệu "${existing.title}" của bạn đã được duyệt và xuất bản.`);
+
     return toJsonSafe(updated);
+  }
+
+  private async notifyDocumentSeller(documentId: number, type: 'DOC_APPROVED' | 'DOC_REJECTED' | 'DOC_HIDDEN', title: string, message: string) {
+    const doc = await this.prisma.documents.findUnique({
+      where: { document_id: documentId },
+      select: { seller_id: true }
+    });
+    if (!doc) return;
+    const profile = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: doc.seller_id },
+      select: { account_id: true }
+    });
+    if (!profile) return;
+    this.notifications.notify({
+      accountId: profile.account_id,
+      type,
+      title,
+      message,
+      referenceId: documentId,
+      referenceType: 'DOCUMENT'
+    });
   }
 
   async rejectDocument(documentId: string, dto: RejectDocumentDto, actor: AuthUser) {
@@ -503,6 +529,9 @@ export class AdminService {
       await this.storageService.deleteFile(reviewKey);
       await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
     }
+
+    // Notify seller: tài liệu bị từ chối
+    this.notifyDocumentSeller(id, 'DOC_REJECTED', 'Tài liệu bị từ chối', `Tài liệu "${existing.title}" bị từ chối. Lý do: ${dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.'}`);
 
     return toJsonSafe(updated);
   }
@@ -582,6 +611,9 @@ export class AdminService {
         new_value: { status: 'HIDDEN' }
       }
     });
+
+    // Notify seller: tài liệu bị ẩn bởi admin
+    this.notifyDocumentSeller(id, 'DOC_HIDDEN', 'Tài liệu bị ẩn', `Tài liệu "${existing.title}" đã bị quản trị viên ẩn khỏi hệ thống.`);
 
     return toJsonSafe(updated);
   }
@@ -719,6 +751,18 @@ export class AdminService {
         new_value: { status: nextStatus }
       }
     });
+
+    // Notify user nếu bị ban
+    if (nextStatus === 'BANNED') {
+      this.notifications.notify({
+        accountId: account.account_id,
+        type: 'ACCOUNT_BANNED',
+        title: 'Tài khoản bị khóa',
+        message: 'Tài khoản của bạn đã bị khóa do vi phạm quy định hệ thống.',
+        referenceId: account.account_id,
+        referenceType: 'ACCOUNT'
+      });
+    }
 
     return toJsonSafe(updated);
   }

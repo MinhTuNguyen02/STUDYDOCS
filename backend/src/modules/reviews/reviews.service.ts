@@ -4,10 +4,14 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 import { PrismaService } from '../../database/prisma.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { UpsertReviewDto } from './dto/upsert-review.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   private async recalculateDocumentRating(documentId: number) {
     const aggregate = await this.prisma.reviews.aggregate({
@@ -116,6 +120,24 @@ export class ReviewsService {
 
     await this.recalculateDocumentRating(docId);
 
+    // Notify seller: có review mới (chỉ với review mới, không phải update)
+    if (!existingByDoc) {
+      const sellerProfile = await this.prisma.customer_profiles.findUnique({
+        where: { customer_id: document.seller_id },
+        select: { account_id: true }
+      });
+      if (sellerProfile) {
+        this.notifications.notify({
+          accountId: sellerProfile.account_id,
+          type: 'NEW_REVIEW',
+          title: 'Có đánh giá mới',
+          message: `Tài liệu "${document.title}" nhận được đánh giá ${dto.rating}⭐.`,
+          referenceId: docId,
+          referenceType: 'DOCUMENT'
+        });
+      }
+    }
+
     return toJsonSafe(result);
   }
 
@@ -140,6 +162,22 @@ export class ReviewsService {
         replied_at: new Date()
       }
     });
+
+    // Notify buyer: seller đã reply
+    const buyerProfile = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: review.buyer_id },
+      select: { account_id: true }
+    });
+    if (buyerProfile) {
+      this.notifications.notify({
+        accountId: buyerProfile.account_id,
+        type: 'REVIEW_REPLY',
+        title: 'Người bán đã phản hồi',
+        message: `Người bán đã trả lời đánh giá của bạn về tài liệu "${review.documents.title}".`,
+        referenceId: review.document_id,
+        referenceType: 'DOCUMENT'
+      });
+    }
 
     return toJsonSafe(updated);
   }

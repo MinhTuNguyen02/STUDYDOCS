@@ -6,12 +6,14 @@ import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateReportDto } from './dto/create-report.dto';
 import { HandleReportDto } from './dto/handle-report.dto';
 import { LedgerService } from '../wallets/ledger.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ModerationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService
   ) {}
 
   async createReport(user: AuthUser, dto: CreateReportDto) {
@@ -208,6 +210,22 @@ export class ModerationService {
 
       return updated;
     });
+
+    // Notify reporter: Báo cáo đã được xử lý
+    const reporterProfile = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: report.customer_id },
+      select: { account_id: true }
+    });
+    if (reporterProfile) {
+      this.notifications.notify({
+        accountId: reporterProfile.account_id,
+        type: 'REPORT_HANDLED',
+        title: 'Báo cáo đã được xử lý',
+        message: `Báo cáo #${id} của bạn đã được quản trị viên xử lý.`,
+        referenceId: id,
+        referenceType: 'REPORT'
+      });
+    }
 
     return toJsonSafe(result);
   }

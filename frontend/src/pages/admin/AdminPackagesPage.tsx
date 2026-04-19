@@ -128,44 +128,46 @@ export default function AdminPackagesPage() {
         </button>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border bg-muted/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+      {/* ── Filter ── */}
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-3">
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+          >
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="INACTIVE">Bị ẩn</option>
+          </select>
+
+          {statusFilter !== 'ALL' && (
+            <button
+              onClick={() => setStatusFilter('ALL')}
+              className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
+              title="Xóa bộ lọc"
             >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Hoạt động</option>
-              <option value="INACTIVE">Bị ẩn</option>
-            </select>
-            
-            {statusFilter !== 'ALL' && (
-              <button
-                onClick={() => setStatusFilter('ALL')}
-                className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
-                title="Xóa bộ lọc"
-              >
-                Xóa lọc
-              </button>
-            )}
-          </div>
+              Xóa lọc
+            </button>
+          )}
         </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
 
         {loading ? (
           <div className="text-center py-12 text-muted-foreground animate-pulse">Đang tải danh sách packages...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+              <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                 <tr>
-                  <th className="px-6 py-4 rounded-tl-2xl">Mã</th>
-                  <th className="px-6 py-4">Tên gói</th>
-                  <th className="px-6 py-4">Mức giá</th>
-                  <th className="px-6 py-4">Quyền lợi</th>
-                  <th className="px-6 py-4 text-center">Trạng thái</th>
-                  <th className="px-6 py-4 text-right rounded-tr-2xl">Hành động</th>
+                  <th className="p-4 font-semibold">Mã</th>
+                  <th className="p-4 font-semibold">Tên gói</th>
+                  <th className="p-4 font-semibold">Mức giá</th>
+                  <th className="p-4 font-semibold">Quyền lợi</th>
+                  <th className="p-4 font-semibold text-center">Trạng thái</th>
+                  <th className="p-4 font-semibold text-right">Hành động</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

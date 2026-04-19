@@ -118,29 +118,31 @@ export default function AdminDisputesPage() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-border rounded-xl bg-background text-sm outline-none"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="OPEN">Chờ xử lý</option>
-            <option value="INVESTIGATING">Đang điều tra</option>
-            <option value="RESOLVED">Chấp nhận</option>
-            <option value="REJECTED">Từ chối</option>
-          </select>
+      </div>
 
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Tìm theo user, tài liệu..."
-              className="w-full pl-9 pr-4 py-2 border border-border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 outline-none text-sm"
-            />
-          </div>
+      {/* ── Filter ── */}
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
+        >
+          <option value="ALL">Tất cả trạng thái</option>
+          <option value="OPEN">Chờ xử lý</option>
+          <option value="INVESTIGATING">Đang điều tra</option>
+          <option value="RESOLVED">Chấp nhận</option>
+          <option value="REJECTED">Từ chối</option>
+        </select>
+
+        <div className="relative flex-1 md:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm theo user, tài liệu..."
+            className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background focus:ring-2 focus:ring-primary/20 outline-none text-sm transition-all"
+          />
         </div>
       </div>
 
@@ -156,7 +158,7 @@ export default function AdminDisputesPage() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="bg-muted text-muted-foreground font-semibold uppercase text-xs">
+                <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                   <tr>
                     <th className="px-6 py-4">Mã KN</th>
                     <th className="px-6 py-4">Người khiếu nại</th>

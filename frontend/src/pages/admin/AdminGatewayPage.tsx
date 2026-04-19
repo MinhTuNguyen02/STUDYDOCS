@@ -87,7 +87,7 @@ export default function AdminGatewayPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <Vault className="w-7 h-7 text-primary" /> Theo Dõi Tài Sản
@@ -95,14 +95,14 @@ export default function AdminGatewayPage() {
         </div>
         <button
           onClick={handleExportCSV}
-          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 h-[38px] shrink-0 shadow-sm transition-colors"
+          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors"
         >
           <Download className="w-4 h-4" /> Xuất CSV
         </button>
       </div>
 
       {/* ── Filter ── */}
-      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-end gap-4">
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Từ ngày</label>
           <div className="relative">
@@ -132,7 +132,7 @@ export default function AdminGatewayPage() {
         </div>
         <button
           onClick={fetchData}
-          className="btn bg-primary text-white hover:bg-primary-hover px-5 py-2 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm h-[38px]"
+          className="btn bg-primary text-white hover:bg-primary-hover px-5 py-2 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm"
         >
           Lọc dữ liệu
         </button>

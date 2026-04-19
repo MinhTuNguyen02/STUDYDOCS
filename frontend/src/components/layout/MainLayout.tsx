@@ -7,6 +7,7 @@ import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store, ShieldCheck, Upload } from 'lucide-react'
 import { FiFacebook, FiInstagram, FiYoutube } from 'react-icons/fi'
 import { documentsApi } from '@/api/documents.api'
+import NotificationBell from '@/components/common/NotificationBell'
 
 interface Props {
   children: ReactNode
@@ -118,6 +119,8 @@ export default function MainLayout({ children }: Props) {
                       </Link>
                     </>
                   )}
+
+                  <NotificationBell />
 
                   {/* User Dropdown */}
                   <div className="relative group ml-2 py-2">

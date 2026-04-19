@@ -121,20 +121,20 @@ export default function AdminApprovalsPage() {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold font-heading text-foreground">
-          Kiểm duyệt Tài liệu
-          {documents.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 bg-warning/10 text-warning rounded-full text-sm">{documents.length}</span>
-          )}
-        </h1>
-      </div>
+    <>
+      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold font-heading text-foreground">
+            Kiểm duyệt Tài liệu
+            {documents.length > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-warning/10 text-warning rounded-full text-sm">{documents.length}</span>
+            )}
+          </h1>
+        </div>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         {/* Search bar */}
-        <div className="p-4 border-b border-border bg-muted/30 flex items-center gap-4">
-          <div className="relative flex-1 max-w-sm">
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
@@ -146,7 +146,9 @@ export default function AdminApprovalsPage() {
           </div>
           <span className="text-xs text-muted-foreground">{filtered.length} tài liệu</span>
         </div>
+      </div>
 
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           {filtered.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
@@ -156,8 +158,8 @@ export default function AdminApprovalsPage() {
             </div>
           ) : (
             <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-border bg-muted/20 text-muted-foreground text-xs uppercase tracking-wider">
+              <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider">
+                <tr>
                   <th className="p-4 font-semibold">Tài liệu</th>
                   <th className="p-4 font-semibold">Người gửi</th>
                   <th className="p-4 font-semibold">Giá</th>
@@ -323,7 +325,7 @@ export default function AdminApprovalsPage() {
               <div className="md:col-span-2 p-5 flex flex-col">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Xem nội dung tài liệu</p>
 
-                              {(() => {
+                {(() => {
                   const viewUrl = getViewUrl(previewDoc);
                   if (!viewUrl) {
                     return (
@@ -372,7 +374,7 @@ export default function AdminApprovalsPage() {
 
       {/* ── Reject Modal ── */}
       {rejectId && (
-        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4">
           <div className="bg-card rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in zoom-in-95">
             <div className="p-5 border-b border-border font-bold text-lg flex justify-between items-center">
               Từ chối Tài liệu
@@ -401,6 +403,6 @@ export default function AdminApprovalsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

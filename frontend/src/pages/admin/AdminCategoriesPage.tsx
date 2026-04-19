@@ -280,33 +280,33 @@ export default function AdminCategoriesPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold font-heading">Quản lý Danh mục</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            <span className="font-semibold text-foreground">{categories.length}</span> danh mục
-            &nbsp;·&nbsp;
-            <span className="font-semibold text-foreground">{tree.length}</span> gốc
-            &nbsp;·&nbsp;
-            <span className="font-semibold text-foreground">{categories.filter(c => c.parent_id).length}</span> con
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Tìm danh mục..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full sm:w-64 pl-9 pr-4 py-2 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
+          <div>
+            <h1 className="text-2xl font-bold font-heading">Quản lý Danh mục</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              <span className="font-semibold text-foreground">{categories.length}</span> danh mục
+              &nbsp;·&nbsp;
+              <span className="font-semibold text-foreground">{tree.length}</span> gốc
+              &nbsp;·&nbsp;
+              <span className="font-semibold text-foreground">{categories.filter(c => c.parent_id).length}</span> con
+            </p>
           </div>
           <button
             onClick={() => handleOpenModal()}
-            className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm"
+            className="btn bg-primary text-white hover:bg-primary-hover px-4 py-2 flex items-center gap-2 rounded-xl text-sm font-semibold shadow-sm h-[38px]"
           >
             <Plus className="w-5 h-5 hidden sm:block" /> Thêm mới
           </button>
+        </div>
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Tìm danh mục..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-border rounded-xl text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+          />
         </div>
       </div>
 
@@ -318,7 +318,7 @@ export default function AdminCategoriesPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="bg-muted/50 text-muted-foreground font-semibold uppercase text-xs border-b border-border">
+              <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                 <tr>
                   <th className="px-4 py-3">Tên danh mục</th>
                   <th className="px-4 py-3">Slug</th>
