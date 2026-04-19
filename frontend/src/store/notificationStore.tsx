@@ -49,7 +49,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     // Avoid multiple connections
     if (get().socket?.connected) return;
 
-    const socket = io({
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || '';
+    const socket = io(socketUrl, {
       path: '/socket.io',
       auth: { token },
       transports: ['websocket'],

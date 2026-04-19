@@ -23,4 +23,4 @@ ENV PORT=4000
 EXPOSE 4000
 
 # Push DB schema trước, rồi mới start server
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/src/main.js"]
