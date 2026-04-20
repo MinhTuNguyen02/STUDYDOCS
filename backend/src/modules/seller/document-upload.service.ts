@@ -38,7 +38,8 @@ export class DocumentUploadService {
         const safeFilename = file.originalname.includes('.') ? file.originalname : `${file.originalname}.${extension}`;
         formData.append('files', file.buffer, { filename: safeFilename });
 
-        const response = await axios.post('http://localhost:3000/forms/libreoffice/convert', formData, {
+        const gotenbergUrl = process.env.GOTENBERG_URL || 'http://localhost:3000';
+        const response = await axios.post(`${gotenbergUrl}/forms/libreoffice/convert`, formData, {
           headers: formData.getHeaders(),
           responseType: 'arraybuffer'
         });
