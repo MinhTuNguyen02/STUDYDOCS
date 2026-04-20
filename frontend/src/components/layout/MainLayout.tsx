@@ -7,6 +7,8 @@ import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store, ShieldCheck, Upload } from 'lucide-react'
 import { FiFacebook, FiInstagram, FiYoutube } from 'react-icons/fi'
 import { documentsApi } from '@/api/documents.api'
+import { walletsApi } from '@/api/wallets.api'
+import { formatBalance } from '@/utils/format'
 import NotificationBell from '@/components/common/NotificationBell'
 
 interface Props {
@@ -24,6 +26,7 @@ export default function MainLayout({ children }: Props) {
 
   const [footerCategories, setFooterCategories] = useState<any[]>([])
   const [footerPolicies, setFooterPolicies] = useState<any[]>([])
+  const [wallets, setWallets] = useState<any[]>([])
 
   const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
 
@@ -45,6 +48,17 @@ export default function MainLayout({ children }: Props) {
     documentsApi.getCategories().then(res => setFooterCategories(res || []))
     documentsApi.getPolicies().then(res => setFooterPolicies(res || []))
   }, [])
+
+  useEffect(() => {
+    if (user && !isStaff) {
+      walletsApi.getMyWallets()
+        .then(res => setWallets(res?.data || []))
+        .catch(() => setWallets([]))
+    }
+  }, [user, isStaff])
+
+  const paymentWallet = wallets.find(w => w.wallet_type === 'PAYMENT' || w.walletType === 'PAYMENT')
+  const revenueWallet = wallets.find(w => w.wallet_type === 'REVENUE' || w.walletType === 'REVENUE')
 
   const handleLogout = () => {
     logout()
@@ -135,6 +149,18 @@ export default function MainLayout({ children }: Props) {
                     {/* Dropdown Menu (Hover Trigger) */}
                     <div className="absolute right-0 top-full mt-1 w-56 bg-card border border-border rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top translate-y-2 group-hover:translate-y-0 z-50 overflow-hidden">
                       <div className="p-2 flex flex-col">
+                        {!isStaff && (
+                          <Link to="/profile?tab=wallet" className="block px-3 py-2 mb-1 bg-muted/30 hover:bg-muted/60 rounded-lg border border-border/50 transition-colors cursor-pointer">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs text-muted-foreground font-medium">Ví thanh toán:</span>
+                              <span className="text-xs font-bold text-foreground">{formatBalance(paymentWallet?.balance || 0)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground font-medium">Ví doanh thu:</span>
+                              <span className="text-xs font-bold text-success">{formatBalance(revenueWallet?.balance || 0)}</span>
+                            </div>
+                          </Link>
+                        )}
                         {isStaff && (
                           <Link to="/admin" className="flex items-center gap-3 px-3 py-2.5 bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors text-sm font-semibold text-primary mb-1 border border-primary/20">
                             <ShieldCheck className="w-4 h-4" />

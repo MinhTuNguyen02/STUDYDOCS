@@ -387,11 +387,10 @@ export default function ProfilePage() {
                             return (
                               <div
                                 key={up.userPackageId}
-                                className={`rounded-xl p-4 border ${
-                                  isActive
+                                className={`rounded-xl p-4 border ${isActive
                                     ? 'bg-background border-primary/30 shadow-sm'
                                     : 'bg-muted/40 border-border'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex justify-between items-start mb-2">
                                   <div className="flex items-center gap-2">
@@ -401,9 +400,8 @@ export default function ProfilePage() {
                                     }
                                     <span className="font-semibold text-sm text-foreground">{up.name}</span>
                                   </div>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                    isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
-                                  }`}>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                                    }`}>
                                     {isActive ? 'Đang dùng' : `#${idx + 1} Chờ kích hoạt`}
                                   </span>
                                 </div>
@@ -503,7 +501,7 @@ export default function ProfilePage() {
                     <CreditCard className="w-32 h-32" />
                   </div>
                   <div className="relative z-10">
-                    <h3 className="text-white/80 font-medium mb-1 flex items-center gap-2">Ví Thanh Toán (PAYMENT)</h3>
+                    <h3 className="text-white/80 font-medium mb-1 flex items-center gap-2">Ví Thanh Toán</h3>
                     <p className="text-3xl font-bold font-heading mb-6 tracking-tight">{formatBalance(paymentWallet?.balance || 0)}</p>
                     <button className="btn bg-white/20 text-white cursor-not-allowed w-full rounded-xl shadow-sm text-sm" disabled>
                       (Nạp tiền qua thanh Header)
@@ -513,7 +511,7 @@ export default function ProfilePage() {
 
                 <div className="bg-background border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between">
                   <div>
-                    <h3 className="text-muted-foreground font-medium mb-1">Ví Doanh Thu (REVENUE)</h3>
+                    <h3 className="text-muted-foreground font-medium mb-1">Ví Doanh Thu</h3>
                     <div className="flex items-end gap-3 mb-4">
                       <p className="text-3xl font-bold font-heading text-foreground tracking-tight">{formatBalance(revenueWallet?.balance || 0)}</p>
                     </div>
