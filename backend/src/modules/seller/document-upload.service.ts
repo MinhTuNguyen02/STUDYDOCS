@@ -39,11 +39,26 @@ export class DocumentUploadService {
         formData.append('files', file.buffer, { filename: safeFilename });
 
         const gotenbergUrl = process.env.GOTENBERG_URL || 'http://localhost:3000';
-        const response = await axios.post(`${gotenbergUrl}/forms/libreoffice/convert`, formData, {
-          headers: formData.getHeaders(),
-          responseType: 'arraybuffer'
-        });
-        pdfBufferToParse = Buffer.from(response.data);
+
+        // Retry logic: Gotenberg on Fly.io may need time to wake up (cold start)
+        let response: any = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            response = await axios.post(`${gotenbergUrl}/forms/libreoffice/convert`, formData, {
+              headers: formData.getHeaders(),
+              responseType: 'arraybuffer',
+              timeout: 60000, // 60s timeout per attempt
+            });
+            break; // success — exit retry loop
+          } catch (retryErr: any) {
+            console.warn(`Gotenberg attempt ${attempt}/3 failed: ${retryErr.message}`);
+            if (attempt < 3) await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
+          }
+        }
+
+        if (response) {
+          pdfBufferToParse = Buffer.from(response.data);
+        }
       } catch (e) {
         console.error('Gotenberg conversion error (fallback to placeholder):', e);
       }
