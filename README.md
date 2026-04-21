@@ -1,6 +1,6 @@
 # 📚 StudyDocs Market
 
-Sàn giao dịch tài liệu học tập trực tuyến — nơi sinh viên có thể **mua, bán, tải xuống và đánh giá** tài liệu một cách an toàn, minh bạch.
+Sàn giao dịch tài liệu học tập trực tuyến — nơi mọi người có thể **mua, bán, tải xuống và đánh giá** tài liệu một cách an toàn, minh bạch.
 
 > **Trạng thái:** Đang phát triển (Development)
 
