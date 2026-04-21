@@ -73,7 +73,7 @@ export class WalletsService {
 
     const amount = new Prisma.Decimal(dto.amount);
     if (wallet.balance.lt(amount)) {
-      throw new BadRequestException('So du kha dung khong du de thuc hien lenh rut tien.');
+      throw new BadRequestException('Số dư khả dụng không đủ để thực hiện lệnh rút tiền.');
     }
 
     const configs = await this.prisma.configs.findMany({

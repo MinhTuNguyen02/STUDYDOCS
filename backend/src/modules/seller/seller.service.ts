@@ -75,7 +75,7 @@ export class SellerService {
     ]);
 
     const topDownloads = await this.prisma.documents.findMany({
-      where: { 
+      where: {
         seller_id: sellerId,
         created_at: { lte: end }  // Only include docs that existed within the period
       },
@@ -85,7 +85,7 @@ export class SellerService {
     });
 
     const topViews = await this.prisma.documents.findMany({
-      where: { 
+      where: {
         seller_id: sellerId,
         created_at: { lte: end }  // Only include docs that existed within the period
       },
@@ -216,10 +216,10 @@ export class SellerService {
   }
 
   async listMyDocuments(
-    user: AuthUser, 
-    status?: string, 
-    search?: string, 
-    pageStr?: string, 
+    user: AuthUser,
+    status?: string,
+    search?: string,
+    pageStr?: string,
     limitStr?: string
   ) {
     const sellerId = this.ensureSeller(user);
@@ -294,6 +294,9 @@ export class SellerService {
     }
 
     const parsedPrice = new Prisma.Decimal(dto.price);
+    if (parsedPrice.gt(500000)) {
+      throw new BadRequestException('Giá tài liệu không được vượt quá 500,000 VND.');
+    }
     const finalPrice = dto.pageCount < 10 ? new Prisma.Decimal(0) : parsedPrice;
 
     const fileHash =
@@ -324,7 +327,7 @@ export class SellerService {
       // Call penalty service
       await this.penaltyService.evaluateUserViolations(sellerId);
 
-      throw new BadRequestException('Tai lieu nay da ton tai tren he thong (trung file).');
+      throw new BadRequestException('Tài liệu này đã tồn tại trên hệ thống (trùng file).');
     }
 
     const tagIdsArray = dto.tagIds
@@ -382,6 +385,9 @@ export class SellerService {
 
     const nextCategoryId = dto.categoryId ? Number(dto.categoryId) : existing.category_id;
     const nextPrice = dto.price ? new Prisma.Decimal(dto.price) : existing.price;
+    if (nextPrice.gt(500000)) {
+      throw new BadRequestException('Giá tài liệu không được vượt quá 500,000 VND.');
+    }
 
     const updated = await this.prisma.documents.update({
       where: { document_id: id },
@@ -420,10 +426,10 @@ export class SellerService {
   }
 
   async listSales(
-    user: AuthUser, 
-    status?: string, 
-    search?: string, 
-    pageStr?: string, 
+    user: AuthUser,
+    status?: string,
+    search?: string,
+    pageStr?: string,
     limitStr?: string
   ) {
     const sellerId = this.ensureSeller(user);

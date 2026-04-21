@@ -37,7 +37,7 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshToken = randomUUID() + randomUUID();
     const refreshTokenHash = this.hashRefreshToken(refreshToken);
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 hours
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
     await this.prisma.user_sessions.create({
       data: {
@@ -66,11 +66,21 @@ export class AuthService {
     });
 
     if (!account || !account.password_hash) {
-      throw new UnauthorizedException('Thong tin dang nhap khong hop le.');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
-    if (account.status === 'BANNED' || account.delete_at !== null) {
-      throw new ForbiddenException('Tai khoan da bi vo hieu hoa.');
+    if (account.delete_at !== null) {
+      throw new ForbiddenException('Tài khoản này đã bị xóa khỏi hệ thống.');
+    }
+
+    if (account.status === 'BANNED') {
+      if (account.banned_until) {
+        const until = account.banned_until.toLocaleDateString('vi-VN', {
+          day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh'
+        });
+        throw new ForbiddenException(`Tài khoản của bạn đang bị khóa tạm thời đến ngày ${until}. Nếu cần hỗ trợ, vui lòng liên hệ dịch vụ khách hàng.`);
+      }
+      throw new ForbiddenException('Tài khoản của bạn đã bị khóa vĩnh viễn do vi phạm quy định. Vui lòng liên hệ bộ phận hỗ trợ để biết thêm chi tiết.');
     }
 
     const isLegacyPlain = account.password_hash === rawPassword;
@@ -83,7 +93,7 @@ export class AuthService {
 
     const passwordMatched = isLegacyPlain || isBcryptAsync || isBcryptSync;
     if (!passwordMatched) {
-      throw new UnauthorizedException('Thong tin dang nhap khong hop le.');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
     const profileName = account.customer_profiles?.full_name ?? account.staff_profiles?.full_name ?? null;
@@ -97,7 +107,7 @@ export class AuthService {
       : false;
 
     return {
-      message: 'Dang nhap thanh cong.',
+      message: 'Đăng nhập thành công.',
       user: toJsonSafe({
         accountId: account.account_id,
         customerId: account.customer_profiles?.customer_id ?? null,
@@ -119,7 +129,7 @@ export class AuthService {
       where: { email: dto.email.toLowerCase().trim() }
     });
     if (existing) {
-      throw new ConflictException('Email da duoc su dung.');
+      throw new ConflictException('Email đã được sử dụng.');
     }
 
     const passwordHash = await hash(dto.password, 10);
@@ -156,7 +166,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Dang ky thanh cong.',
+      message: 'Đăng ký thành công.',
       user: toJsonSafe({
         accountId: account.account_id,
         customerId: account.customer_profiles?.customer_id,
@@ -175,11 +185,11 @@ export class AuthService {
     });
 
     if (!session || session.is_revoked || session.expires_at < new Date()) {
-      throw new UnauthorizedException('Refresh token khong hop le hoac da het han.');
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn.');
     }
 
     if (session.accounts.status === 'BANNED' || session.accounts.delete_at !== null) {
-      throw new ForbiddenException('Tai khoan da bi vo hieu hoa.');
+      throw new ForbiddenException('Tài khoản đã bị vô hiệu hóa.');
     }
 
     const payload = {
@@ -189,7 +199,7 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_ACCESS_SECRET', 'dev_access_secret'),
-      expiresIn: '15m'
+      expiresIn: '2h'
     });
 
     return {
@@ -205,12 +215,12 @@ export class AuthService {
       data: { is_revoked: true }
     });
 
-    return { message: 'Dang xuat thanh cong.' };
+    return { message: 'Đăng xuất thành công.' };
   }
 
   async sendOtp(user: AuthUser, dto: SendOtpDto) {
     if (!user.customerId) {
-      throw new ForbiddenException('Chi khach hang moi co the xac minh OTP.');
+      throw new ForbiddenException('Chỉ khách hàng mới có thể xác minh OTP.');
     }
 
     const { phoneNumber } = dto;
@@ -422,7 +432,7 @@ export class AuthService {
   async forgotPassword(email: string) {
     const formattedEmail = email.trim().toLowerCase();
     const account = await this.prisma.accounts.findUnique({ where: { email: formattedEmail } });
-    
+
     if (!account) {
       // Don't throw 404 to prevent email enumeration, but we'll throw here for UX
       throw new NotFoundException('Khong tim thay tai khoan voi email nay.');
@@ -441,7 +451,7 @@ export class AuthService {
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
-    
+
     // Gửi email thực tế thông qua thư viện nodemailer / mailer
     await this.mailerService.sendMail({
       to: formattedEmail,
@@ -468,12 +478,12 @@ export class AuthService {
 
     console.log(`\n\n[MAIL SENT] Đã gửi mail reset password cho ${formattedEmail}\n\n`);
 
-    return { message: 'Link dat lai mat khau da duoc gui' };
+    return { message: 'Liên kết đặt lại mật khẩu đã được gửi' };
   }
 
   async resetPassword(token: string, newPassword: string) {
     if (!token || !newPassword) {
-      throw new BadRequestException('Thieu token hoac mat khau moi.');
+      throw new BadRequestException('Thiếu token hoặc mật khẩu mới.');
     }
 
     const account = await this.prisma.accounts.findFirst({
@@ -498,6 +508,6 @@ export class AuthService {
       }
     });
 
-    return { message: 'Doi mat khau thanh cong' };
+    return { message: 'Đổi mật khẩu thành công.' };
   }
 }

@@ -67,7 +67,7 @@ export class UsersService {
       : account.password_hash === currentPassword;
 
     if (!isMatched) {
-      throw new BadRequestException('Mat khau hien tai khong xac.');
+      throw new BadRequestException('Mật khẩu hiện tại không chính xác.');
     }
 
     const newHash = await hash(newPassword, 10);
@@ -76,6 +76,6 @@ export class UsersService {
       data: { password_hash: newHash }
     });
 
-    return { message: 'Doi mat khau thanh cong.' };
+    return { message: 'Đổi mật khẩu thành công.' };
   }
 }

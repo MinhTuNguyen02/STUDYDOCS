@@ -242,7 +242,7 @@ export class CheckoutService {
     return {
       orderId: order.order_id.toString(),
       status: order.status,
-      message: 'Thanh toan don hang thanh cong bang vi PAYMENT.'
+      message: 'Thanh toán đơn hàng thành công bằng ví PAYMENT.'
     };
   }
 
@@ -251,9 +251,9 @@ export class CheckoutService {
   // ──────────────────────────────────────────────
 
   async createTopup(user: AuthUser, amount: number) {
-    if (!user.customerId) throw new ForbiddenException('Khong the nap tien vao tai khoan nay.');
+    if (!user.customerId) throw new ForbiddenException('Không thể nạp tiền vào tài khoản này.');
 
-    if (amount < 10000) throw new BadRequestException('So tien nap toi thieu la 10,000 VND.');
+    if (amount < 10000) throw new BadRequestException('Số tiền nạp tối thiểu là 10,000 VND.');
 
     const txnRef = `TOPUP-${Date.now()}-${user.customerId}`;
 

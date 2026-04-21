@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { hash } from 'bcryptjs';
 import { NotificationsService } from '../notifications/notifications.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class AdminService {
@@ -35,7 +36,7 @@ export class AdminService {
     return 'CUSTOMER';
   }
 
-  async getDashboard(params?: { startDate?: string; endDate?: string }) {
+  async getDashboard(params?: { startDate?: string; endDate?: string; groupBy?: 'day' | 'month' }) {
     const now = new Date();
 
     // ── Parse startDate/endDate as VN local time (UTC+7) ────────────────────
@@ -63,11 +64,14 @@ export class AdminService {
       endOfDay.setHours(23, 59, 59, 999);
     }
 
-    // Helper: get VN local date string "YYYY-MM-DD" from a UTC Date
+    // Helper: get VN local date string "YYYY-MM-DD" or "YYYY-MM" from a UTC Date
     const toVNDateKey = (d: Date) => {
       const vnDate = new Date(d.getTime() + VN_OFFSET_MS);
       const y = vnDate.getUTCFullYear();
       const m = String(vnDate.getUTCMonth() + 1).padStart(2, '0');
+      if (params?.groupBy === 'month') {
+        return `${y}-${m}`;
+      }
       const day = String(vnDate.getUTCDate()).padStart(2, '0');
       return `${y}-${m}-${day}`;
     };
@@ -141,6 +145,8 @@ export class AdminService {
       if (!chartMap.has(dateKey)) {
         chartMap.set(dateKey, { date: dateKey, revenue: 0, depositRevenue: 0, commissionRevenue: 0, packageRevenue: 0, orders: 0, refunded: 0, documents: 0 });
       }
+      // If grouping by month, we can safely advance by 1 day because the key only gets inserted once.
+      // Or we can advance by 1 month to be slightly more efficient. We'll advance by 1 day to keep it simple and robust.
       current.setDate(current.getDate() + 1);
     }
 
@@ -720,6 +726,7 @@ export class AdminService {
           accountStatus: user.status,
           isActive: user.status === 'ACTIVE',
           joinedAt: user.created_at,
+          bannedUntil: user.banned_until,
           role,
           documentsCount,
           totalSales
@@ -728,16 +735,22 @@ export class AdminService {
     );
   }
 
-  async toggleUserActive(userId: string, _actor: AuthUser) {
+  async toggleUserActive(userId: string, durationDays: number | null, _actor: AuthUser) {
     const account = await this.prisma.accounts.findUnique({
       where: { account_id: Number(userId) }
     });
     if (!account) throw new NotFoundException('Không tìm thấy người dùng.');
 
     const nextStatus = account.status === 'BANNED' ? 'ACTIVE' : 'BANNED';
+    let bannedUntil = null;
+
+    if (nextStatus === 'BANNED' && durationDays) {
+      bannedUntil = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+    }
+
     const updated = await this.prisma.accounts.update({
       where: { account_id: account.account_id },
-      data: { status: nextStatus }
+      data: { status: nextStatus, banned_until: bannedUntil }
     });
     await this.prisma.user_sessions.updateMany({
       where: { account_id: account.account_id, is_revoked: false },
@@ -1076,5 +1089,33 @@ export class AdminService {
 
       return toJsonSafe(ledgerTx);
     });
+  }
+
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleAutoUnban() {
+    const expiredAccounts = await this.prisma.accounts.findMany({
+      where: {
+        status: 'BANNED',
+        banned_until: { lte: new Date() }
+      }
+    });
+
+    if (expiredAccounts.length > 0) {
+      for (const account of expiredAccounts) {
+        await this.prisma.accounts.update({
+          where: { account_id: account.account_id },
+          data: { status: 'ACTIVE', banned_until: null }
+        });
+        this.notifications.notify({
+          accountId: account.account_id,
+          type: 'ACCOUNT_UNBANNED',
+          title: 'Tài khoản đã được mở khóa',
+          message: 'Thời hạn khóa tài khoản của bạn đã kết thúc. Bạn có thể tiếp tục sử dụng dịch vụ.',
+          referenceId: account.account_id,
+          referenceType: 'ACCOUNT'
+        });
+      }
+      console.log(`[Cron] Auto unbanned ${expiredAccounts.length} accounts.`);
+    }
   }
 }

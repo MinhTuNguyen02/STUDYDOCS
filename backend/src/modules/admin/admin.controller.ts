@@ -20,8 +20,8 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) { }
 
   @Get('dashboard')
-  dashboard(@Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
-    return this.adminService.getDashboard({ startDate, endDate });
+  dashboard(@Query('startDate') startDate?: string, @Query('endDate') endDate?: string, @Query('groupBy') groupBy?: 'day' | 'month') {
+    return this.adminService.getDashboard({ startDate, endDate, groupBy });
   }
 
   @Get('reconciliation')
@@ -87,8 +87,8 @@ export class AdminController {
   }
 
   @Patch('users/:id/toggle-active')
-  toggleUserActive(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.adminService.toggleUserActive(id, user);
+  toggleUserActive(@Param('id') id: string, @Body('durationDays') durationDays: number | null, @CurrentUser() user: AuthUser) {
+    return this.adminService.toggleUserActive(id, durationDays, user);
   }
 
   @Get('categories')

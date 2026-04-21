@@ -26,6 +26,7 @@ model accounts {
   created_at            DateTime       @default(now()) @db.Timestamptz(6)
   updated_at            DateTime?      @default(now()) @db.Timestamptz(6)
   delete_at             DateTime?      @db.Timestamptz(6)
+  banned_until          DateTime?      @db.Timestamptz(6)
 
   roles             roles              @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction)
   audit_logs        audit_logs[]
@@ -649,5 +650,6 @@ enum notification_type {
   REPORT_HANDLED
   REPORT_NEW
   ACCOUNT_BANNED
+  ACCOUNT_UNBANNED
   SYSTEM
 }
