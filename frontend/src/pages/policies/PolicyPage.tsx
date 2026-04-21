@@ -75,7 +75,40 @@ export default function PolicyPage() {
         </p>
 
         {/* Content rendering: HTML from WYSIWYG editor */}
-        <div className="ql-snow bg-transparent border-none mt-6">
+        <div className="ql-snow bg-transparent border-none mt-6 policy-content">
+          <style>{`
+            .policy-content .ql-editor {
+              word-break: break-word;
+              overflow-wrap: break-word;
+              white-space: pre-wrap;
+              max-width: 100%;
+              overflow-x: hidden;
+            }
+            .policy-content .ql-editor ol {
+              padding-left: 2rem !important;
+            }
+            .policy-content .ql-editor ul {
+              padding-left: 2rem !important;
+            }
+            .policy-content .ql-editor li {
+              padding-left: 0.5rem !important;
+              margin-bottom: 0.25rem;
+            }
+            /* Fix Quill's default list numbering if broken by tailwind */
+            .policy-content .ql-editor ol > li {
+              list-style-type: decimal !important;
+            }
+            .policy-content .ql-editor ul > li {
+              list-style-type: disc !important;
+            }
+            .policy-content .ql-editor li::before {
+              display: none !important;
+            }
+            .policy-content .ql-editor img {
+              max-width: 100%;
+              height: auto;
+            }
+          `}</style>
           <div 
             className="ql-editor"
             style={{ padding: 0, fontSize: 'var(--text-base)', lineHeight: 1.8 }}

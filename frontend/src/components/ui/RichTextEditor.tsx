@@ -94,25 +94,23 @@ const RichTextEditor = ({ value, onChange }: RichTextEditorProps) => {
                     max-height: 700px;
                     background: var(--card, #fff);
                 }
+                .rich-text-editor-wrapper .quill {
+                    display: flex;
+                    flex-direction: column;
+                }
                 .rich-text-editor-wrapper .ql-toolbar.ql-snow {
                     border: none !important;
                     border-bottom: 1px solid var(--border, #e5e7eb) !important;
                     padding: 10px;
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                    flex-shrink: 0;
                     background: var(--muted, #f9fafb);
                 }
                 .rich-text-editor-wrapper .ql-container.ql-snow {
                     border: none !important;
                     font-family: inherit;
                     font-size: 1rem;
-                    flex: 1;
-                    overflow-y: auto;
+                    height: 500px;
                 }
                 .rich-text-editor-wrapper .ql-editor {
-                    min-height: 350px;
                     padding: 20px 24px;
                     line-height: 1.75;
                 }
