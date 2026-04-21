@@ -52,7 +52,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     const socketUrl = import.meta.env.VITE_SOCKET_URL || '';
     const socket = io(socketUrl, {
       path: '/socket.io',
-      auth: { token },
+      auth: (cb) => {
+        const freshToken = useAuthStore.getState().accessToken;
+        cb({ token: freshToken });
+      },
       transports: ['websocket'],
     });
 

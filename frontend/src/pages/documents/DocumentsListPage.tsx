@@ -16,7 +16,7 @@ export default function DocumentsListPage() {
   const keyword = searchParams.get('keyword') || ''
   const categoryId = searchParams.get('categoryId') || ''
   const sortBy = searchParams.get('sortBy') || 'popular'
-  
+
   const [localKeyword, setLocalKeyword] = useState(keyword)
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function DocumentsListPage() {
         }
         const res = await documentsApi.getDocuments(params)
         setDocuments(res.data || [])
-        setMeta(res.meta || { page, limit: 12, total: 0 })
+        setMeta(res.meta || { page, limit: 9, total: 0 })
       } catch (err) {
         console.error(err)
       } finally {
@@ -102,7 +102,7 @@ export default function DocumentsListPage() {
               <h3 className="font-bold text-lg">Bộ lọc tài liệu</h3>
             </div>
             {isFiltered && (
-              <button 
+              <button
                 onClick={clearFilters}
                 className="text-xs font-semibold text-danger flex items-center gap-1 hover:bg-danger/10 px-2 py-1 rounded transition-colors"
               >
@@ -163,8 +163,8 @@ export default function DocumentsListPage() {
                   <div key={pId} className="flex flex-col gap-2">
                     <div className="flex items-center gap-2 group">
                       {children.length > 0 ? (
-                        <button 
-                          onClick={() => toggleCategory(pId)} 
+                        <button
+                          onClick={() => toggleCategory(pId)}
                           className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors outline-none shrink-0"
                         >
                           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -172,7 +172,7 @@ export default function DocumentsListPage() {
                       ) : (
                         <div className="w-6 shrink-0" />
                       )}
-                      
+
                       <label className="flex items-center gap-2 cursor-pointer flex-1">
                         <input
                           type="radio"

@@ -26,8 +26,8 @@ export const adminApi = {
     const res = await api.get('/admin/users', { params });
     return res.data;
   },
-  toggleUserStatus: async (id: number) => {
-    const res = await api.patch(`/admin/users/${id}/toggle-active`);
+  toggleUserStatus: async (id: number, durationDays: number | null = null) => {
+    const res = await api.patch(`/admin/users/${id}/toggle-active`, { durationDays });
     return res.data;
   },
   createStaffAccount: async (data: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) => {

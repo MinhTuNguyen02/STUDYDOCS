@@ -30,10 +30,21 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-function StatusBadge({ isActive }: { isActive: boolean }) {
-  return isActive
-    ? <span className="inline-flex items-center gap-1 text-success text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Hoạt động</span>
-    : <span className="inline-flex items-center gap-1 text-danger text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-danger inline-block" /> Bị khóa</span>;
+function StatusBadge({ isActive, bannedUntil }: { isActive: boolean, bannedUntil?: string | null }) {
+  if (isActive) {
+    return <span className="inline-flex items-center gap-1 text-success text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse inline-block" /> Hoạt động</span>;
+  }
+
+  if (bannedUntil) {
+    return (
+      <div className="flex flex-col">
+        <span className="inline-flex items-center gap-1 text-warning text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" /> Khóa tạm thời</span>
+        <span className="text-[10px] text-muted-foreground">Đến {formatDate(bannedUntil)}</span>
+      </div>
+    );
+  }
+
+  return <span className="inline-flex items-center gap-1 text-danger text-xs font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-danger inline-block" /> Bị khóa vĩnh viễn</span>;
 }
 
 export default function AdminUsersPage() {
@@ -44,6 +55,7 @@ export default function AdminUsersPage() {
   const [sortBy, setSortBy] = useState('NEWEST');
   const [activeTab, setActiveTab] = useState<TabType>('customers');
   const currentUser = useAuthStore(state => state.user);
+  const [banModalUser, setBanModalUser] = useState<any | null>(null);
 
   // ── Create staff modal ──
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -70,13 +82,22 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleToggleStatus = async (id: number) => {
+  const handleToggleStatus = async (id: number, durationDays: number | null = null) => {
     try {
-      await adminApi.toggleUserStatus(id);
+      await adminApi.toggleUserStatus(id, durationDays);
       toast.success('Đã cập nhật trạng thái tài khoản');
+      setBanModalUser(null);
       fetchUsers();
     } catch {
       toast.error('Có lỗi xảy ra');
+    }
+  };
+
+  const onBanClick = (u: any) => {
+    if (u.isActive || u.accountStatus === 'ACTIVE') {
+      setBanModalUser(u);
+    } else {
+      handleToggleStatus(u.id, null);
     }
   };
 
@@ -181,7 +202,7 @@ export default function AdminUsersPage() {
               }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            Nhân viên & Admin
+            Nhân viên
             <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
               {staffCount}
             </span>
@@ -281,7 +302,7 @@ export default function AdminUsersPage() {
                         <RoleBadge role={u.role} />
                       </td>
                       <td className="p-4">
-                        <StatusBadge isActive={u.isActive || u.accountStatus === 'ACTIVE'} />
+                        <StatusBadge isActive={u.isActive || u.accountStatus === 'ACTIVE'} bannedUntil={u.bannedUntil} />
                       </td>
                       <td className="p-4 text-muted-foreground text-xs">
                         {formatDate(u.joinedAt || u.created_at)}
@@ -301,7 +322,7 @@ export default function AdminUsersPage() {
                           <span className="text-xs text-muted-foreground italic">Tài khoản hiện tại</span>
                         ) : (
                           <button
-                            onClick={() => handleToggleStatus(u.id)}
+                            onClick={() => onBanClick(u)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ml-auto transition-colors ${u.isActive || u.accountStatus === 'ACTIVE'
                               ? 'bg-danger/10 text-danger hover:bg-danger/20'
                               : 'bg-success/10 text-success hover:bg-success/20'
@@ -423,6 +444,44 @@ export default function AdminUsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Ban Options Modal */}
+      {banModalUser && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-sm rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
+              <h3 className="text-lg font-bold font-heading text-danger flex items-center gap-2">
+                <Ban className="w-5 h-5" />
+                Khóa tài khoản
+              </h3>
+              <button onClick={() => setBanModalUser(null)} className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm font-medium mb-4 text-foreground text-center">
+                Bạn muốn khóa tài khoản <strong>{banModalUser.fullName || banModalUser.email}</strong> trong bao lâu?
+              </p>
+              <button onClick={() => handleToggleStatus(banModalUser.id, 3)} className="w-full bg-muted hover:bg-warning/10 hover:text-warning hover:border-warning/30 border border-border text-foreground font-semibold py-2.5 rounded-xl transition-all">
+                Khóa 3 ngày
+              </button>
+              <button onClick={() => handleToggleStatus(banModalUser.id, 7)} className="w-full bg-muted hover:bg-warning/10 hover:text-warning hover:border-warning/30 border border-border text-foreground font-semibold py-2.5 rounded-xl transition-all">
+                Khóa 7 ngày
+              </button>
+              <button onClick={() => handleToggleStatus(banModalUser.id, 15)} className="w-full bg-muted hover:bg-warning/10 hover:text-warning hover:border-warning/30 border border-border text-foreground font-semibold py-2.5 rounded-xl transition-all">
+                Khóa 15 ngày
+              </button>
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border"></span></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground font-bold">Hoặc</span></div>
+              </div>
+              <button onClick={() => handleToggleStatus(banModalUser.id, null)} className="w-full bg-danger text-white hover:bg-danger/90 font-bold py-2.5 rounded-xl shadow-sm transition-all">
+                Khóa vô thời hạn (Bình thường)
+              </button>
+            </div>
           </div>
         </div>
       )}

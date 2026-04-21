@@ -78,7 +78,7 @@ export default function AdminDashboardPage() {
   const fetchStats = async (start: string, end: string) => {
     try {
       setLoading(true);
-      const res = await adminApi.getDashboardStats({ startDate: start, endDate: end });
+      const res = await adminApi.getDashboardStats({ startDate: start, endDate: end, groupBy: filterMode === 'YEAR' ? 'month' : 'day' });
       setStats(res.data || res);
     } catch (err: any) {
       toast.error('Không thể tải dữ liệu Dashboard');
@@ -182,7 +182,8 @@ export default function AdminDashboardPage() {
   const xAxisFormatter = (val: string) => {
     if (!val || !val.includes('-')) return val;
     const parts = val.split('-');
-    return `${parts[2]}/${parts[1]}`;
+    if (parts.length === 2) return `${parts[1]}/${parts[0]}`; // YYYY-MM
+    return `${parts[2]}/${parts[1]}`; // YYYY-MM-DD
   };
 
   const activeRevOption = REVENUE_FILTER_OPTIONS.find(o => o.value === revenueFilter)!;

@@ -58,7 +58,15 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      toast.error('Email hoặc mật khẩu không đúng')
+      console.error('[Login Error]', err?.response?.status, err?.response?.data);
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message;
+      if (status === 403 && msg) {
+        // Tài khoản bị khóa hoặc xóa — hiện lý do rõ ràng
+        toast.error(msg, { duration: 6000 });
+      } else {
+        toast.error('Email hoặc mật khẩu không đúng');
+      }
     } finally {
       setLoading(false)
     }
