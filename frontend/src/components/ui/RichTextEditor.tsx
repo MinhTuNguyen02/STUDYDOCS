@@ -70,7 +70,7 @@ const RichTextEditor = ({ value, onChange }: RichTextEditorProps) => {
     }), [videoHandler]);
 
     return (
-        <div className="rich-text-editor-wrapper">
+        <div className="rich-text-editor-wrapper relative border-2 border-border rounded-lg overflow-hidden bg-card flex flex-col max-h-[700px]">
             <Suspense fallback={<div className="h-[400px] bg-muted animate-pulse rounded-lg border border-border flex items-center justify-center text-muted-foreground text-sm">Đang tải editor...</div>}>
                 <ReactQuill
                     ref={(el: any) => {
@@ -82,41 +82,43 @@ const RichTextEditor = ({ value, onChange }: RichTextEditorProps) => {
                     onChange={onChange}
                     modules={modules}
                     placeholder="Nhập nội dung bài viết..."
+                    className="flex-1 flex flex-col overflow-hidden"
                 />
             </Suspense>
             <style>{`
                 .rich-text-editor-wrapper {
-                    border: 2px solid var(--border, #e5e7eb);
-                    border-radius: 0.5rem;
-                    overflow: hidden;
-                    display: flex;
-                    flex-direction: column;
-                    max-height: 700px;
-                    background: var(--card, #fff);
-                }
-                .rich-text-editor-wrapper .quill {
                     display: flex;
                     flex-direction: column;
                 }
                 .rich-text-editor-wrapper .ql-toolbar.ql-snow {
                     border: none !important;
                     border-bottom: 1px solid var(--border, #e5e7eb) !important;
-                    padding: 10px;
                     background: var(--muted, #f9fafb);
+                    padding: 10px;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    flex-shrink: 0;
                 }
                 .rich-text-editor-wrapper .ql-container.ql-snow {
                     border: none !important;
                     font-family: inherit;
                     font-size: 1rem;
-                    height: 500px;
+                    flex: 1;
+                    overflow-y: hidden;
+                    display: flex;
+                    flex-direction: column;
                 }
                 .rich-text-editor-wrapper .ql-editor {
+                    min-height: 200px;
+                    flex: 1;
+                    overflow-y: auto;
                     padding: 20px 24px;
                     line-height: 1.75;
                 }
                 .rich-text-editor-wrapper .ql-editor.ql-blank::before {
                     font-style: italic;
-                    color: #9ca3af;
+                    color: #9ca3af !important;
                     left: 24px;
                 }
                 /* Dark mode */
