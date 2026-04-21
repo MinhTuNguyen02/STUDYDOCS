@@ -67,7 +67,10 @@ export default function DocumentsListPage() {
     } else {
       newParams.delete(key)
     }
-    newParams.set('page', '1')
+    // Only reset to page 1 if the user is changing other filters (not navigating pages)
+    if (key !== 'page') {
+      newParams.set('page', '1')
+    }
     setSearchParams(newParams)
     if (scroll) {
       window.scrollTo({ top: 0, behavior: 'smooth' })

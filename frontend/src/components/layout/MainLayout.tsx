@@ -348,11 +348,11 @@ export default function MainLayout({ children }: Props) {
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="w-5 h-5 shrink-0" />
-                  <span>0909 090 909</span>
+                  <a href="tel:0909090909" className="hover:text-white transition-colors">0909 090 909</a>
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail className="w-5 h-5 shrink-0" />
-                  <span>support@studydocs.vn</span>
+                  <a href="mailto:support@studydocs.vn" className="hover:text-white transition-colors">support@studydocs.vn</a>
                 </li>
               </ul>
             </div>

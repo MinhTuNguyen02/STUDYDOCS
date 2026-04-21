@@ -2,18 +2,24 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import DocumentCard from '@/components/common/DocumentCard'
-import { ArrowRight, BookOpen, GraduationCap, Calculator, Globe, Microscope, Palette, Code, Languages, Search, Shield, Truck, Headphones, Award } from 'lucide-react'
+import { ArrowRight, BookOpen, GraduationCap, Calculator, Globe, Microscope, Palette, Code, Languages, Search, Shield, Truck, Headphones, Award, TrendingUp, Scale, HeartPulse } from 'lucide-react'
 
 const getCategoryIconAndColor = (name: string) => {
   const n = name.toLowerCase()
+  if (n.includes('công nghệ thông tin') || n.includes('lập trình') || n.includes('cơ sở dữ liệu')) return { icon: Code, color: 'bg-indigo-100 text-indigo-700' }
+  if (n.includes('kinh tế') || n.includes('quản trị') || n.includes('marketing') || n.includes('kế toán')) return { icon: TrendingUp, color: 'bg-emerald-100 text-emerald-700' }
+  if (n.includes('ngoại ngữ') || n.includes('tiếng')) return { icon: Languages, color: 'bg-purple-100 text-purple-700' }
+  if (n.includes('khoa học') || n.includes('kỹ thuật') || n.includes('vật lý') || n.includes('hóa')) return { icon: Microscope, color: 'bg-cyan-100 text-cyan-700' }
+  if (n.includes('luật') || n.includes('chính trị') || n.includes('nhà nước') || n.includes('quốc tế')) return { icon: Scale, color: 'bg-amber-100 text-amber-700' }
+  if (n.includes('y dược') || n.includes('sức khỏe') || n.includes('y khoa') || n.includes('răng hàm mặt')) return { icon: HeartPulse, color: 'bg-rose-100 text-rose-700' }
+  if (n.includes('phổ thông')) return { icon: BookOpen, color: 'bg-blue-100 text-blue-700' }
+  
+  // Fallbacks
   if (n.includes('toán')) return { icon: Calculator, color: 'bg-blue-100 text-blue-700' }
-  if (n.includes('văn')) return { icon: BookOpen, color: 'bg-green-100 text-green-700' }
-  if (n.includes('anh')) return { icon: Languages, color: 'bg-purple-100 text-purple-700' }
-  if (n.includes('khoa học') || n.includes('lý') || n.includes('hóa')) return { icon: Microscope, color: 'bg-pink-100 text-pink-700' }
   if (n.includes('sử') || n.includes('địa')) return { icon: Globe, color: 'bg-orange-100 text-orange-700' }
   if (n.includes('nghệ thuật') || n.includes('nhạc')) return { icon: Palette, color: 'bg-yellow-100 text-yellow-700' }
-  if (n.includes('tin học') || n.includes('công nghệ thông tin') || n.includes('lập trình')) return { icon: Code, color: 'bg-indigo-100 text-indigo-700' }
-  return { icon: GraduationCap, color: 'bg-red-100 text-red-700' }
+  
+  return { icon: GraduationCap, color: 'bg-slate-100 text-slate-700' }
 }
 
 const features = [
