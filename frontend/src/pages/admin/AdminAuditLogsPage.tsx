@@ -20,15 +20,44 @@ interface AuditLog {
   }
 }
 
+const ACTION_MAP: Record<string, string> = {
+  ADMIN_CREATE_TAG: 'Tạo thẻ',
+  ADMIN_UPDATE_TAG: 'Cập nhật thẻ',
+  ADMIN_DELETE_TAG: 'Xóa thẻ',
+  UPLOAD_VIOLATION: 'Vi phạm tải lên',
+  STAFF_DELETE_REVIEW: 'Xóa đánh giá',
+  STAFF_DELETE_REPLY: 'Xóa phản hồi',
+  STAFF_RESOLVE_REPORT: 'Xử lý báo cáo',
+  ADMIN_CREATE_POLICY: 'Tạo chính sách',
+  ADMIN_UPDATE_POLICY: 'Cập nhật chính sách',
+  ADMIN_DELETE_POLICY: 'Xóa chính sách',
+  ADMIN_CREATE_PACKAGE: 'Tạo gói',
+  ADMIN_UPDATE_PACKAGE: 'Cập nhật gói',
+  ADMIN_DELETE_PACKAGE: 'Xóa gói',
+  PENALTY_APPLIED: 'Xử phạt tài khoản',
+  REPORT_HANDLED: 'Xử lý báo cáo TL',
+  ADMIN_UPDATE_CONFIG: 'Sửa cấu hình HT',
+  ADMIN_CREATE_CATEGORY: 'Tạo danh mục',
+  ADMIN_UPDATE_CATEGORY: 'Sửa danh mục',
+  ADMIN_DELETE_CATEGORY: 'Xóa danh mục',
+  STAFF_REVIEW_DOCUMENT: 'Nhận xét TL',
+  APPROVE_DOCUMENT: 'Duyệt tài liệu',
+  REJECT_DOCUMENT: 'Từ chối tài liệu',
+  STAFF_SOFT_DELETE_DOCUMENT: 'Xóa tạm tài liệu',
+  STAFF_RESTORE_DOCUMENT: 'Khôi phục tài liệu',
+  STAFF_TOGGLE_USER_STATUS: 'Khóa/Mở tài khoản',
+  ADMIN_CREATE_STAFF: 'Tạo tài khoản NV',
+  TAX_PAYMENT: 'Thanh toán thuế/phí',
+  PROCESS_WITHDRAWAL: 'Xử lý rút tiền',
+  RESOLVE_DISPUTE: 'Xử lý khiếu nại',
+}
+
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Filters
   const [searchEmail, setSearchEmail] = useState('')
   const [actionFilter, setActionFilter] = useState('')
-
-  // View Details Modal
+  const [limit, setLimit] = useState(100)
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
 
   useEffect(() => {
@@ -38,8 +67,6 @@ export default function AdminAuditLogsPage() {
   const fetchLogs = async () => {
     setLoading(true)
     try {
-      // In a real scenario, we might pass searchEmail instead of userId if API supports it.
-      // We will just filter on frontend if backend doesn't support email search directly.
       const res = await adminApi.getAuditLogs({ action: actionFilter || undefined, limit })
       setLogs(res.data || res)
     } catch (error) {
@@ -58,23 +85,13 @@ export default function AdminAuditLogsPage() {
     return log.accounts?.email?.toLowerCase().includes(searchEmail.toLowerCase())
   })
 
-  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredLogs, 20);
-
-  // Helper cho JSON highlight
-  const renderJson = (data: any) => {
-    if (!data) return <span className="text-muted-foreground italic">Không có dữ liệu</span>
-    return (
-      <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed text-foreground/80 wrap-break-word">
-        {JSON.stringify(data, null, 2)}
-      </pre>
-    )
-  }
+  const { page, setPage, totalPages, total, paginatedItems } = usePagination(filteredLogs, 20);
 
   const getActionBadge = (action: string) => {
-    if (action.includes('CREATE') || action.includes('INSERT')) return 'bg-success/10 text-success border-success/20'
-    if (action.includes('UPDATE') || action.includes('EDIT')) return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-    if (action.includes('DELETE') || action.includes('REMOVE')) return 'bg-danger/10 text-danger border-danger/20'
-    if (action.includes('APPROVE')) return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+    if (action.includes('CREATE') || action.includes('INSERT') || action.includes('RESTORE')) return 'bg-success/10 text-success border-success/20'
+    if (action.includes('UPDATE') || action.includes('EDIT') || action.includes('TOGGLE')) return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+    if (action.includes('DELETE') || action.includes('REMOVE') || action.includes('VIOLATION') || action.includes('PENALTY')) return 'bg-danger/10 text-danger border-danger/20'
+    if (action.includes('APPROVE') || action.includes('RESOLVE') || action.includes('HANDLED')) return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
     if (action.includes('REJECT')) return 'bg-orange-500/10 text-orange-600 border-orange-500/20'
     return 'bg-muted text-muted-foreground border-border'
   }
@@ -89,7 +106,6 @@ export default function AdminAuditLogsPage() {
         </div>
       </div>
 
-      {/* ── Filter ── */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm mb-6 flex flex-wrap items-center gap-4 w-full">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -108,18 +124,15 @@ export default function AdminAuditLogsPage() {
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">Mọi hành động (Tất cả)</option>
-            <option value="APPROVE_DOCUMENT">Duyệt tài liệu</option>
-            <option value="REJECT_DOCUMENT">Từ chối tài liệu</option>
-            <option value="PROCESS_WITHDRAWAL">Xử lý rút tiền</option>
-            <option value="RESOLVE_DISPUTE">Xử lý khiếu nại</option>
-            <option value="UPDATE_SYSTEM_CONFIG">Sửa cấu hình</option>
-            <option value="TOGGLE_USER_STATUS">Khoá tài khoản</option>
+            {Object.entries(ACTION_MAP).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
           </select>
         </div>
         <div className="w-full md:w-auto">
           <select
             value={limit}
-            // onChange={e => setLimit(Number(e.target.value))}
+            onChange={e => setLimit(Number(e.target.value))}
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value={50}>50 dòng gần nhất</option>
@@ -163,9 +176,9 @@ export default function AdminAuditLogsPage() {
                         <div className="font-semibold text-primary">{log.accounts?.email || 'System'}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">UID: {log.account_id}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold border uppercase tracking-wider ${getActionBadge(log.action)}`}>
-                          {log.action.replace(/_/g, ' ')}
+                      <td className="p-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getActionBadge(log.action)}`}>
+                          {ACTION_MAP[log.action] || log.action}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -215,7 +228,7 @@ export default function AdminAuditLogsPage() {
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
                   <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Hành động</p>
-                  <p className="font-bold text-sm text-primary">{selectedLog.action}</p>
+                  <p className="font-bold text-sm text-primary">{ACTION_MAP[selectedLog.action] || selectedLog.action} <span className="text-xs font-mono text-muted-foreground font-normal ml-1">({selectedLog.action})</span></p>
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
                   <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Mục tiêu (Target)</p>

@@ -9,11 +9,11 @@ Sàn giao dịch tài liệu học tập trực tuyến — nơi sinh viên có 
 ## 📐 Kiến trúc tổng quan
 
 ```
-PTHT TMDT/
+STUDYDOCS/
 ├── docker-compose.yml          # Gotenberg (chuyển đổi DOCX → PDF)
-├── Studio-docx/                # Backend  (NestJS + Prisma)
+├── backend/                    # Backend  (NestJS + Prisma)
 │   ├── prisma/schema.prisma
-│   ├── src/modules/            # 22 module nghiệp vụ
+│   ├── src/modules/            # 24 module nghiệp vụ
 │   └── .env.example
 ├── frontend/                   # Frontend (React + Vite + TailwindCSS 4)
 │   └── src/
@@ -51,7 +51,7 @@ PTHT TMDT/
 
 ### Bước 1 — Khởi động Docker (Gotenberg)
 
-Mở terminal tại **thư mục root** của dự án (`PTHT TMDT/`):
+Mở terminal tại **thư mục root** của dự án (`STUDYDOCS/`):
 
 ```bash
 docker compose up -d
@@ -71,7 +71,7 @@ Lệnh này sẽ khởi động **Gotenberg** — dịch vụ chuyển đổi DO
 
 ```bash
 # 1. Di chuyển vào thư mục backend
-cd Studio-docx
+cd backend
 
 # 2. Cài đặt dependencies
 npm install
@@ -177,10 +177,12 @@ src/modules/
 ├── reports/        # Báo cáo vi phạm
 ├── disputes/       # Tranh chấp đơn hàng
 ├── packages/       # Gói lượt tải
-├── moderation/     # Duyệt tài liệu (staff/mod)
+├── moderation/     # Phạt/Cảnh cáo tài liệu vi phạm
 ├── admin/          # Quản trị hệ thống
 ├── configs/        # Cấu hình hệ thống
 ├── policies/       # Chính sách & điều khoản
+├── gateway/        # Socket.IO Gateway (Realtime)
+├── notifications/  # Quản lý thông báo in-app
 └── storage/        # Supabase Storage upload/download service
 ```
 
@@ -218,7 +220,7 @@ src/pages/
 
 ## 📋 Các lệnh hữu ích
 
-### Backend (`Studio-docx/`)
+### Backend (`backend/`)
 
 ```bash
 npm run start:dev         # Chạy dev server (hot-reload)

@@ -156,7 +156,7 @@ export default function AdminPackagesPage() {
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
 
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground animate-pulse">Đang tải danh sách packages...</div>
+          <div className="text-center py-12 text-muted-foreground animate-pulse">Đang tải danh sách các gói...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">

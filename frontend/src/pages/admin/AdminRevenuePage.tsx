@@ -176,7 +176,7 @@ export default function AdminRevenuePage() {
           <h2 className="font-bold flex items-center gap-2"><DollarSign className="w-5 h-5 text-muted-foreground" /> Lịch sử Dòng tiền</h2>
         </div>
         {loading ? (
-          <div className="text-center py-16 text-muted-foreground animate-pulse">Đang tải data từ Ledger...</div>
+          <div className="text-center py-16 text-muted-foreground animate-pulse">Đang tải dữ liệu...</div>
         ) : data.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">Không có dữ liệu trong khoảng thời gian này.</div>
         ) : (

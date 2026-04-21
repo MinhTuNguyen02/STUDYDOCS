@@ -46,7 +46,7 @@ export default function DocumentsListPage() {
           categoryId: categoryId === 'ALL' ? '' : categoryId,
           sortBy,
           page,
-          limit: 12
+          limit: 9
         }
         const res = await documentsApi.getDocuments(params)
         setDocuments(res.data || [])
