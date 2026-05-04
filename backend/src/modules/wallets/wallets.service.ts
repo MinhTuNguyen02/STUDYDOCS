@@ -1,10 +1,9 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { LedgerService } from './ledger.service';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { IsNumber, IsNotEmpty, IsObject, IsIn, IsString, IsOptional } from 'class-validator';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -238,82 +237,6 @@ export class WalletsService {
     return toJsonSafe(result);
   }
 
-  async releaseHeldFunds() {
-    const now = new Date();
-    const heldItems = await this.prisma.order_items.findMany({
-      where: {
-        status: 'HELD',
-        hold_until: { lte: now }
-      }
-    });
-
-    if (heldItems.length === 0) {
-      return { releasedCount: 0 };
-    }
-
-
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of heldItems) {
-        const wallet = await tx.wallets.findUnique({
-          where: {
-            customer_id_wallet_type: {
-              customer_id: item.seller_id,
-              wallet_type: 'REVENUE'
-            }
-          }
-        });
-        if (!wallet) continue;
-
-        const nextPending = wallet.pending_balance.sub(item.seller_earning);
-        const nextBalance = wallet.balance.add(item.seller_earning);
-
-        await tx.wallets.update({
-          where: { wallet_id: wallet.wallet_id },
-          data: {
-            pending_balance: nextPending,
-            balance: nextBalance
-          }
-        });
-
-        await tx.order_items.update({
-          where: { order_item_id: item.order_item_id },
-          data: { status: 'RELEASED' }
-        });
-      }
-    });
-
-    console.log(`[Cron] Đã release thành công ${heldItems.length} khoản tiền bị hold vào số dư khả dụng.`);
-
-    // Notify từng seller có tiền được release
-    const sellerIds = [...new Set(heldItems.map(i => i.seller_id))];
-    for (const sellerId of sellerIds) {
-      const profile = await this.prisma.customer_profiles.findUnique({
-        where: { customer_id: sellerId },
-        select: { account_id: true }
-      });
-      if (profile) {
-        const sellerItems = heldItems.filter(i => i.seller_id === sellerId);
-        const totalEarning = sellerItems.reduce((sum, i) => sum + Number(i.seller_earning), 0);
-        this.notifications.notify({
-          accountId: profile.account_id,
-          type: 'FUNDS_RELEASED',
-          title: 'Tiền đã được giải phóng',
-          message: `${totalEarning.toLocaleString('vi-VN')}đ đã chuyển từ số dư chờ sang khả dụng (${sellerItems.length} đơn hàng).`,
-          referenceType: 'ORDER'
-        });
-      }
-    }
-
-    return { releasedCount: heldItems.length };
-  }
-
-  // 5.5 Cronjob release tiền: Kiểm tra hold_until < NOW() -> chuyển pending_balance -> balance
-  @Cron(CronExpression.EVERY_HOUR)
-  async handleReleaseHeldFunds() {
-    console.log('[Cron] Running hourly release held funds...');
-    await this.releaseHeldFunds();
-  }
 
   async getLedgerHistory(user: AuthUser) {
     if (!user.customerId) throw new BadRequestException('Khong phai khach hang.');

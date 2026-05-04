@@ -88,7 +88,7 @@ export class CheckoutService {
           buyer_id: user.customerId!,
           status: 'PAID'
         },
-        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+        status: { in: ['PAID', 'RELEASED'] }
       }
     });
     if (alreadyBought) {
@@ -99,8 +99,6 @@ export class CheckoutService {
 
     const commissionConfig = await this.prisma.configs.findUnique({ where: { config_key: 'COMMISSION_RATE' } });
     const commissionRate = new Prisma.Decimal(commissionConfig?.config_value ?? '0.5');
-    const holdConfig = await this.prisma.configs.findUnique({ where: { config_key: 'HOLD_DURATION_HOURS' } });
-    const holdHours = Number(holdConfig?.config_value ?? '48');
 
     const paymentWallet = await this.prisma.wallets.findUnique({
       where: {
@@ -139,7 +137,7 @@ export class CheckoutService {
 
         totalCommissionFee = totalCommissionFee.add(commissionFee);
 
-        // 3. Tao order_item HELD dang cho doi soat
+        // 3. Tao order_item RELEASED (thanh toán xong, tiền vào ngay)
         await tx.order_items.create({
           data: {
             order_id: createdOrder.order_id,
@@ -148,12 +146,11 @@ export class CheckoutService {
             unit_price: doc.price,
             commission_fee: commissionFee,
             seller_earning: sellerEarning,
-            status: 'HELD',
-            hold_until: new Date(Date.now() + holdHours * 60 * 60 * 1000)
+            status: 'RELEASED'
           }
         });
 
-        // 4. Cong tien vao Pending Balance vi REVENUE cua Seller
+        // 4. Cong tien vao Balance vi REVENUE cua Seller (ngay lap tuc)
         const sellerWallet = await tx.wallets.upsert({
           where: {
             customer_id_wallet_type: { customer_id: doc.seller_id, wallet_type: 'REVENUE' }
@@ -161,11 +158,10 @@ export class CheckoutService {
           create: {
             customer_id: doc.seller_id,
             wallet_type: 'REVENUE',
-            balance: new Prisma.Decimal(0),
-            pending_balance: sellerEarning
+            balance: sellerEarning
           },
           update: {
-            pending_balance: { increment: sellerEarning }
+            balance: { increment: sellerEarning }
           }
         });
 
@@ -349,8 +345,7 @@ export class CheckoutService {
           create: {
             customer_id: customerId,
             wallet_type: 'PAYMENT',
-            balance: payment.amount,
-            pending_balance: new Prisma.Decimal(0)
+            balance: payment.amount
           },
           update: {
             balance: { increment: payment.amount }
@@ -411,8 +406,7 @@ export class CheckoutService {
                 title: true,
                 slug: true
               }
-            },
-            disputes: { select: { id: true }, take: 1 }
+            }
           }
         }
       }
@@ -436,8 +430,6 @@ export class CheckoutService {
         id: item.order_item_id,
         status: item.status,
         unitPrice: item.unit_price,
-        holdUntil: item.hold_until,
-        hasDispute: item.disputes && item.disputes.length > 0,
         document: item.documents
       }))
     });

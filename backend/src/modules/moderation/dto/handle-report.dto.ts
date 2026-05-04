@@ -7,8 +7,8 @@ export class HandleReportDto {
   status!: 'RESOLVED' | 'REJECTED';
 
   @IsString()
-  @IsIn(['DELETE_DOCUMENT', 'BAN_USER', 'IGNORE', 'REFUND_DOCUMENT'])
-  action!: 'DELETE_DOCUMENT' | 'BAN_USER' | 'IGNORE' | 'REFUND_DOCUMENT';
+  @IsIn(['DELETE_DOCUMENT', 'BAN_USER', 'IGNORE'])
+  action!: 'DELETE_DOCUMENT' | 'BAN_USER' | 'IGNORE';
 
   @ApiProperty({ example: 'example value' })
   @IsOptional()

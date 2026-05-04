@@ -27,7 +27,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { DownloadsModule } from './modules/downloads/downloads.module';
 import { ReportsModule } from './modules/reports/reports.module';
-import { DisputesModule } from './modules/disputes/disputes.module';
+
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
@@ -64,7 +64,6 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     }]),
     DownloadsModule,
     ReportsModule,
-    DisputesModule,
     MailerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({

@@ -65,18 +65,6 @@ export const adminApi = {
     const res = await api.put(`/reports/${id}/resolve`, data);
     return res.data;
   },
-  getDisputes: async () => {
-    const res = await api.get('/disputes');
-    return res.data;
-  },
-  analyzeDispute: async (id: number) => {
-    const res = await api.put(`/disputes/${id}/analyze`);
-    return res.data;
-  },
-  resolveDispute: async (id: number, data: { status: string; resolution: string }) => {
-    const res = await api.put(`/disputes/${id}/resolve`, data);
-    return res.data;
-  },
 
   getReconciliation: async () => {
     const res = await api.get('/admin/reconciliation');

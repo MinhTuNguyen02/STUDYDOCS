@@ -42,11 +42,4 @@ export class WalletsController {
   processWithdrawal(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ProcessWithdrawalDto) {
     return this.walletsService.processWithdrawal(user, id, dto);
   }
-
-  @Post('jobs/release-held-funds')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('accountant', 'admin')
-  releaseHeldFunds() {
-    return this.walletsService.releaseHeldFunds();
-  }
 }

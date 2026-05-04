@@ -9,7 +9,7 @@ import { RolesGuard } from '../../common/security/roles.guard';
 import { Roles } from '../../common/security/roles.decorator';
 import { report_status } from '@prisma/client';
 
-@ApiTags('Interactions (Reviews, Reports, Disputes)')
+@ApiTags('Interactions (Reviews, Reports)')
 @Controller('reports')
 @UseGuards(JwtAuthGuard)
 export class ReportsController {

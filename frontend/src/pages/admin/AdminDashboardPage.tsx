@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '@/api/admin.api';
 import toast from 'react-hot-toast';
-import { FileCheck, Files, ShoppingBag, Banknote, ArrowRight, Download, CalendarDays, Trophy, Package, RefreshCw } from 'lucide-react';
+import { FileCheck, Files, ShoppingBag, Banknote, ArrowRight, Download, CalendarDays, Trophy, Package } from 'lucide-react';
 import { formatBalance } from '@/utils/format';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
 
   // Chart controls
   const [revenueFilter, setRevenueFilter] = useState<RevenueFilter>('all');
-  const [showRefunded, setShowRefunded] = useState(false);
+
 
   // Filter state
   const [filterMode, setFilterMode] = useState<FilterMode>('DAY');
@@ -398,13 +398,6 @@ export default function AdminDashboardPage() {
             <div className="bg-card border border-border p-6 rounded-2xl shadow-sm">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold font-heading">Giao dịch & Lượt tải lên</h3>
-                <button
-                  onClick={() => setShowRefunded(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${showRefunded ? 'bg-danger/10 border-danger/30 text-danger' : 'bg-muted border-border text-muted-foreground hover:text-foreground'}`}
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  {showRefunded ? 'Ẩn hoàn tiền' : 'Hiện hoàn tiền'}
-                </button>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
@@ -416,9 +409,6 @@ export default function AdminDashboardPage() {
                     <Legend />
                     <Bar dataKey="orders" name="Đơn thành công" fill="#10b981" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="documents" name="File tải lên mới" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                    {showRefunded && (
-                      <Bar dataKey="refunded" name="Hoàn tiền" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </div>

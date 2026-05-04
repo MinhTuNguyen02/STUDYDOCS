@@ -76,7 +76,7 @@ export class AdminService {
       return `${y}-${m}-${day}`;
     };
 
-    const [pendingApprovals, totalDocuments, payments, orders, documents, commissionItems, packageSales, refundedItems] = await Promise.all([
+    const [pendingApprovals, totalDocuments, payments, orders, documents, commissionItems, packageSales] = await Promise.all([
       this.prisma.documents.count({ where: { status: 'PENDING' } }),
       // Only count publicly visible APPROVED documents
       this.prisma.documents.count({ where: { status: 'APPROVED' } }),
@@ -85,12 +85,11 @@ export class AdminService {
         where: { status: 'COMPLETED', created_at: { gte: startOfDay, lte: endOfDay } },
         select: { amount: true, created_at: true }
       }),
-      // Đơn hàng thành công (PAID), không tính REFUNDED
+      // Đơn hàng thành công (PAID)
       this.prisma.orders.findMany({
         where: {
           status: 'PAID',
-          created_at: { gte: startOfDay, lte: endOfDay },
-          order_items: { none: { status: 'REFUNDED' } }
+          created_at: { gte: startOfDay, lte: endOfDay }
         },
         select: { created_at: true }
       }),
@@ -101,7 +100,7 @@ export class AdminService {
       // Doanh thu hoa hồng từ bán tài liệu (commission_fee)
       this.prisma.order_items.findMany({
         where: {
-          status: { in: ['HELD', 'RELEASED'] },
+          status: { in: ['PAID', 'RELEASED'] },
           created_at: { gte: startOfDay, lte: endOfDay }
         },
         select: { commission_fee: true, created_at: true }
@@ -110,14 +109,6 @@ export class AdminService {
       this.prisma.user_packages.findMany({
         where: { purchased_at: { gte: startOfDay, lte: endOfDay } },
         select: { purchased_at: true, packages: { select: { price: true, package_id: true, name: true } } }
-      }),
-      // Giao dịch bị hoàn tiền (per-day data for chart toggle)
-      this.prisma.order_items.findMany({
-        where: {
-          status: 'REFUNDED',
-          updated_at: { gte: startOfDay, lte: endOfDay }
-        },
-        select: { updated_at: true }
       })
     ]);
 
@@ -136,14 +127,13 @@ export class AdminService {
       commissionRevenue: number; // hoa hồng tài liệu
       packageRevenue: number;  // bán gói
       orders: number;
-      refunded: number;
       documents: number;
     }>();
     let current = new Date(startOfDay);
     while (current <= endOfDay) {
       const dateKey = toVNDateKey(current);
       if (!chartMap.has(dateKey)) {
-        chartMap.set(dateKey, { date: dateKey, revenue: 0, depositRevenue: 0, commissionRevenue: 0, packageRevenue: 0, orders: 0, refunded: 0, documents: 0 });
+        chartMap.set(dateKey, { date: dateKey, revenue: 0, depositRevenue: 0, commissionRevenue: 0, packageRevenue: 0, orders: 0, documents: 0 });
       }
       // If grouping by month, we can safely advance by 1 day because the key only gets inserted once.
       // Or we can advance by 1 month to be slightly more efficient. We'll advance by 1 day to keep it simple and robust.
@@ -183,11 +173,6 @@ export class AdminService {
       if (!o.created_at) return;
       const key = toVNDateKey(o.created_at);
       if (chartMap.has(key)) chartMap.get(key)!.orders += 1;
-    });
-    refundedItems.forEach(r => {
-      if (!r.updated_at) return;
-      const key = toVNDateKey(r.updated_at);
-      if (chartMap.has(key)) chartMap.get(key)!.refunded += 1;
     });
     documents.forEach(d => {
       const key = toVNDateKey(d.created_at);
@@ -232,7 +217,7 @@ export class AdminService {
       _count: { order_item_id: true },
       where: {
         created_at: { gte: startOfDay, lte: endOfDay },
-        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+        status: { in: ['PAID', 'RELEASED'] }
       },
       orderBy: { _count: { order_item_id: 'desc' } },
       take: 5
@@ -244,7 +229,7 @@ export class AdminService {
       _sum: { seller_earning: true },
       where: {
         created_at: { gte: startOfDay, lte: endOfDay },
-        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+        status: { in: ['PAID', 'RELEASED'] }
       },
       orderBy: { _sum: { seller_earning: 'desc' } },
       take: 5
@@ -273,8 +258,7 @@ export class AdminService {
       _sum: { total_amount: true },
       where: {
         status: 'PAID',
-        created_at: { gte: startOfDay, lte: endOfDay },
-        order_items: { none: { status: 'REFUNDED' } }
+        created_at: { gte: startOfDay, lte: endOfDay }
       },
       orderBy: { _count: { order_id: 'desc' } },
       take: 5
@@ -298,7 +282,7 @@ export class AdminService {
       _count: { order_item_id: true },
       where: {
         created_at: { gte: startOfDay, lte: endOfDay },
-        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+        status: { in: ['PAID', 'RELEASED'] }
       },
       orderBy: { _count: { order_item_id: 'desc' } },
       take: 5
@@ -882,13 +866,13 @@ export class AdminService {
       where: {
         wallet_type: { in: ['PAYMENT', 'REVENUE'] },
       },
-      _sum: { balance: true, pending_balance: true }
+      _sum: { balance: true }
     });
 
     const gatewayBalance = gatewayPool?.balance || new Prisma.Decimal(0);
     const systemBalance = systemRevenue?.balance || new Prisma.Decimal(0);
     const taxBalance = taxPayable?.balance || new Prisma.Decimal(0);
-    const userBalance = (userWalletsAgg._sum.balance || new Prisma.Decimal(0)).plus(userWalletsAgg._sum.pending_balance || new Prisma.Decimal(0));
+    const userBalance = userWalletsAgg._sum.balance || new Prisma.Decimal(0);
 
     // GATEWAY_POOL is the total fiat cash in the real bank account.
     // It should perfectly equal all user liabilities (User Balances + Pending) + platform earnings (System) + tax obligations (Tax)
@@ -971,8 +955,7 @@ export class AdminService {
     return toJsonSafe({
       wallet: {
         wallet_id: gatewayWallet.wallet_id,
-        balance: gatewayWallet.balance,
-        pending_balance: gatewayWallet.pending_balance
+        balance: gatewayWallet.balance
       },
       summary: { totalIn, totalOut, netFlow: totalIn - totalOut, entryCount: entries.length },
       entries
@@ -1014,8 +997,7 @@ export class AdminService {
     return toJsonSafe({
       wallet: {
         wallet_id: taxWallet.wallet_id,
-        balance: taxWallet.balance,
-        pending_balance: taxWallet.pending_balance
+        balance: taxWallet.balance
       },
       summary: { totalCollected, totalPaid, totalRefunded, netFlow: totalCollected - totalPaid - totalRefunded, entryCount: entries.length },
       entries

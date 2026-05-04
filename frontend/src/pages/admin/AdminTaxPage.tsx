@@ -23,7 +23,7 @@ interface LedgerEntry {
 }
 
 interface TaxReport {
-  wallet: { wallet_id: number; balance: string; pending_balance: string } | null
+  wallet: { wallet_id: number; balance: string } | null
   summary: { totalCollected: number; totalPaid: number; totalRefunded: number; netFlow: number; entryCount: number } | null
   entries: LedgerEntry[]
 }

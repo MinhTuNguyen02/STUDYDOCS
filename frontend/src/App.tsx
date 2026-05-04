@@ -47,7 +47,6 @@ import AdminReportsPage from '@/pages/admin/AdminReportsPage'
 import AdminCategoriesPage from '@/pages/admin/AdminCategoriesPage'
 import AdminTagsPage from '@/pages/admin/AdminTagsPage'
 import AdminReconciliationPage from '@/pages/admin/AdminReconciliationPage'
-import AdminDisputesPage from '@/pages/admin/AdminDisputesPage'
 import AdminConfigsPage from '@/pages/admin/AdminConfigsPage'
 import AdminPackagesPage from '@/pages/admin/AdminPackagesPage'
 import AdminRevenuePage from '@/pages/admin/AdminRevenuePage'
@@ -172,11 +171,6 @@ function App() {
                 <Route path="/reports" element={
                   <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
                     <AdminReportsPage />
-                  </RequireRole>
-                } />
-                <Route path="/disputes" element={
-                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
-                    <AdminDisputesPage />
                   </RequireRole>
                 } />
                 <Route path="/documents" element={

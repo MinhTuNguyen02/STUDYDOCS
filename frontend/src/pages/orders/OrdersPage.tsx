@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ordersApi } from '@/api/orders.api'
 import { formatPrice, formatDate } from '@/utils/format'
-import { Package, Clock, CheckCircle2, XCircle, AlertCircle, Eye } from 'lucide-react'
+import { Package, Clock, CheckCircle2, XCircle, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function OrdersPage() {
@@ -35,13 +35,7 @@ export default function OrdersPage() {
   }
 
   const getStatusBadge = (order: any) => {
-    let status = order.status;
-    if (status === 'PAID' && order.items && order.items.length > 0) {
-      const allRefunded = order.items.every((item: any) => item.status === 'REFUNDED');
-      const someRefunded = order.items.some((item: any) => item.status === 'REFUNDED');
-      if (allRefunded) status = 'REFUNDED';
-      else if (someRefunded) status = 'PARTIAL_REFUND';
-    }
+    const status = order.status;
 
     switch (status) {
       case 'PAID':
@@ -50,10 +44,6 @@ export default function OrdersPage() {
         return <span className="bg-warning/10 text-warning px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><Clock className="w-3.5 h-3.5" /> Chờ thanh toán</span>
       case 'CANCELLED':
         return <span className="bg-danger/10 text-danger px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><XCircle className="w-3.5 h-3.5" /> Đã hủy</span>
-      case 'REFUNDED':
-        return <span className="bg-info/10 text-info px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><AlertCircle className="w-3.5 h-3.5" /> Đã hoàn tiền</span>
-      case 'PARTIAL_REFUND':
-        return <span className="bg-info/10 text-info px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><AlertCircle className="w-3.5 h-3.5" /> Hoàn tiền 1 phần</span>
       default:
         return <span className="bg-gray-100 text-gray-600 px-3 py-1 text-xs font-semibold rounded-full">{status}</span>
     }
@@ -75,7 +65,6 @@ export default function OrdersPage() {
           <option value="ALL">Tất cả trạng thái</option>
           <option value="PAID">Đã thanh toán</option>
           <option value="PENDING_PAYMENT">Chờ thanh toán</option>
-          <option value="REFUNDED">Đã hoàn tiền</option>
         </select>
       </div>
 

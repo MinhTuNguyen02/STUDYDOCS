@@ -114,22 +114,7 @@ describe('PHẦN 3: Financial, Packages & Downloads (e2e)', () => {
     });
   });
 
-  // ─── RELEASE HELD FUNDS (Manual trigger) ──────────────────
 
-  describe('POST /wallets/jobs/release-held-funds', () => {
-    it('✅ Trigger release held funds thành công', async () => {
-      if (!adminUser) return;
-      const res = await authPost('/wallets/jobs/release-held-funds', adminUser.accessToken)
-        .expect(201);
-
-      expect(res.body.releasedCount).toBeDefined();
-    });
-
-    it('❌ Customer không thể trigger release', async () => {
-      await authPost('/wallets/jobs/release-held-funds', customer.accessToken)
-        .expect(403);
-    });
-  });
 
   // ─── PACKAGES ──────────────────────────────────────────────
 

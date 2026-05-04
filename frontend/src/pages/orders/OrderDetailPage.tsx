@@ -2,16 +2,14 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ordersApi } from '@/api/orders.api'
 import { libraryApi } from '@/api/library.api'
-import DisputeModal from '@/components/common/DisputeModal'
 import { formatPrice, formatDate } from '@/utils/format'
-import { Package, Download, ChevronLeft, ShieldCheck, FileText, CheckCircle2, Clock, XCircle, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Package, Download, ChevronLeft, FileText, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function OrderDetailPage() {
   const { id } = useParams()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [disputeTarget, setDisputeTarget] = useState<any>(null)
 
   useEffect(() => {
     fetchOrderDetail()
@@ -43,14 +41,7 @@ export default function OrderDetailPage() {
   }
 
   const getStatusBadge = (orderObj: any) => {
-    let status = orderObj.status || orderObj.paymentStatus;
-    const items = orderObj.items || orderObj.order_items || [];
-    if (status === 'PAID' && items.length > 0) {
-      const allRefunded = items.every((item: any) => item.status === 'REFUNDED');
-      const someRefunded = items.some((item: any) => item.status === 'REFUNDED');
-      if (allRefunded) status = 'REFUNDED';
-      else if (someRefunded) status = 'PARTIAL_REFUND';
-    }
+    const status = orderObj.status || orderObj.paymentStatus;
 
     switch (status) {
       case 'PAID':
@@ -59,10 +50,6 @@ export default function OrderDetailPage() {
         return <span className="bg-warning/10 text-warning px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><Clock className="w-4 h-4" /> Chờ thanh toán</span>
       case 'CANCELLED':
         return <span className="bg-danger/10 text-danger px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><XCircle className="w-4 h-4" /> Đã hủy</span>
-      case 'REFUNDED':
-        return <span className="bg-info/10 text-info px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><AlertCircle className="w-4 h-4" /> Đã hoàn tiền</span>
-      case 'PARTIAL_REFUND':
-        return <span className="bg-info/10 text-info px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-1.5 w-fit"><AlertCircle className="w-4 h-4" /> Hoàn tiền 1 phần</span>
       default:
         return <span className="bg-gray-100 text-gray-600 px-4 py-1.5 text-sm font-semibold rounded-full">{status}</span>
     }
@@ -72,7 +59,6 @@ export default function OrderDetailPage() {
   if (!order) return <div className="py-24 text-center text-muted-foreground">Không tìm thấy đơn hàng</div>
 
   const orderId = order.orderId || order.order_id || order.id
-  const status = order.status || order.paymentStatus
   const items = order.items || order.order_items || []
   let totalAmount = 0
   if (order.totalAmount || order.total_amount) {
@@ -121,58 +107,22 @@ export default function OrderDetailPage() {
                       {doc.title}
                     </Link>
                     <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span className={`font-bold ${item.status === 'REFUNDED' ? 'text-muted-foreground line-through opacity-70' : 'text-primary'}`}>
+                      <span className="font-bold text-primary">
                         {formatPrice(item.unitPrice || item.unit_price || doc.price || 0)}
                       </span>
                       <span className="uppercase text-xs font-semibold px-2 py-0.5 bg-muted rounded-md">{ext}</span>
-                      {item.status === 'REFUNDED' && (
-                        <span className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 bg-danger/10 text-danger rounded-md">
-                          <XCircle className="w-3.5 h-3.5" /> Bị hoàn tiền
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  {(() => {
-                    const canDispute =
-                      status === 'PAID' &&
-                      item.status !== 'REFUNDED' &&
-                      !item.hasDispute &&
-                      item.holdUntil &&
-                      new Date(item.holdUntil) > new Date()
-
-                    return canDispute ? (
-                      <div className="flex items-center justify-end shrink-0 gap-2">
-                        <button
-                          onClick={() => setDisputeTarget(item)}
-                          className="p-3 bg-danger/10 text-danger hover:bg-danger hover:text-white rounded-xl transition-colors tooltip-trigger"
-                          title="Khiếu nại / Hoàn tiền"
-                        >
-                          <AlertTriangle className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDownload(doc.id || doc.document_id)}
-                          className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
-                          title="Tải xuống tài liệu"
-                        >
-                          <Download className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ) : status === 'PAID' && item.status !== 'REFUNDED' ? (
-                      <div className="flex items-center justify-end shrink-0 gap-2">
-                        {item.hasDispute && (
-                          <span className="text-xs text-muted-foreground italic px-2">Đã khiếu nại</span>
-                        )}
-                        <button
-                          onClick={() => handleDownload(doc.id || doc.document_id)}
-                          className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
-                          title="Tải xuống tài liệu"
-                        >
-                          <Download className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ) : null
-                  })()}
+                  <div className="flex items-center justify-end shrink-0 gap-2">
+                    <button
+                      onClick={() => handleDownload(doc.id || doc.document_id)}
+                      className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-colors tooltip-trigger"
+                      title="Tải xuống tài liệu"
+                    >
+                      <Download className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               )
             })}
@@ -182,22 +132,8 @@ export default function OrderDetailPage() {
             <span className="text-lg font-medium text-foreground">Tổng thanh toán:</span>
             <span className="text-3xl font-bold font-heading text-primary">{formatPrice(totalAmount)}</span>
           </div>
-
-          <div className="mt-6 p-4 bg-muted border border-border rounded-xl flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-success shrink-0 mt-0.5" />
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Bạn có 48 giờ để đánh giá hoặc khiếu nại tài liệu này nếu nội dung không đúng với mô tả. Giao dịch được bảo vệ bởi StudyDocs.
-            </p>
-          </div>
         </div>
       </div>
-      {disputeTarget && (
-        <DisputeModal
-          orderItemId={disputeTarget.id || disputeTarget.order_item_id}
-          documentTitle={disputeTarget.document?.title || ''}
-          onClose={() => setDisputeTarget(null)}
-        />
-      )}
     </div>
   )
 }

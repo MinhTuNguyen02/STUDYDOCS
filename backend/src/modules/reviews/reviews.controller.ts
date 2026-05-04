@@ -9,7 +9,7 @@ import { Roles } from '../../common/security/roles.decorator';
 import { ReviewsService } from './reviews.service';
 import { UpsertReviewDto } from './dto/upsert-review.dto';
 
-@ApiTags('Interactions (Reviews, Reports, Disputes)')
+@ApiTags('Interactions (Reviews, Reports)')
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) { }

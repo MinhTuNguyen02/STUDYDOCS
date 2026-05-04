@@ -79,7 +79,7 @@ export class ReviewsService {
           buyer_id: user.customerId,
           status: 'PAID'
         },
-        status: { in: ['PAID', 'HELD', 'RELEASED'] }
+        status: { in: ['PAID', 'RELEASED'] }
       },
       orderBy: { created_at: 'asc' }
     });

@@ -53,7 +53,7 @@ export class SellerService {
         _sum: { seller_earning: true },
         where: {
           documents: { seller_id: sellerId },
-          status: { in: ['PAID', 'HELD', 'RELEASED'] },
+          status: { in: ['PAID', 'RELEASED'] },
           created_at: { gte: start, lte: end }
         }
       }),
@@ -68,7 +68,7 @@ export class SellerService {
       this.prisma.order_items.count({
         where: {
           documents: { seller_id: sellerId },
-          status: { in: ['PAID', 'HELD', 'RELEASED'] },
+          status: { in: ['PAID', 'RELEASED'] },
           created_at: { gte: start, lte: end }
         }
       })
@@ -129,14 +129,14 @@ export class SellerService {
             _sum: { seller_earning: true },
             where: {
               documents: { seller_id: sellerId },
-              status: { in: ['PAID', 'HELD', 'RELEASED'] },
+              status: { in: ['PAID', 'RELEASED'] },
               created_at: { gte: start, lte: effectiveEnd }
             }
           }),
           this.prisma.order_items.count({
             where: {
               documents: { seller_id: sellerId },
-              status: { in: ['PAID', 'HELD', 'RELEASED'] },
+              status: { in: ['PAID', 'RELEASED'] },
               created_at: { gte: start, lte: effectiveEnd }
             }
           })
@@ -185,7 +185,7 @@ export class SellerService {
     const items = await this.prisma.order_items.findMany({
       where: {
         documents: { seller_id: sellerId },
-        status: { in: ['PAID', 'HELD', 'RELEASED'] },
+        status: { in: ['PAID', 'RELEASED'] },
         created_at: { gte: start, lte: effectiveEnd }
       },
       select: { seller_earning: true, created_at: true }
@@ -449,7 +449,6 @@ export class SellerService {
       select: { status: true, seller_earning: true }
     });
     const totalEarnings = overallItems.reduce((sum, item) => {
-      if (item.status === 'REFUNDED') return sum;
       return sum + Number(item.seller_earning || 0);
     }, 0);
     const totalOrders = overallItems.length;
@@ -479,7 +478,6 @@ export class SellerService {
           unitPrice: item.unit_price,
           commissionFee: item.commission_fee,
           sellerEarning: item.seller_earning,
-          holdUntil: item.hold_until,
           document: item.documents,
           order: item.orders
         }))

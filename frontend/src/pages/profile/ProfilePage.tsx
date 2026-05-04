@@ -512,11 +512,8 @@ export default function ProfilePage() {
                 <div className="bg-background border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between">
                   <div>
                     <h3 className="text-muted-foreground font-medium mb-1">Ví Doanh Thu</h3>
-                    <div className="flex items-end gap-3 mb-4">
+                    <div className="flex items-end gap-3 mb-6">
                       <p className="text-3xl font-bold font-heading text-foreground tracking-tight">{formatBalance(revenueWallet?.balance || 0)}</p>
-                    </div>
-                    <div className="text-sm font-medium text-warning bg-warning/10 px-3 py-1.5 rounded-lg w-fit flex items-center gap-2 mb-6">
-                      <Clock className="w-4 h-4 shrink-0" /> Chờ duyệt: {formatBalance(revenueWallet?.pending_balance || 0)}
                     </div>
                   </div>
                   <div className="space-y-3">

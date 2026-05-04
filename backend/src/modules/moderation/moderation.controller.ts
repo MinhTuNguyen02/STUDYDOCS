@@ -9,7 +9,7 @@ import { ModerationService } from './moderation.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { HandleReportDto } from './dto/handle-report.dto';
 
-@ApiTags('Interactions (Reviews, Reports, Disputes)')
+@ApiTags('Interactions (Reviews, Reports)')
 @Controller('moderation')
 export class ModerationController {
   constructor(private readonly moderationService: ModerationService) {}

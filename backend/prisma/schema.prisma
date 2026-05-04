@@ -54,7 +54,6 @@ model staff_profiles {
   policies            policies[]
   reports             reports[]
   withdrawal_requests withdrawal_requests[]
-  disputes            disputes[]
 }
 
 // ─── Bảng Customer_Profile ──────────────────────────────────────
@@ -82,7 +81,6 @@ model customer_profiles {
   wallets             wallets[]
   wishlists           wishlists[]
   withdrawal_requests withdrawal_requests[]
-  disputes            disputes[]
 }
 
 // ─── Bảng Roles ─────────────────────────────────────────────────
@@ -178,7 +176,6 @@ model order_items {
   commission_fee Decimal           @db.Decimal(10, 2)
   seller_earning Decimal           @db.Decimal(10, 2)
   status         order_item_status
-  hold_until     DateTime?         @db.Timestamptz(6)
   created_at     DateTime          @default(now()) @db.Timestamptz(6)
   unit_price     Decimal           @db.Decimal(10, 2)
   updated_at     DateTime          @default(now()) @db.Timestamptz(6)
@@ -188,12 +185,9 @@ model order_items {
   customer_profiles customer_profiles  @relation(fields: [seller_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   reviews           reviews?
   download_history  download_history[]
-  disputes          disputes[]
 
   @@unique([order_id, document_id])
   @@index([seller_id], map: "idx_order_items_seller_id")
-  @@index([hold_until], map: "idx_order_items_hold_until")
-  @@index([seller_id, hold_until], map: "idx_order_items_seller_hold_until")
 }
 
 // ─── Bảng Categories ────────────────────────────────────────────
@@ -313,7 +307,6 @@ model wallets {
   customer_id     Int?
   wallet_type     wallet_type
   balance         Decimal     @default(0) @db.Decimal(12, 2)
-  pending_balance Decimal     @default(0) @db.Decimal(12, 2)
 
   customer_profiles customer_profiles? @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   payments          payments[]
@@ -477,23 +470,7 @@ model policies {
   staff_profiles staff_profiles? @relation(fields: [updated_by], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
 }
 
-// ─── Bảng Disputes ──────────────────────────────────────────────
-model disputes {
-  id            Int            @id @default(autoincrement())
-  order_item_id Int
-  customer_id   Int
-  reason        String         @db.VarChar(255)
-  description   String
-  status        dispute_status @default(OPEN)
-  staff_id      Int?
-  resolution    String?        @db.VarChar(50)
-  created_at    DateTime       @default(now()) @db.Timestamptz(6)
-  resolved_at   DateTime?      @db.Timestamptz(6)
 
-  order_items       order_items       @relation(fields: [order_item_id], references: [order_item_id], onDelete: NoAction, onUpdate: NoAction)
-  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
-  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
-}
 
 // ─── Bảng Notifications ─────────────────────────────────────────
 model notifications {
@@ -544,18 +521,13 @@ enum download_type {
 enum order_item_status {
   PENDING
   PAID
-  HELD
   RELEASED
-  REFUNDED
-  DISPUTED
 }
 
 enum order_status {
   PENDING_PAYMENT
   PAID
   CANCELLED
-  REFUNDED
-  PARTIAL_REFUNDED
 }
 
 enum package_status {
@@ -624,12 +596,7 @@ enum withdrawal_status {
   REJECTED
 }
 
-enum dispute_status {
-  OPEN
-  INVESTIGATING
-  RESOLVED
-  REJECTED
-}
+
 
 enum notification_type {
   ORDER_NEW
@@ -644,9 +611,7 @@ enum notification_type {
   WITHDRAWAL_NEW
   NEW_REVIEW
   REVIEW_REPLY
-  DISPUTE_NEW
-  DISPUTE_RESOLVED
-  DISPUTE_REJECTED
+
   REPORT_HANDLED
   REPORT_NEW
   ACCOUNT_BANNED

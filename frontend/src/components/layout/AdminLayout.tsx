@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, FileCheck, FileText, Users, Tags, AlertTriangle,
-  MessageSquareWarning, WalletCards, Calculator, BarChart3, Settings,
+  WalletCards, Calculator, BarChart3, Settings,
   ShieldCheck, ScrollText, Package, LogOut, Menu, X, Library,
   FolderTree, Vault
 } from 'lucide-react';
@@ -48,7 +48,6 @@ export default function AdminLayout({ children }: Props) {
       items: [
         { name: 'Quản lý Người dùng', path: '/admin/users', icon: <Users className="w-5 h-5" />, roles: ['admin', 'mod'] },
         { name: 'Báo cáo Vi phạm', path: '/admin/reports', icon: <AlertTriangle className="w-5 h-5" />, roles: ['admin', 'mod'] },
-        { name: 'Khiếu nại', path: '/admin/disputes', icon: <MessageSquareWarning className="w-5 h-5" />, roles: ['admin', 'mod'] },
       ]
     },
     {

@@ -22,7 +22,7 @@ interface LedgerEntry {
 }
 
 interface GatewayReport {
-  wallet: { wallet_id: number; balance: string; pending_balance: string } | null
+  wallet: { wallet_id: number; balance: string } | null
   summary: { totalIn: number; totalOut: number; netFlow: number; entryCount: number } | null
   entries: LedgerEntry[]
 }

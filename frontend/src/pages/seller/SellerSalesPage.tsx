@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { sellerApi } from '@/api/seller.api'
 import { formatBalance, formatDate } from '@/utils/format'
-import { TrendingUp, Clock, CheckCircle2, DollarSign, XCircle, Search, Filter } from 'lucide-react'
+import { TrendingUp, CheckCircle2, DollarSign, Search, Filter } from 'lucide-react'
 import SellerLayout from '@/components/layout/SellerLayout'
 
 export default function SellerSalesPage() {
@@ -89,9 +89,7 @@ export default function SellerSalesPage() {
               className="px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-background font-medium"
             >
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="HELD">Tạm giữ</option>
               <option value="RELEASED">Đã cộng ví</option>
-              <option value="REFUNDED">Bị hoàn tiền</option>
             </select>
           </div>
         </div>
@@ -124,26 +122,12 @@ export default function SellerSalesPage() {
                   <td className="p-4 font-medium">{formatBalance(sale.unitPrice || sale.unit_price)}</td>
                   <td className="p-4 text-warning font-medium">-{formatBalance(sale.commissionFee || sale.commission_fee || 0)}</td>
                   <td className="p-4 font-bold text-success">
-                    {sale.status === 'REFUNDED' ? (
-                      <span className="text-danger line-through opacity-70">+{formatBalance(sale.sellerEarning || sale.seller_earning || 0)}</span>
-                    ) : (
-                      `+${formatBalance(sale.sellerEarning || sale.seller_earning || 0)}`
-                    )}
+                    {`+${formatBalance(sale.sellerEarning || sale.seller_earning || 0)}`}
                   </td>
                   <td className="p-4">
-                    {sale.status === 'REFUNDED' ? (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-danger bg-danger/10 px-2 py-1 rounded-md w-fit">
-                        <XCircle className="w-3.5 h-3.5" /> Bị hoàn tiền
-                      </span>
-                    ) : (sale.status === 'HELD' || sale.fund_status === 'HELD') ? (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-warning bg-warning/10 px-2 py-1 rounded-md w-fit">
-                        <Clock className="w-3.5 h-3.5" /> Tạm giữ
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-success bg-success/10 px-2 py-1 rounded-md w-fit">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Đã cộng ví
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-success bg-success/10 px-2 py-1 rounded-md w-fit">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Đã cộng ví
+                    </span>
                   </td>
                   <td className="p-4 text-muted-foreground text-sm">{formatDate(sale.order?.created_at || sale.order?.createdAt)}</td>
                 </tr>

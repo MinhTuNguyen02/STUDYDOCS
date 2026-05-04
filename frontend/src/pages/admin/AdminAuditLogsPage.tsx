@@ -49,7 +49,6 @@ const ACTION_MAP: Record<string, string> = {
   ADMIN_CREATE_STAFF: 'Tạo tài khoản NV',
   TAX_PAYMENT: 'Thanh toán thuế/phí',
   PROCESS_WITHDRAWAL: 'Xử lý rút tiền',
-  RESOLVE_DISPUTE: 'Xử lý khiếu nại',
 }
 
 export default function AdminAuditLogsPage() {

@@ -6,7 +6,6 @@
  * Bao gồm:
  * - Reviews: create, reply, average_rating
  * - Reports: create, resolve, status lifecycle
- * - Disputes: create (2-day rule), analyze, resolve (refund)
  * - Admin: dashboard, audit logs, revenue report
  * - Moderation: reports, penalty
  */
@@ -25,7 +24,7 @@ import {
   TestUser
 } from './test-utils';
 
-describe('PHẦN 4: Reviews, Reports, Disputes & Admin (e2e)', () => {
+describe('PHẦN 4: Reviews, Reports & Admin (e2e)', () => {
   let customer: TestUser;
   let adminUser: TestUser;
   let modUser: TestUser;
@@ -152,47 +151,7 @@ describe('PHẦN 4: Reviews, Reports, Disputes & Admin (e2e)', () => {
     });
   });
 
-  // ─── DISPUTES ──────────────────────────────────────────────
 
-  describe('Disputes', () => {
-    it('❌ Tạo dispute: orderItem không tồn tại', async () => {
-      await authPost('/disputes', customer.accessToken)
-        .send({
-          orderItemId: 999999,
-          reason: 'File bị lỗi',
-          description: 'Không mở được tài liệu'
-        })
-        .expect(404);
-    });
-
-    it('❌ Tạo dispute: thiếu thông tin (DTO validation)', async () => {
-      await authPost('/disputes', customer.accessToken)
-        .send({ orderItemId: 1 }) // Thiếu reason & description
-        .expect(400);
-    });
-
-    it('❌ Tạo dispute: khách chưa đăng nhập', async () => {
-      await request(getApp().getHttpServer())
-        .post('/disputes')
-        .send({
-          orderItemId: 1,
-          reason: 'Test',
-          description: 'Test description'
-        })
-        .expect(401);
-    });
-
-    it('❌ Customer không thể analyze dispute', async () => {
-      const res = await authPut('/disputes/1/analyze', customer.accessToken);
-      expect([403, 404]).toContain(res.status);
-    });
-
-    it('❌ Customer không thể resolve dispute', async () => {
-      const res = await authPut('/disputes/1/resolve', customer.accessToken)
-        .send({ status: 'RESOLVED', resolution: 'Test' });
-      expect([403, 404]).toContain(res.status);
-    });
-  });
 
   // ─── MODERATION ────────────────────────────────────────────
 
@@ -321,7 +280,7 @@ describe('PHẦN 4: Reviews, Reports, Disputes & Admin (e2e)', () => {
 
     it('✅ Admin xem audit logs filter by action', async () => {
       if (!adminUser) return;
-      const res = await authGet('/admin/audit-logs?action=RELEASE_HELD_FUNDS&limit=5', adminUser.accessToken)
+      const res = await authGet('/admin/audit-logs?action=PROCESS_WITHDRAWAL&limit=5', adminUser.accessToken)
         .expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);

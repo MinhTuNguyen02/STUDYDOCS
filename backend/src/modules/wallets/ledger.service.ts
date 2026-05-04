@@ -31,8 +31,7 @@ export class LedgerService {
       taxPayable = await tx.wallets.create({
         data: {
           wallet_type: 'TAX_PAYABLE',
-          balance: 0,
-          pending_balance: 0
+          balance: 0
         }
       });
     }
