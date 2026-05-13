@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
+import { useNotificationStore } from '@/store/notificationStore'
 import TopupModal from '@/components/common/TopupModal'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store, ShieldCheck, Upload } from 'lucide-react'
@@ -18,12 +19,12 @@ interface Props {
 export default function MainLayout({ children }: Props) {
   const { user, logout } = useAuthStore()
   const { count, fetchCart } = useCartStore()
+  const { socket } = useNotificationStore()
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showTopupModal, setShowTopupModal] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
-
   const [footerCategories, setFooterCategories] = useState<any[]>([])
   const [footerPolicies, setFooterPolicies] = useState<any[]>([])
   const [wallets, setWallets] = useState<any[]>([])
@@ -49,13 +50,28 @@ export default function MainLayout({ children }: Props) {
     documentsApi.getPolicies().then(res => setFooterPolicies(res || []))
   }, [])
 
-  useEffect(() => {
+  const fetchWallets = () => {
     if (user && !isStaff) {
       walletsApi.getMyWallets()
         .then(res => setWallets(res?.data || []))
         .catch(() => setWallets([]))
     }
+  }
+
+  useEffect(() => {
+    fetchWallets()
   }, [user, isStaff])
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('wallet_updated', () => {
+        fetchWallets()
+      })
+      return () => {
+        socket.off('wallet_updated')
+      }
+    }
+  }, [socket, user, isStaff])
 
   const paymentWallet = wallets.find(w => w.wallet_type === 'PAYMENT' || w.walletType === 'PAYMENT')
   const revenueWallet = wallets.find(w => w.wallet_type === 'REVENUE' || w.walletType === 'REVENUE')

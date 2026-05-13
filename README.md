@@ -1,295 +1,459 @@
 # 📚 StudyDocs Market
 
-Sàn giao dịch tài liệu học tập trực tuyến — nơi mọi người có thể **mua, bán, tải xuống và đánh giá** tài liệu một cách an toàn, minh bạch.
+> A full-stack digital document marketplace with internal wallet accounting, VNPay payment integration, automated document processing, and multi-role administration.
 
-> **Trạng thái:** Đang phát triển (Development)
+**🔗 Live Demo:** [https://studydocs-lac.vercel.app/](https://studydocs-lac.vercel.app/)
+
+**⚙️ API Base URL:** [https://studydocs-backend-minhtu.fly.dev](https://studydocs-backend-minhtu.fly.dev)
+
+Students can **buy, sell, download, and review** academic documents through a transparent, commission-based platform with real-time notifications and financial audit trails.
 
 ---
 
-## 📐 Kiến trúc tổng quan
+## ✨ Key Features
 
+- **Multi-Role System** — 4 roles (Customer, Moderator, Accountant, Admin) with granular RBAC on both backend and frontend
+- **Double-Entry Accounting** — 5 wallet types (PAYMENT, REVENUE, GATEWAY_POOL, SYSTEM_REVENUE, TAX_PAYABLE) with debit-credit balance validation
+- **Payment Integration** — VNPay gateway with HMAC-SHA512 signing, IPN webhook, and idempotent transaction processing
+- **Document Processing Pipeline** — Upload → SHA256 dedup → DOCX/PPTX/XLSX-to-PDF conversion (Gotenberg) → watermarked preview generation (pdf-lib)
+- **Real-Time Notifications** — Socket.IO WebSocket gateway with JWT auth and role-based broadcasting (multiple event types)
+- **Anti-Fraud System** — File hash duplicate detection, progressive penalties (fine → ban), and comprehensive audit logging
+- **Seller Dashboard** — Revenue analytics, daily/monthly trends, top documents, sales management
+- **Admin Dashboard** — 18 management pages covering content moderation, financial oversight, user management, and system configuration
+- **Download Packages** — Subscription-like download bundles with expiration and auto-activation queue
+
+---
+
+## 📸 Screenshots
+
+| Homepage | Document Listing |
+|----------|------------------|
+| ![Homepage](docs/screenshots/01-homepage.png) | ![Document Listing](docs/screenshots/02-document-listing.png) |
+
+| Document Detail | Seller Upload |
+|-----------------|---------------|
+| ![Document Detail](docs/screenshots/03-document-detail.png) | ![Seller Upload](docs/screenshots/04-seller-upload.png) |
+
+| Seller Dashboard | Wallet & Transactions |
+|------------------|-----------------------|
+| ![Seller Dashboard](docs/screenshots/05-seller-dashboard.png) | ![Wallet Transactions](docs/screenshots/06-wallet-transactions.png) |
+
+| Checkout & Payment | Moderation Queue |
+|--------------------|------------------|
+| ![Checkout & Payment](docs/screenshots/07-checkout-payment.png) | ![Moderation Queue](docs/screenshots/08-moderation-queue.png) |
+
+| Admin Dashboard |
+|-----------------|
+| ![Admin Dashboard](docs/screenshots/09-admin-dashboard.png) |
+
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart LR
+    FE["React 19 + Vite Frontend\n(Vercel)"] -->|REST API| API["NestJS Backend API\n(Fly.io)"]
+    FE <-->|WebSocket| WS["Socket.IO Gateway\n(NestJS)"]
+    WS --> API
+
+    API --> DB[(PostgreSQL\nSupabase Cloud)]
+    API --> Storage["Supabase Storage\nS3-compatible"]
+    API --> Gotenberg["Gotenberg 8\nFile Conversion\nFly.io / Docker"]
+    API --> VNPay["VNPay\nPayment Gateway"]
+    API --> Mail["Gmail SMTP\nEmail Service"]
 ```
 STUDYDOCS/
-├── docker-compose.yml          # Gotenberg (chuyển đổi DOCX → PDF)
-├── backend/                    # Backend  (NestJS + Prisma)
-│   ├── prisma/schema.prisma
-│   ├── src/modules/            # 24 module nghiệp vụ
-│   └── .env.example
-├── frontend/                   # Frontend (React + Vite + TailwindCSS 4)
+├── docs/
+│   ├── screenshots/                # README screenshots
+│   ├── diagrams/                   # Architecture and flow diagrams
+│   └── demo/ 
+├── docker-compose.yml              # Gotenberg service (file conversion)
+├── backend/                        # NestJS + Prisma (23 modules)
+│   ├── prisma/schema.prisma        # 28 tables, 17 enums
+│   ├── src/
+│   │   ├── common/                 # Guards, filters, decorators, utils
+│   │   ├── database/               # PrismaModule + PrismaService
+│   │   └── modules/                # 23 business modules
+│   ├── test/                       # 4 E2E test suites
+│   ├── Dockerfile                  # Multi-stage production build
+│   └── fly.toml                    # Fly.io deployment config
+├── frontend/                       # React 19 + Vite 8 + TailwindCSS 4
 │   └── src/
-│       ├── api/                # Axios API clients
-│       ├── components/         # Reusable UI components
-│       ├── pages/              # 11 nhóm trang
-│       └── store/              # Zustand state management
-└── README.md                   ← bạn đang ở đây
+│       ├── api/                    # 14 Axios API clients
+│       ├── components/             # Reusable UI (guards, layout, common)
+│       ├── pages/                  # 12 page groups, 40+ routes
+│       └── store/                  # Zustand state (auth, cart, notifications)
+└── README.md
 ```
 
-## 🧰 Công nghệ sử dụng
+---
 
-| Tầng | Công nghệ |
-|------|-----------|
-| **Frontend** | React 19, Vite 8, TailwindCSS 4, Zustand, React Router 7 |
-| **Backend** | NestJS 10, Prisma ORM 6, Passport JWT |
-| **Database** | PostgreSQL 16 (Supabase) |
+## 💰 Core Business Flows
+
+### Wallet & Double-Entry Ledger
+
+Every financial operation creates balanced ledger entries (total debit = total credit), validated at the service layer.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     WALLET ARCHITECTURE                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Customer Wallets         System Wallets (no owner)             │
+│  ┌──────────────┐         ┌──────────────────┐                  │
+│  │   PAYMENT    │         │   GATEWAY_POOL   │  ← VNPay funds  │
+│  │  (buy docs)  │         │   (escrow pool)  │                  │
+│  ├──────────────┤         ├──────────────────┤                  │
+│  │   REVENUE    │         │  SYSTEM_REVENUE  │  ← commissions  │
+│  │ (sell docs)  │         │  (platform fee)  │                  │
+│  └──────────────┘         ├──────────────────┤                  │
+│                           │   TAX_PAYABLE    │  ← withdrawal   │
+│                           │  (withheld tax)  │     tax          │
+│                           └──────────────────┘                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Flow | Money Movement |
+|------|---------------|
+| **Top-up** | VNPay → `GATEWAY_POOL` ↑ → Buyer `PAYMENT` ↑ |
+| **Purchase** | Buyer `PAYMENT` ↓ → Seller `REVENUE` ↑ + `SYSTEM_REVENUE` ↑ (commission) |
+| **Withdrawal** | Seller `REVENUE` ↓ → `GATEWAY_POOL` ↓ (net) + `TAX_PAYABLE` ↑ (tax) |
+| **Rejection** | Reversal: `GATEWAY_POOL` ↑ + `TAX_PAYABLE` ↓ → Seller `REVENUE` ↑ |
+
+### Document Processing Pipeline
+
+```
+Seller uploads file
+       │
+       ▼
+  SHA256 hash ──── Duplicate? ──→ Reject + Record violation
+       │                          (auto-fine at 3rd, ban at 5th)
+       │ unique
+       ▼
+  Is PDF? ─── No ──→ Gotenberg (LibreOffice) ──→ Convert to PDF
+       │                                              │
+       │ Yes                                          │
+       ▼                                              ▼
+  pdf-lib processing ◄────────────────────────────────┘
+       │
+       ├──→ Preview PDF (30% pages, strong red watermark) → Supabase Storage
+       ├──→ Review PDF  (100% pages, light blue watermark) → Supabase Storage
+       └──→ Original file → Supabase Storage
+               │
+               ▼
+       Status: PENDING → Staff moderation
+       Staff approves/rejects → Review PDF auto-deleted
+```
+
+### Payment Flow (VNPay)
+
+```
+Customer clicks "Top Up"
+       │
+       ▼
+  Backend creates Payment record (PENDING)
+  + generates VNPay URL with HMAC-SHA512 signature
+       │
+       ▼
+  Customer redirected to VNPay → completes payment
+       │
+       ▼
+  VNPay sends IPN webhook → Backend verifies signature
+       │
+       ├── Amount mismatch? → Reject (RspCode: 04)
+       ├── Already processed? → Idempotent return (RspCode: 02)
+       └── Valid? → Atomic transaction:
+              • Update payment status → COMPLETED
+              • Increment GATEWAY_POOL balance
+              • Increment customer PAYMENT wallet
+              • Record double-entry ledger
+              • Push real-time notification via Socket.IO
+```
+
+---
+
+## 🧰 Tech Stack
+
+| Layer | Technologies |
+|-------|-------------|
+| **Frontend** | React 19, Vite 8, TailwindCSS 4, Zustand, React Router 7, Recharts, Socket.IO Client |
+| **Backend** | NestJS 10, Prisma ORM 6, Passport JWT, Socket.IO, Swagger/OpenAPI |
+| **Database** | PostgreSQL 16 (Supabase Cloud) |
 | **File Storage** | Supabase Storage (S3-compatible) |
-| **Thanh toán** | VNPay Sandbox |
-| **Chuyển đổi file** | Gotenberg 8 (DOCX → PDF preview) |
+| **Payment** | VNPay (HMAC-SHA512) |
+| **File Conversion** | Gotenberg 8 (LibreOffice engine — DOCX/PPTX/XLSX → PDF) |
+| **Auth** | JWT (access + refresh), Google OAuth 2.0, Firebase Phone OTP, 2FA |
+| **Email** | Nodemailer (Gmail SMTP) |
+| **Security** | Helmet, Throttler (rate limiting), bcryptjs |
+| **Testing** | Jest, Supertest (4 E2E suites) |
+| **DevOps** | Docker (multi-stage), Fly.io, Vercel |
 
 ---
 
-## 🚀 Hướng dẫn chạy dự án
+## 🌍 Deployment
 
-### Yêu cầu hệ thống
+| Service | Platform | Region | Link |
+|---------|----------|--------|------|
+| Frontend | [Vercel](https://vercel.com) | Auto (Edge) | [https://studydocs-lac.vercel.app/](https://studydocs-lac.vercel.app/) |
+| Backend API | [Fly.io](https://fly.io) | Singapore (`sin`) | [https://studydocs-backend-minhtu.fly.dev](https://studydocs-backend-minhtu.fly.dev) |
+| Database | [Supabase](https://supabase.com) | AP Southeast 1 | — |
+| File Storage | Supabase Storage | S3-compatible | — |
+| Gotenberg | Fly.io / Docker local | — | — |
 
-- **Node.js** ≥ 18 (khuyến nghị ≥ 20)
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** ≥ 18 (recommended ≥ 20)
 - **npm** ≥ 9
-- **Docker Desktop** (đã cài và đang chạy — chỉ cần cho Gotenberg)
+- **Docker Desktop** (running — required for Gotenberg)
 - **Git**
-- **Tài khoản Supabase** (database + storage đã được setup sẵn)
+- A [Supabase](https://supabase.com) project with:
+  - PostgreSQL database
+  - A **public** storage bucket named `studydocs`
+  - `service_role` API key (found in **Settings → API**)
 
----
+### Environment Variables
 
-### Bước 1 — Khởi động Docker (Gotenberg)
+#### Backend (`backend/.env`)
 
-Mở terminal tại **thư mục root** của dự án (`STUDYDOCS/`):
+Copy the example and fill in your values:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Required variables:
+
+```env
+PORT=4000
+FRONTEND_URL="http://localhost:5173"
+DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
+
+JWT_ACCESS_SECRET="your-access-secret"
+JWT_REFRESH_SECRET="your-refresh-secret"
+
+# Supabase (Settings → API in your Supabase Dashboard)
+SUPABASE_URL="https://[project-ref].supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOi..."
+SUPABASE_STORAGE_BUCKET="studydocs"
+
+# VNPay (optional — for payment testing)
+VNPAY_TMN_CODE="your-tmn-code"
+VNPAY_HASH_SECRET="your-hash-secret"
+VNPAY_URL="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+
+# Email (optional — for password reset)
+MAIL_USER="your-gmail@gmail.com"
+MAIL_PASS="your-app-password"
+```
+
+#### Frontend (`frontend/.env`)
+
+```env
+VITE_API_URL="/api"
+VITE_STORAGE_URL="https://[project-ref].supabase.co/storage/v1/object/public/studydocs"
+```
+
+### Start Gotenberg
+
+From the project root directory:
 
 ```bash
 docker compose up -d
 ```
 
-Lệnh này sẽ khởi động **Gotenberg** — dịch vụ chuyển đổi DOCX → PDF để tạo preview:
+This starts Gotenberg on port `3000` for DOCX/PPTX/XLSX → PDF conversion.
 
-| Service | Port | Mô tả |
-|---------|------|-------|
-| **Gotenberg** | `3000` | Chuyển đổi DOCX → PDF preview |
+> **Note:** Database and Storage run on Supabase Cloud — no local Docker needed for those.
 
-> **Lưu ý:** Database (PostgreSQL) và File Storage đều chạy trên **Supabase Cloud**, không cần Docker.
-
----
-
-### Bước 2 — Cài đặt và chạy Backend
+### Start Backend
 
 ```bash
-# 1. Di chuyển vào thư mục backend
 cd backend
-
-# 2. Cài đặt dependencies
 npm install
-
-# 3. Tạo file cấu hình môi trường
-cp .env.example .env
-```
-
-Mở file `.env` và chỉnh sửa các giá trị:
-
-```env
-PORT=4000
-FRONTEND_URL="http://localhost:5173"
-DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
-
-JWT_ACCESS_SECRET="dev_access_secret"
-JWT_REFRESH_SECRET="dev_refresh_secret"
-
-# Supabase Storage (lấy từ Supabase Dashboard → Settings → API)
-SUPABASE_URL="https://[project-ref].supabase.co"
-SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOi..."
-SUPABASE_STORAGE_BUCKET="studydocs"
-
-# VNPay Sandbox (tùy chọn — để test thanh toán)
-VNPAY_TMN_CODE="your-tmn-code"
-VNPAY_HASH_SECRET="your-hash-secret"
-VNPAY_URL="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-```
-
-Tiếp tục:
-
-```bash
-# 4. Sinh Prisma Client từ schema
 npx prisma generate
-
-# 5. Khởi động server ở chế độ development
+npx prisma db push        # Sync schema to database (see warning below)
 npm run start:dev
 ```
 
-✅ Backend sẽ chạy tại: **http://localhost:4000**
-📖 Swagger API Docs: **http://localhost:4000/api-docs**
+> ⚠️ **Warning:** `prisma db push` directly modifies the database schema without migration history. Use it **only for local/development databases**. For shared or production databases, use `prisma migrate dev` instead to avoid accidental data loss.
 
----
+✅ Backend runs at: **http://localhost:4000**
 
-### Bước 3 — Cài đặt và chạy Frontend
+### Start Frontend
 
-Mở **terminal mới** (giữ terminal backend):
+Open a **new terminal** (keep the backend running):
 
 ```bash
-# 1. Di chuyển vào thư mục frontend
 cd frontend
-
-# 2. Cài đặt dependencies
 npm install
-
-# 3. Khởi động dev server
 npm run dev
 ```
 
-✅ Frontend sẽ chạy tại: **http://localhost:5173**
+✅ Frontend runs at: **http://localhost:5173**
 
-> Frontend tự động proxy tất cả request `/api/*` sang Backend `http://localhost:4000` thông qua Vite proxy config.
-
-> File `.env` trong thư mục `frontend/` chứa biến `VITE_STORAGE_URL` trỏ tới Supabase Storage public URL.
+> The Vite dev server proxies all `/api/*` requests to the backend at `http://localhost:4000`.
 
 ---
 
-### Cách lấy Supabase Service Role Key
+## 📖 API Documentation
 
-1. Truy cập [https://supabase.com/dashboard](https://supabase.com/dashboard)
-2. Chọn project đang sử dụng
-3. Vào **Settings** → **API**
-4. Copy giá trị **`service_role` key** (⚠️ không phải `anon` key)
-5. Dán vào biến `SUPABASE_SERVICE_ROLE_KEY` trong file `.env`
+Swagger UI is auto-generated and available at:
 
-### Cách tạo Storage Bucket
+**http://localhost:4000/api/docs**
 
-1. Trong Supabase Dashboard → **Storage**
-2. Click **New bucket** → đặt tên `studydocs`
-3. Chọn **Public bucket** → **Create**
-4. Backend sẽ tự tạo bucket nếu chưa tồn tại (cần `service_role` key)
+All endpoints use the `/api` prefix and require `Bearer` token authentication (except public routes).
+
+A Postman collection is also available at `backend/studydocs-be.postman_collection.json`.
 
 ---
 
-## 🗂️ Cấu trúc Backend Modules
+## 🧪 Testing
+
+The project includes 4 end-to-end test suites:
+
+```bash
+cd backend
+
+# Run all tests
+npm run test
+
+# Run individual suites
+npm run test:e2e:part1    # 01-auth — Registration, login, JWT, OAuth, OTP
+npm run test:e2e:part2    # 02-documents — Upload, search, cart, checkout
+npm run test:e2e:part3    # 03-financial — Wallets, top-up, withdrawal, packages
+npm run test:e2e:part4    # 04-interaction — Reviews, reports, admin operations
+```
+
+---
+
+## 🗂️ Project Structure
+
+### Backend Modules (23 modules)
 
 ```
 src/modules/
-├── auth/           # Đăng nhập, đăng ký, JWT, OAuth, OTP, 2FA
-├── users/          # Quản lý hồ sơ người dùng
-├── seller/         # Quản lý tài liệu của người bán
-├── documents/      # Tìm kiếm, xem chi tiết tài liệu
-├── categories/     # Danh mục tài liệu
-├── tags/           # Tag / nhãn tài liệu
-├── cart/           # Giỏ hàng
-├── wishlists/      # Danh sách yêu thích
-├── checkout/       # Thanh toán (VNPay, ví nội bộ)
-├── orders/         # Quản lý đơn hàng
-├── wallets/        # Ví thanh toán & ví doanh thu
-├── downloads/      # Xử lý tải tài liệu (free / purchased / package)
-├── library/        # Thư viện tài liệu đã mua & sinh link tải
-├── reviews/        # Đánh giá & phản hồi người bán
-├── reports/        # Báo cáo vi phạm
-├── disputes/       # Tranh chấp đơn hàng
-├── packages/       # Gói lượt tải
-├── moderation/     # Phạt/Cảnh cáo tài liệu vi phạm
-├── admin/          # Quản trị hệ thống
-├── configs/        # Cấu hình hệ thống
-├── policies/       # Chính sách & điều khoản
-├── gateway/        # Socket.IO Gateway (Realtime)
-├── notifications/  # Quản lý thông báo in-app
+├── auth/           # Login, register, JWT, Google OAuth, OTP, 2FA, password reset
+├── users/          # User profile management
+├── seller/         # Seller document management, upload pipeline, dashboard analytics
+├── documents/      # Public document search, detail, view counting
+├── categories/     # Category tree (parent-child)
+├── tags/           # Document tags
+├── cart/           # Shopping cart
+├── wishlists/      # Wishlist / favorites
+├── checkout/       # Wallet payment + VNPay top-up + IPN webhook
+├── orders/         # Order history and detail
+├── wallets/        # Wallet management + ledger service + withdrawal
+├── downloads/      # Download authorization (free / purchased / package)
+├── library/        # Purchased documents library
+├── reviews/        # Ratings, comments, seller replies
+├── reports/        # Content violation reports
+├── packages/       # Download packages (subscription bundles)
+├── moderation/     # Content moderation + penalty/auto-ban system
+├── admin/          # System admin (dashboard, users, configs, staff management)
+├── configs/        # Dynamic system configuration (commission rate, fees)
+├── policies/       # Terms & policies CMS (rich text)
+├── gateway/        # Socket.IO WebSocket gateway
+├── notifications/  # In-app notifications (multiple types) + cron cleanup
 └── storage/        # Supabase Storage upload/download service
 ```
 
----
-
-## 🖥️ Cấu trúc Frontend Pages
+### Frontend Pages (12 groups, 40+ routes)
 
 ```
 src/pages/
-├── home/           # Trang chủ
-├── auth/           # Đăng nhập / Đăng ký
-├── documents/      # Danh sách & Chi tiết tài liệu
-├── cart/           # Giỏ hàng & Thanh toán
-├── orders/         # Lịch sử đơn hàng & Chi tiết đơn
-├── library/        # Thư viện tài liệu đã mua
-├── seller/         # Dashboard người bán (upload, quản lý tài liệu)
-├── profile/        # Thông tin cá nhân, ví, bảo mật
-├── payment/        # Nạp tiền (VNPay)
-├── packages/       # Mua gói lượt tải
-└── policies/       # Chính sách sử dụng
+├── home/           # Landing page
+├── auth/           # Login, Register, Verify Phone, Reset Password
+├── documents/      # Document listing (search, filter) + detail page
+├── cart/           # Cart + Wishlist
+├── orders/         # Order history + Order detail
+├── library/        # Purchased documents library
+├── seller/         # Seller dashboard, document management, upload, sales
+├── profile/        # User profile, wallet, security settings
+├── payment/        # VNPay return handler
+├── packages/       # Download package marketplace
+├── policies/       # Terms & policies viewer
+└── admin/          # 18 admin pages (dashboard, approvals, users, finances, ...)
 ```
 
 ---
 
-## 🔐 Tài khoản mặc định (sau khi seed)
-
-| Vai trò  | Email | Mật khẩu |
-|----------|-------|-----------|
-| Admin    | `admin@studydocs.vn` | `admin123` |
-| Customer | *(tự đăng ký tại /register)* | — |
-
-> **Lưu ý:** Tài khoản mặc định có thể khác tùy vào file `prisma/seed.ts`. Hãy kiểm tra file đó để biết chính xác.
-
----
-
-## 📋 Các lệnh hữu ích
+## 📋 Useful Commands
 
 ### Backend (`backend/`)
 
 ```bash
-npm run start:dev         # Chạy dev server (hot-reload)
-npm run build             # Build production
-npm run seed              # Seed dữ liệu mẫu
-npx prisma studio         # Mở Prisma Studio (xem DB trực quan)
-npx prisma db push        # Đồng bộ schema → DB
-npx prisma generate       # Sinh lại Prisma Client
-npm run test              # Chạy test suite
+npm run start:dev         # Dev server (hot-reload)
+npm run build             # Production build
+npm run seed              # Seed sample data
+npx prisma studio         # Visual database browser
+npx prisma generate       # Regenerate Prisma Client
+npx prisma db push        # Sync schema → DB (dev only!)
+npm run test              # Run E2E test suites
 ```
 
 ### Frontend (`frontend/`)
 
 ```bash
-npm run dev               # Chạy dev server (port 5173)
-npm run build             # Build production
-npm run preview           # Preview bản build
-npm run lint              # Kiểm tra code style
+npm run dev               # Dev server (port 5173)
+npm run build             # Production build
+npm run preview           # Preview production build
+npm run lint              # Code style check
 ```
 
 ### Docker
 
 ```bash
-docker compose up -d      # Khởi động Gotenberg
-docker compose down       # Dừng services
-docker compose logs -f    # Xem log realtime
+docker compose up -d      # Start Gotenberg
+docker compose down       # Stop services
+docker compose logs -f    # Stream logs
 ```
 
 ---
 
-## 🌐 Cổng mặc định
+## 🌐 Default Ports
 
-| Dịch vụ | URL |
+| Service | URL |
 |---------|-----|
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:4000 |
-| Swagger Docs | http://localhost:4000/api-docs |
-| Database | Supabase Cloud (xem Dashboard) |
-| File Storage | Supabase Storage (xem Dashboard) |
-| Gotenberg | localhost:3000 |
+| Swagger Docs | http://localhost:4000/api/docs |
+| Gotenberg | http://localhost:3000 |
+| Database | Supabase Cloud Dashboard |
+| File Storage | Supabase Storage Dashboard |
 
 ---
 
-## ⚠️ Lưu ý quan trọng
+## ⚠️ Important Notes
 
-1. **Docker Desktop phải đang chạy** trước khi thực hiện `docker compose up -d` (cho Gotenberg).
-2. **Thứ tự khởi động:** Docker → Backend → Frontend.
-3. Nếu thay đổi file `prisma/schema.prisma`, cần chạy lại:
+1. **Docker Desktop must be running** before `docker compose up -d` (for Gotenberg).
+2. **Startup order:** Docker → Backend → Frontend.
+3. **Schema changes** — after editing `prisma/schema.prisma`:
    ```bash
    npx prisma generate && npx prisma db push
    ```
-4. Để test thanh toán VNPay, cần cấu hình `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` trong `.env` với thông tin từ [VNPay Sandbox](https://sandbox.vnpayment.vn).
-5. Để nhận webhook IPN từ VNPay (xác nhận giao dịch tự động), Backend cần được expose ra internet bằng **ngrok** hoặc tương đương:
+   > ⚠️ Use `prisma db push` only for **local/dev** databases. For production or shared databases, use `prisma migrate dev` to create proper migration files.
+4. **VNPay testing** — configure `VNPAY_TMN_CODE` and `VNPAY_HASH_SECRET` in `.env` from [VNPay Sandbox](https://sandbox.vnpayment.vn).
+5. **VNPay IPN webhook** — to receive automatic payment confirmations, expose the backend via **ngrok**:
    ```bash
    ngrok http 4000
    ```
-   Sau đó cập nhật IPN URL trên trang quản lý VNPay Sandbox.
-6. **⚠️ Không commit file `.env` lên Git** — file này chứa secret keys. Chỉ commit `.env.example`.
+   Then update the IPN URL in your VNPay Sandbox merchant dashboard.
+6. **Never commit `.env` files** — they contain secret keys. Only `.env.example` should be in version control.
+7. **Supabase setup** — this project requires a configured Supabase project. See `backend/prisma/schema.prisma` for the database schema and `backend/prisma/seed.ts` for initial data.
 
 ---
 
-## 👥 Thành viên
+## 👥 Contributors
 
-| Họ tên | MSSV | Vai trò |
-|--------|------|---------|
-| *(Điền thông tin)* | *(MSSV)* | *(Vai trò)* |
+| Name | Student ID | Role |
+|------|-----------|------|
+| *(Fill in)* | *(ID)* | *(Role)* |
 
 ---
 
-## 📄 Giấy phép
+## 📄 License
 
-Dự án phục vụ mục đích học tập — môn **Phát triển hệ thống Thương mại điện tử**, Học kỳ 2, Năm 4.
+Academic project for **E-Commerce System Development** — Semester 2, Year 4.

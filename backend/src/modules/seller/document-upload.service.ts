@@ -40,7 +40,6 @@ export class DocumentUploadService {
 
         const gotenbergUrl = process.env.GOTENBERG_URL || 'http://localhost:3000';
 
-        // Retry logic: Gotenberg on Fly.io may need time to wake up (cold start)
         let response: any = null;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {

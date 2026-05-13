@@ -145,6 +145,9 @@ export class WalletsService {
       referenceType: 'WITHDRAWAL'
     });
 
+    // Notify customer wallet update
+    this.notifications.notifyAccountWalletChange(Number(user.accountId));
+
     return toJsonSafe(created);
   }
 
@@ -232,6 +235,8 @@ export class WalletsService {
         referenceId: id,
         referenceType: 'WITHDRAWAL'
       });
+      // Notify wallet update
+      this.notifications.notifyAccountWalletChange(sellerProfile.account_id);
     }
 
     return toJsonSafe(result);

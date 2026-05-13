@@ -56,6 +56,18 @@ export class NotificationsService {
     return notification;
   }
 
+  async notifyCustomerWalletChange(customerId: number) {
+    await this.gateway.sendToCustomer(customerId, 'wallet_updated', {
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  async notifyAccountWalletChange(accountId: number) {
+    this.gateway.sendToUser(accountId, 'wallet_updated', {
+      timestamp: new Date().toISOString()
+    });
+  }
+
   /**
    * Tạo notification cho nhiều users cùng lúc.
    * Dùng individual create để có ID cho socket push (tránh dedup failure).

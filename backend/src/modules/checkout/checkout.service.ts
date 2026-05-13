@@ -233,7 +233,13 @@ export class CheckoutService {
         referenceId: order.order_id,
         referenceType: 'ORDER'
       });
+      // Notify seller of wallet change
+      this.notifications.notifyAccountWalletChange(sellerAccountId);
     }
+
+    // Notify buyer of wallet change
+    this.notifications.notifyAccountWalletChange(Number(user.accountId));
+
 
     return {
       orderId: order.order_id.toString(),
@@ -385,6 +391,8 @@ export class CheckoutService {
           referenceId: payment.payment_id,
           referenceType: 'PAYMENT'
         });
+        // Notify customer wallet update
+        this.notifications.notifyAccountWalletChange(profile.account_id);
       }
     }
 

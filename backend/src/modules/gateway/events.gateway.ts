@@ -91,4 +91,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   sendToRole(role: string, event: string, data: any) {
     this.server.to(`role:${role}`).emit(event, data);
   }
+
+  /**
+   * Send an event to a customer by customer_id.
+   */
+  async sendToCustomer(customerId: number, event: string, data: any) {
+    const profile = await this.prisma.customer_profiles.findUnique({
+      where: { customer_id: customerId },
+      select: { account_id: true }
+    });
+    if (profile) {
+      this.sendToUser(profile.account_id, event, data);
+    }
+  }
 }

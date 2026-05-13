@@ -4,13 +4,16 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 import { LedgerService } from '../wallets/ledger.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
+import { NotificationsService } from '../notifications/notifications.service';
+
 @Injectable()
 export class PackagesService {
   private readonly logger = new Logger(PackagesService.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ledger: LedgerService
+    private readonly ledger: LedgerService,
+    private readonly notifications: NotificationsService
   ) { }
 
   async getActivePackages() {
@@ -210,6 +213,9 @@ export class PackagesService {
     const statusMessage = newStatus === 'PENDING'
       ? `Gói "${pkg.name}" đã được thêm vào hàng chờ. Sẽ tự động kích hoạt khi gói hiện tại hết hạn hoặc hết lượt tải.`
       : `Mua thành công gói ${pkg.name}.`;
+
+    // Notify buyer wallet update
+    this.notifications.notifyAccountWalletChange(Number(user.accountId));
 
     return { message: statusMessage, data: result };
   }
