@@ -75,8 +75,8 @@ export default function ProfilePage() {
     if (socket) {
       socket.on('wallet_updated', () => {
         // Just refresh wallet and transactions
-        walletsApi.getMyWallets().then(res => setWallets(res?.data || [])).catch(() => {});
-        walletsApi.getTransactions().then(res => setTransactions(res?.data || res || [])).catch(() => {});
+        walletsApi.getMyWallets().then(res => setWallets(res?.data || [])).catch(() => { });
+        walletsApi.getTransactions().then(res => setTransactions(res?.data || res || [])).catch(() => { });
       })
       return () => {
         socket.off('wallet_updated')
@@ -368,7 +368,7 @@ export default function ProfilePage() {
                     <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6">
                       <div className="flex items-center gap-3 mb-4">
                         <Download className="w-6 h-6 text-primary" />
-                        <h3 className="font-bold text-lg">Lượt tải miễn phí</h3>
+                        <h3 className="font-bold text-lg">Lượt tải xuống miễn phí</h3>
                       </div>
                       <div className="flex items-end gap-2 mb-2">
                         <span className="text-4xl font-bold font-heading text-primary">{profile?.free_downloads_remaining ?? 0}/4</span>
@@ -381,14 +381,14 @@ export default function ProfilePage() {
                     <div className="bg-muted/50 border border-border rounded-2xl p-6">
                       <div className="flex items-center gap-3 mb-4">
                         <PackageOpen className="w-5 h-5 text-primary" />
-                        <h3 className="font-bold">Quản lý Gói đăng ký</h3>
+                        <h3 className="font-bold">Quản lý Gói lượt tải xuống</h3>
                       </div>
 
                       {myPackages.length === 0 ? (
                         <>
-                          <p className="text-sm text-muted-foreground mb-4">Bạn chưa đăng ký gói lượt tải nào.</p>
+                          <p className="text-sm text-muted-foreground mb-4">Bạn chưa đăng ký gói lượt tải xuống nào.</p>
                           <Link to="/packages">
-                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Xem tất cả gói tải</button>
+                            <button className="btn w-full border border-border bg-background hover:bg-muted text-sm py-2 rounded-xl text-foreground font-semibold">Xem tất cả gói tải xuống</button>
                           </Link>
                         </>
                       ) : (
@@ -404,8 +404,8 @@ export default function ProfilePage() {
                               <div
                                 key={up.userPackageId}
                                 className={`rounded-xl p-4 border ${isActive
-                                    ? 'bg-background border-primary/30 shadow-sm'
-                                    : 'bg-muted/40 border-border'
+                                  ? 'bg-background border-primary/30 shadow-sm'
+                                  : 'bg-muted/40 border-border'
                                   }`}
                               >
                                 <div className="flex justify-between items-start mb-2">

@@ -104,7 +104,7 @@ export default function MainLayout({ children }: Props) {
               <nav className="hidden md:flex items-center gap-6">
                 <Link to="/documents" className="text-foreground hover:text-primary font-medium transition-colors">Danh mục</Link>
                 <Link to="/packages" className="text-foreground hover:text-primary font-medium transition-colors flex items-center gap-1">
-                  Gói tải <span className="bg-warning text-white text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">Hot</span>
+                  Gói tải xuống <span className="bg-warning text-white text-[10px] px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold">Hot</span>
                 </Link>
               </nav>
             </div>
@@ -130,7 +130,7 @@ export default function MainLayout({ children }: Props) {
 
                       <Link to="/seller/documents/new" className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
                         <Upload className="w-4 h-4" />
-                        <span>Tải tài liệu</span>
+                        <span>Tải lên tài liệu</span>
                       </Link>
                       <button onClick={() => setShowTopupModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
                         <Wallet className="w-4 h-4" />
@@ -256,7 +256,7 @@ export default function MainLayout({ children }: Props) {
                 <Link to="/" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Trang chủ</Link>
                 <Link to="/documents" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors">Danh mục</Link>
                 <Link to="/packages" onClick={() => setIsMenuOpen(false)} className="px-4 py-2 text-foreground font-medium hover:bg-accent rounded-lg transition-colors flex justify-between items-center">
-                  Gói lượt tải <span className="bg-warning text-white text-xs px-2 py-0.5 rounded-full font-bold">Hot</span>
+                  Gói lượt tải xuống<span className="bg-warning text-white text-xs px-2 py-0.5 rounded-full font-bold">Hot</span>
                 </Link>
 
                 <div className="border-t border-border my-2"></div>

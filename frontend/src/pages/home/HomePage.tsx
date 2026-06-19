@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import DocumentCard from '@/components/common/DocumentCard'
-import { ArrowRight, BookOpen, GraduationCap, Calculator, Globe, Microscope, Palette, Code, Languages, Search, Shield, Truck, Headphones, Award, TrendingUp, Scale, HeartPulse } from 'lucide-react'
+import { ArrowRight, BookOpen, GraduationCap, Calculator, Globe, Microscope, Palette, Code, Languages, Search, Shield, Truck, Headphones, Award, TrendingUp, Scale, HeartPulse, FileText, BarChart3, PenLine } from 'lucide-react'
 
 const getCategoryIconAndColor = (name: string) => {
   const n = name.toLowerCase()
@@ -64,24 +64,98 @@ export default function HomePage() {
   return (
     <>
       {/* ── Hero Section ── */}
-      <section className="bg-linear-to-r from-primary to-primary-light text-white rounded-2xl mb-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-          <div className="max-w-3xl">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl mb-6 text-white leading-tight font-bold">
-              Nền Tảng Tài Liệu Học Tập Hàng Đầu
-            </h1>
-            <p className="text-xl md:text-2xl mb-8 text-white/90">
-              Khám phá hàng ngàn đề thi, giáo trình và tài liệu chất lượng cao. Học tập hiệu quả hơn với StudyDocs.
-            </p>
+      <section className="hero-section text-white rounded-2xl mb-12">
+        {/* ── Decorative floating spheres ── */}
+        <div className="hero-sphere absolute w-24 h-24 top-8 right-[28%] opacity-60"
+             style={{ animation: 'hero-float 7s ease-in-out infinite' }} />
+        <div className="hero-sphere-solid absolute w-14 h-14 bottom-16 right-[35%] opacity-70"
+             style={{ animation: 'hero-float-reverse 5s ease-in-out infinite' }} />
+        <div className="hero-sphere absolute w-10 h-10 top-[40%] right-[12%] opacity-50"
+             style={{ animation: 'hero-float-slow 8s ease-in-out infinite' }} />
+        <div className="hero-sphere-solid absolute w-8 h-8 bottom-24 left-[15%] opacity-40"
+             style={{ animation: 'hero-float 6s ease-in-out infinite 1s' }} />
+        <div className="hero-sphere absolute w-20 h-20 top-12 left-[40%] opacity-30"
+             style={{ animation: 'hero-float-slow 9s ease-in-out infinite 0.5s' }} />
+        <div className="hero-sphere-solid absolute w-36 h-36 -bottom-10 -right-6 opacity-25"
+             style={{ animation: 'hero-float-reverse 10s ease-in-out infinite' }} />
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/documents" className="bg-white font-bold text-primary px-8 py-3 rounded-lg hover:bg-gray-100 hover:shadow-md transition-all flex items-center justify-center gap-2 shadow-sm">
-                Khám phá ngay <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link to="/packages" className="border-2 border-white font-bold text-white px-8 py-3 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center text-center">
-                Xem Gói VIP
-              </Link>
+        {/* ── Content ── */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+
+            {/* Left — Text */}
+            <div>
+              <h1 className="text-4xl md:text-5xl xl:text-6xl mb-6 text-white leading-[1.1] font-bold italic">
+                Nền Tảng Tài Liệu<br className="hidden sm:block" /> Học Tập Hàng Đầu
+              </h1>
+              <p className="text-lg md:text-xl mb-8 text-white/80 max-w-lg leading-relaxed">
+                Khám phá kho tàng tài liệu, bài giảng và đề thi phong phú giúp bạn học tập thông minh hơn cùng StudyDocs.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link to="/documents" className="bg-white font-bold text-primary px-8 py-3.5 rounded-lg hover:bg-gray-100 hover:shadow-lg transition-all flex items-center justify-center gap-2 shadow-md text-base uppercase tracking-wide">
+                  Khám phá ngay <ArrowRight className="w-5 h-5" />
+                </Link>
+                <Link to="/packages" className="border-2 border-white/70 font-bold text-white px-8 py-3.5 rounded-lg hover:bg-white/15 hover:border-white transition-all flex items-center justify-center text-center text-base">
+                  Xem Gói VIP
+                </Link>
+              </div>
             </div>
+
+            {/* Right — Glassmorphism card composition */}
+            <div className="hidden lg:flex items-center justify-center relative"
+                 style={{ animation: 'hero-cards-entrance 0.8s ease-out both', perspective: '800px' }}>
+
+              {/* Main tilted glass panel */}
+              <div className="hero-glass-card p-6 w-[340px]"
+                   style={{ transform: 'rotateY(-5deg) rotateX(3deg)' }}>
+
+                {/* Top row — small icon squares */}
+                <div className="flex gap-3 mb-5">
+                  <div className="hero-glass-icon w-11 h-11 flex items-center justify-center">
+                    <PenLine className="w-5 h-5 text-white/90" />
+                  </div>
+                  <div className="hero-glass-icon w-11 h-11 flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-white/90" />
+                  </div>
+                  <div className="hero-glass-icon w-11 h-11 flex items-center justify-center">
+                    <GraduationCap className="w-5 h-5 text-white/90" />
+                  </div>
+                </div>
+
+                {/* Document preview card */}
+                <div className="hero-glass-card p-4 mb-4 flex items-start gap-3">
+                  <div className="hero-glass-icon w-10 h-10 flex-shrink-0 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-white/90" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">Tài Liệu: Đại Số</p>
+                    <p className="text-white/50 text-xs mt-0.5">Toán cao cấp — 48 trang</p>
+                  </div>
+                </div>
+
+                {/* Exam preview card */}
+                <div className="hero-glass-card p-4 flex items-start gap-3">
+                  <div className="hero-glass-icon w-10 h-10 flex-shrink-0 flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-white/90" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">Đề Thi & Bài Tập</p>
+                    <p className="text-white/50 text-xs mt-0.5">12 đề thi thử — Có đáp án</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating accent card — offset */}
+              <div className="hero-glass-card absolute -bottom-4 -left-6 p-3 flex items-center gap-2"
+                   style={{ animation: 'hero-float 6s ease-in-out infinite 0.3s' }}>
+                <div className="hero-glass-icon w-9 h-9 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-white/90" />
+                </div>
+                <span className="text-white/90 text-xs font-medium">1,200+ Tài liệu</span>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

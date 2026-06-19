@@ -95,9 +95,9 @@ export default function PackagesPage() {
         <div className="inline-flex items-center justify-center p-3 bg-primary/10 rounded-2xl mb-4">
           <PackageOpen className="w-8 h-8 text-primary" />
         </div>
-        <h1 className="text-4xl font-bold font-heading text-foreground mb-4">Các gói tải tài liệu</h1>
+        <h1 className="text-4xl font-bold font-heading text-foreground mb-4">Các gói tải xuống tài liệu</h1>
         <p className="text-lg text-muted-foreground">
-          Nâng cấp trải nghiệm học tập của bạn với các gói lượt tải tiết kiệm. Mua 1 lần, tải bất kỳ tài liệu nào trên hệ thống.
+          Nâng cấp trải nghiệm học tập của bạn với các gói lượt tải xuống tiết kiệm. Mua 1 lần, tải bất kỳ tài liệu nào trên hệ thống.
         </p>
       </div>
 
@@ -119,8 +119,8 @@ export default function PackagesPage() {
                 <div className="flex items-start gap-4">
                   {/* Queue badge */}
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${up.status === 'ACTIVE'
-                      ? 'bg-success/15 text-success'
-                      : 'bg-muted text-muted-foreground'
+                    ? 'bg-success/15 text-success'
+                    : 'bg-muted text-muted-foreground'
                     }`}>
                     {up.status === 'ACTIVE' ? <Zap className="w-5 h-5" /> : `#${idx + 1}`}
                   </div>
@@ -192,7 +192,7 @@ export default function PackagesPage() {
       {/* ── Package List ── */}
       {packages.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border border-dashed border-border rounded-2xl">
-          Hiện tại chưa có gói lượt tải nào khả dụng.
+          Hiện tại chưa có gói lượt tải xuống nào khả dụng.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">

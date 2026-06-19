@@ -102,4 +102,92 @@
   .form-group input:focus {
     @apply outline-none border-primary bg-background ring-3 ring-primary/10;
   }
+
+  /* ── Hero Section ── */
+  .hero-section {
+    position: relative;
+    overflow: hidden;
+    background-image: url('../assets/hero-bg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  /* Subtle dark overlay for text readability */
+  .hero-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to right,
+      rgba(91, 76, 196, 0.35) 0%,
+      rgba(91, 76, 196, 0.1) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  .hero-glass-card {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(91, 76, 196, 0.15);
+  }
+
+  .hero-glass-icon {
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(91, 76, 196, 0.1);
+  }
+
+  .hero-sphere {
+    border-radius: 50%;
+    filter: blur(1px);
+    background: radial-gradient(circle at 35% 35%,
+      rgba(255, 255, 255, 0.35) 0%,
+      rgba(167, 139, 250, 0.25) 40%,
+      rgba(108, 92, 231, 0.2) 100%);
+    box-shadow:
+      inset -4px -4px 12px rgba(91, 76, 196, 0.15),
+      inset 2px 2px 8px rgba(255, 255, 255, 0.2);
+  }
+
+  .hero-sphere-solid {
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%,
+      #b8adff 0%,
+      #8577e0 50%,
+      #6C5CE7 100%);
+    box-shadow:
+      inset -3px -3px 10px rgba(50, 40, 130, 0.3),
+      inset 2px 2px 6px rgba(255, 255, 255, 0.15),
+      0 6px 20px rgba(108, 92, 231, 0.25);
+  }
+}
+
+/* Hero Animations — outside @layer for global scope */
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  33% { transform: translateY(-12px) translateX(4px); }
+  66% { transform: translateY(-6px) translateX(-4px); }
+}
+
+@keyframes hero-float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(3deg); }
+}
+
+@keyframes hero-float-reverse {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(14px) translateX(-6px); }
+}
+
+@keyframes hero-cards-entrance {
+  0% { opacity: 0; transform: perspective(800px) rotateY(-8deg) rotateX(4deg) translateX(30px); }
+  100% { opacity: 1; transform: perspective(800px) rotateY(-5deg) rotateX(3deg) translateX(0); }
 }

@@ -26,7 +26,7 @@ export default function DocumentCard({ document }: Props) {
   const handleDownloadFree = async (e: React.MouseEvent) => {
     e.preventDefault() // prevent Link navigation
     if (!user) return toast.error('Vui lòng đăng nhập để mua')
-    if (isStaff) return toast.error('Quản trị viên không thực hiện tải tài liệu')
+    if (isStaff) return toast.error('Quản trị viên không thực hiện tải xuống tài liệu')
     if (user.customerId && document.seller_id === user.customerId) {
       return toast.error('Không thể mua tài liệu của chính mình')
     }
@@ -36,12 +36,12 @@ export default function DocumentCard({ document }: Props) {
 
       if (res.downloadUrl) {
         window.open(res.downloadUrl, '_blank')
-        toast.success(res.message || 'Bắt đầu tải tài liệu')
+        toast.success(res.message || 'Bắt đầu tải xuống tài liệu')
       } else {
         toast.error('Đã xảy ra lỗi, không sinh được link.')
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Không thể tải tài liệu này')
+      toast.error(err?.response?.data?.message || 'Không thể tải xuống tài liệu này')
     }
   }
 
