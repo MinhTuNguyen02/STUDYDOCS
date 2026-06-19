@@ -61,6 +61,8 @@ flowchart LR
     API --> VNPay["VNPay\nPayment Gateway"]
     API --> Mail["Gmail SMTP\nEmail Service"]
 ```
+
+```
 STUDYDOCS/
 ├── docs/
 │   ├── screenshots/                # README screenshots
@@ -443,14 +445,6 @@ docker compose logs -f    # Stream logs
    Then update the IPN URL in your VNPay Sandbox merchant dashboard.
 6. **Never commit `.env` files** — they contain secret keys. Only `.env.example` should be in version control.
 7. **Supabase setup** — this project requires a configured Supabase project. See `backend/prisma/schema.prisma` for the database schema and `backend/prisma/seed.ts` for initial data.
-
----
-
-## 👥 Contributors
-
-| Name | Student ID | Role |
-|------|-----------|------|
-| *(Fill in)* | *(ID)* | *(Role)* |
 
 ---
 
