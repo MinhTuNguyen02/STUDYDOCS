@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect, useState, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -23,6 +23,9 @@ export default function MainLayout({ children }: Props) {
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const isSearchHovered = useRef(false)
   const [showTopupModal, setShowTopupModal] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [footerCategories, setFooterCategories] = useState<any[]>([])
@@ -86,8 +89,39 @@ export default function MainLayout({ children }: Props) {
     if (searchQuery.trim()) {
       navigate(`/documents?keyword=${encodeURIComponent(searchQuery.trim())}`)
       setIsMenuOpen(false)
+      setIsSearchExpanded(false)
+      searchInputRef.current?.blur()
     }
   }
+
+  const handleSearchMouseEnter = useCallback(() => {
+    isSearchHovered.current = true
+    setIsSearchExpanded(true)
+  }, [])
+
+  const handleSearchMouseLeave = useCallback(() => {
+    isSearchHovered.current = false
+    if (document.activeElement !== searchInputRef.current) {
+      setIsSearchExpanded(false)
+    }
+  }, [])
+
+  const handleSearchInputFocus = useCallback(() => {
+    setIsSearchExpanded(true)
+  }, [])
+
+  const handleSearchInputBlur = useCallback(() => {
+    if (!isSearchHovered.current) {
+      setIsSearchExpanded(false)
+    }
+  }, [])
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsSearchExpanded(false)
+      searchInputRef.current?.blur()
+    }
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -109,32 +143,52 @@ export default function MainLayout({ children }: Props) {
               </nav>
             </div>
 
-            <div className="hidden md:flex items-center gap-4 flex-1 max-w-xl mx-8">
-              <form onSubmit={handleSearch} className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Tìm kiếm tài liệu..."
-                  className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-sm transition-shadow"
-                />
-              </form>
+            <div className="hidden md:flex flex-1 items-center px-8">
+              {/* Expandable Search */}
+              <div
+                onMouseEnter={handleSearchMouseEnter}
+                onMouseLeave={handleSearchMouseLeave}
+                className="relative shrink-0"
+              >
+                <form onSubmit={handleSearch}>
+                  <div
+                    className={`flex items-center h-10 border bg-background overflow-hidden transition-all duration-300 ease-in-out ${isSearchExpanded ? 'w-64 border-primary/50 rounded-lg shadow-md ring-2 ring-primary/20' : 'w-10 border-border rounded-full hover:bg-accent cursor-pointer'}`}
+                    onClick={() => { if (!isSearchExpanded) { setIsSearchExpanded(true); setTimeout(() => searchInputRef.current?.focus(), 100) } }}
+                  >
+                    <Search className="w-5 h-5 text-muted-foreground shrink-0 ml-[10px]" />
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      onFocus={handleSearchInputFocus}
+                      onBlur={handleSearchInputBlur}
+                      onKeyDown={handleSearchKeyDown}
+                      placeholder="Tìm kiếm tài liệu..."
+                      className={`bg-transparent focus:outline-none text-sm py-2 pr-3 pl-2 transition-all duration-300 ${isSearchExpanded ? 'w-full opacity-100' : 'w-0 opacity-0 pointer-events-none'}`}
+                    />
+                  </div>
+                </form>
+              </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-3">
               {user ? (
                 <>
                   {!isStaff && (
                     <>
 
-                      <Link to="/seller/documents/new" className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
-                        <Upload className="w-4 h-4" />
-                        <span>Tải lên tài liệu</span>
+                      <Link to="/seller/documents/new" title="Tải lên tài liệu" className={`flex items-center justify-center bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-lg transition-all duration-300 ease-in-out text-sm font-bold ml-2 cursor-pointer ${isSearchExpanded ? 'w-10 h-10 p-0 gap-0' : 'px-4 h-10 gap-2'}`}>
+                        <Upload className="w-4 h-4 shrink-0" />
+                        <div className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${isSearchExpanded ? 'max-w-0 opacity-0' : 'max-w-[150px] opacity-100'}`}>
+                          Tải lên tài liệu
+                        </div>
                       </Link>
-                      <button onClick={() => setShowTopupModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors text-sm font-bold ml-2 cursor-pointer">
-                        <Wallet className="w-4 h-4" />
-                        <span>Nạp tiền</span>
+                      <button onClick={() => setShowTopupModal(true)} title="Nạp tiền" className={`flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all duration-300 ease-in-out text-sm font-bold ml-2 cursor-pointer ${isSearchExpanded ? 'w-10 h-10 p-0 gap-0' : 'px-4 h-10 gap-2'}`}>
+                        <Wallet className="w-4 h-4 shrink-0" />
+                        <div className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out ${isSearchExpanded ? 'max-w-0 opacity-0' : 'max-w-[100px] opacity-100'}`}>
+                          Nạp tiền
+                        </div>
                       </button>
                       <Link to="/cart" className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors relative">
                         <ShoppingCart className="w-6 h-6" />
