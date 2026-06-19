@@ -401,11 +401,12 @@ export default function SellerUploadPage() {
       items.map(item => sellerApi.uploadDocument(buildFormData(item)))
     )
 
-    let successCount = 0
+    // Count successes synchronously BEFORE setItems (which is async)
+    const successCount = results.filter(r => r.status === 'fulfilled').length
+
     setItems(prev => prev.map((item, i) => {
       const result = results[i]
       if (result.status === 'fulfilled') {
-        successCount++
         return { ...item, status: 'success' as const }
       } else {
         const msg = (result.reason as any)?.response?.data?.message || 'Tải lên thất bại'
