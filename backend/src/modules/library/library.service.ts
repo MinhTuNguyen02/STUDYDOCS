@@ -82,7 +82,7 @@ export class LibraryService {
   }
 
   async createDownloadLink(user: AuthUser, documentId: string, ipAddress?: string) {
-    if (!user.customerId) throw new ForbiddenException('Tài khoản này không có quyền tải tài liệu.');
+    if (!user.customerId) throw new ForbiddenException('Tài khoản này không có quyền tải xuống tài liệu.');
 
     const docId = Number(documentId);
 
@@ -102,7 +102,7 @@ export class LibraryService {
     const documentToDownload = paidItem?.documents || dlHistory?.documents;
 
     if (!documentToDownload) {
-      throw new ForbiddenException('Bạn không có quyền tải tài liệu này.');
+      throw new ForbiddenException('Bạn không có quyền tải xuống tài liệu này.');
     }
 
     if (documentToDownload.delete_at) {

@@ -12,10 +12,10 @@ export class DownloadsService {
     private readonly storageService: StorageService,
     @Inject(forwardRef(() => PackagesService))
     private readonly packagesService: PackagesService
-  ) {}
+  ) { }
 
   async requestDownload(user: AuthUser, documentId: string, ipAddress: string) {
-    if (!user.customerId) throw new ForbiddenException('Chỉ khách hàng mới có quyền tải tài liệu.');
+    if (!user.customerId) throw new ForbiddenException('Chỉ khách hàng mới có quyền tải xuống tài liệu.');
     const docId = Number(documentId);
 
     const doc = await this.prisma.documents.findUnique({
@@ -45,7 +45,7 @@ export class DownloadsService {
           // Fallback to active packages if out of free runs
           const activePkg = await this.useActivePackage(user.customerId);
           if (!activePkg) {
-            throw new BadRequestException('Đã hết lượt tải miễn phí. Vui lòng mua gói dịch vụ.');
+            throw new BadRequestException('Đã hết lượt tải xuống miễn phí. Vui lòng mua gói dịch vụ.');
           }
           downloadType = 'PACKAGE';
         } else {
@@ -70,7 +70,7 @@ export class DownloadsService {
           // Rule 3: Do we have an active package?
           const activePkg = await this.useActivePackage(user.customerId);
           if (!activePkg) {
-             throw new ForbiddenException('Tài liệu có phí. Vui lòng thanh toán hoặc mua gói dịch vụ.');
+            throw new ForbiddenException('Tài liệu có phí. Vui lòng thanh toán hoặc mua gói dịch vụ.');
           }
           downloadType = 'PACKAGE';
         }
@@ -98,8 +98,8 @@ export class DownloadsService {
       });
     }
 
-    return { 
-      message: 'Lấy link tải file thành công.', 
+    return {
+      message: 'Lấy link tải file thành công.',
       downloadUrl: signedUrl,
       download_type: downloadType
     };
@@ -116,7 +116,7 @@ export class DownloadsService {
     const remaining = pkg.turns_remaining - 1;
     await this.prisma.user_packages.update({
       where: { user_package_id: pkg.user_package_id },
-      data: { 
+      data: {
         turns_remaining: remaining,
         status: remaining === 0 ? 'EXHAUSTED' : 'ACTIVE'
       }

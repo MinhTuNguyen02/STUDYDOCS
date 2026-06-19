@@ -86,7 +86,7 @@ export class PackagesService {
       }
     });
 
-    return { message: 'Tạo gói tải thành công.', data: pkg };
+    return { message: 'Tạo gói tải xuống thành công.', data: pkg };
   }
 
   async updatePackage(id: number, dto: any, actor: AuthUser) {
@@ -111,17 +111,17 @@ export class PackagesService {
         action: 'ADMIN_UPDATE_PACKAGE',
         target_table: 'packages',
         target_id: id,
-        old_value: { 
-          name: existing.name, 
-          price: existing.price, 
+        old_value: {
+          name: existing.name,
+          price: existing.price,
           status: existing.status,
           description: existing.description,
           download_turns: existing.download_turns,
           duration_days: existing.duration_days
         },
-        new_value: { 
-          name: pkg.name, 
-          price: pkg.price, 
+        new_value: {
+          name: pkg.name,
+          price: pkg.price,
           status: pkg.status,
           description: pkg.description,
           download_turns: pkg.download_turns,
@@ -140,7 +140,7 @@ export class PackagesService {
       where: { package_id: packageId, status: 'ACTIVE', delete_at: null }
     });
 
-    if (!pkg) throw new NotFoundException('Gói tải không khả dụng.');
+    if (!pkg) throw new NotFoundException('Gói tải xuống không khả dụng.');
 
     const paymentWallet = await this.prisma.wallets.findUnique({
       where: {
@@ -163,10 +163,10 @@ export class PackagesService {
     const expiresAt = hasActivePackage
       ? null
       : (() => {
-          const d = new Date();
-          d.setDate(d.getDate() + pkg.duration_days);
-          return d;
-        })();
+        const d = new Date();
+        d.setDate(d.getDate() + pkg.duration_days);
+        return d;
+      })();
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Deduct balance
@@ -211,7 +211,7 @@ export class PackagesService {
     });
 
     const statusMessage = newStatus === 'PENDING'
-      ? `Gói "${pkg.name}" đã được thêm vào hàng chờ. Sẽ tự động kích hoạt khi gói hiện tại hết hạn hoặc hết lượt tải.`
+      ? `Gói "${pkg.name}" đã được thêm vào hàng chờ. Sẽ tự động kích hoạt khi gói hiện tại hết hạn hoặc hết lượt tải xuống.`
       : `Mua thành công gói ${pkg.name}.`;
 
     // Notify buyer wallet update
