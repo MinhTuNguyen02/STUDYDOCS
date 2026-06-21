@@ -2,13 +2,14 @@ import { ApiTags } from '@nestjs/swagger';
 import { Controller, Get, Param, UseGuards, Req } from '@nestjs/common';
 import { DownloadsService } from './downloads.service';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
+import { PhoneVerifiedGuard } from '../../common/security/phone-verified.guard';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { Request } from 'express';
 
 @ApiTags('Documents / Downloads')
 @Controller('downloads')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
 export class DownloadsController {
   constructor(private readonly downloadsService: DownloadsService) {}
 

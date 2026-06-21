@@ -16,7 +16,7 @@ export class CheckoutController {
   constructor(private readonly checkoutService: CheckoutService) {}
 
   @Post('orders')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
   createOrder(@CurrentUser() user: AuthUser, @Body() dto: CreateCheckoutDto) {
     return this.checkoutService.createOrder(user, dto);
   }

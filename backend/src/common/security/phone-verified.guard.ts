@@ -4,7 +4,7 @@ import { AuthUser } from './auth-user.interface';
 
 @Injectable()
 export class PhoneVerifiedGuard implements CanActivate {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -16,7 +16,7 @@ export class PhoneVerifiedGuard implements CanActivate {
 
     if (!user.customerId) {
       // If staff, we might want to check staff_profiles, but usually this guard is for customers
-      return true; 
+      return true;
     }
 
     const profile = await this.prisma.customer_profiles.findUnique({
@@ -24,7 +24,7 @@ export class PhoneVerifiedGuard implements CanActivate {
     });
 
     if (!profile || !profile.is_phone_verified) {
-      throw new ForbiddenException('Vui long xac minh so dien thoai de thuc hien chuc nang nay.');
+      throw new ForbiddenException('Vui lòng xác minh số điện thoại để thực hiện chức năng này.');
     }
 
     return true;

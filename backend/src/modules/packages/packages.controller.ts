@@ -6,6 +6,7 @@ import { RolesGuard } from '../../common/security/roles.guard';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { Roles } from '../../common/security/roles.decorator';
+import { PhoneVerifiedGuard } from '../../common/security/phone-verified.guard';
 
 @ApiTags('Financial & Packages')
 @Controller('packages')
@@ -45,7 +46,7 @@ export class PackagesController {
   }
 
   @Post(':id/buy')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
   buyPackage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
     return this.packagesService.buyPackage(user, id);
   }
