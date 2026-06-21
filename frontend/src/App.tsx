@@ -196,7 +196,7 @@ function App() {
 
                 {/* Admin + Accountant (financial oversight) */}
                 <Route path="/users" element={
-                  <RequireRole allowedRoles={['admin', 'accountant']} redirectTo="/admin/profile">
+                  <RequireRole allowedRoles={['admin', 'mod']} redirectTo="/admin/profile">
                     <AdminUsersPage />
                   </RequireRole>
                 } />

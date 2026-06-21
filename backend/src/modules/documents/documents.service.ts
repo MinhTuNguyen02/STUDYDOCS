@@ -28,7 +28,8 @@ export class DocumentsService {
     }
     
     if (query.categoryId) {
-      where.category_id = query.categoryId;
+      const categoryIds = await this.getCategoryIdsRecursively(query.categoryId);
+      where.category_id = { in: categoryIds };
     }
 
     if (query.tagId) {
@@ -165,5 +166,21 @@ export class DocumentsService {
       data: { view_count: { increment: 1 } }
     });
     return { success: true };
+  }
+
+  private async getCategoryIdsRecursively(categoryId: number): Promise<number[]> {
+    const ids: number[] = [categoryId];
+
+    const children = await this.prisma.categories.findMany({
+      where: { parent_id: categoryId, delete_at: null },
+      select: { category_id: true }
+    });
+
+    for (const child of children) {
+      const childIds = await this.getCategoryIdsRecursively(child.category_id);
+      ids.push(...childIds);
+    }
+
+    return ids;
   }
 }

@@ -55,6 +55,7 @@ export default function AdminUsersPage() {
   const [sortBy, setSortBy] = useState('NEWEST');
   const [activeTab, setActiveTab] = useState<TabType>('customers');
   const currentUser = useAuthStore(state => state.user);
+  const isAdmin = (currentUser as any)?.roleNames?.some((r: string) => r.toLowerCase() === 'admin');
   const [banModalUser, setBanModalUser] = useState<any | null>(null);
 
   // ── Create staff modal ──
@@ -124,7 +125,7 @@ export default function AdminUsersPage() {
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
     let result = allUsers.filter(u => {
-      const matchesTab = activeTab === 'staff' ? isStaff(u) : !isStaff(u);
+      const matchesTab = (activeTab === 'staff' && isAdmin) ? isStaff(u) : !isStaff(u);
       if (!matchesTab) return false;
 
       const statusMathes = statusFilter === 'ALL' ||
@@ -148,13 +149,12 @@ export default function AdminUsersPage() {
     }
 
     return result;
-  }, [allUsers, searchTerm, activeTab, statusFilter, sortBy]);
+  }, [allUsers, searchTerm, activeTab, statusFilter, sortBy, isAdmin]);
 
   const customerCount = useMemo(() => allUsers.filter(u => !isStaff(u)).length, [allUsers]);
   const staffCount = useMemo(() => allUsers.filter(u => isStaff(u)).length, [allUsers]);
 
   const isCurrentUser = (u: any) => currentUser?.accountId === u.id;
-  const isAdmin = (currentUser as any)?.roleNames?.some((r: string) => r.toLowerCase() === 'admin');
 
   const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filtered, 15);
 
@@ -194,19 +194,21 @@ export default function AdminUsersPage() {
               {customerCount}
             </span>
           </button>
-          <button
-            onClick={() => setActiveTab('staff')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'staff'
-              ? 'bg-card shadow-sm text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-              }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            Nhân viên
-            <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
-              {staffCount}
-            </span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('staff')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'staff'
+                ? 'bg-card shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Nhân viên
+              <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-bold">
+                {staffCount}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* ── Filter ── */}

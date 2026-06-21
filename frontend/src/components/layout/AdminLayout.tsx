@@ -30,7 +30,7 @@ export default function AdminLayout({ children }: Props) {
     {
       label: 'Tổng Quan',
       items: [
-        { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin', 'mod', 'accountant'] },
+        { name: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin'] },
       ]
     },
     {
