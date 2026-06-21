@@ -76,7 +76,7 @@ export default function AdminReconciliationPage() {
             {report.isDoubleEntryMatched ? 'Khớp sổ tuyệt đối' : 'Báo động: Lệch sổ tài chính'}
           </h2>
           <p className="text-foreground/80 mt-1.5 leading-relaxed">
-            Hệ thống ngân hàng của nền tảng đang <strong>{report.isSystemSolvent ? 'có khả năng thanh khoản 100%' : 'MẤT KHẢ NĂNG THANH KHOẢN'}</strong>.
+            Hệ thống ngân hàng của nền tảng đang <strong>{report.isDoubleEntryMatched ? 'có khả năng thanh khoản 100%' : 'MẤT KHẢ NĂNG THANH KHOẢN'}</strong>.
             {/* Phương trình kế toán: <code className="bg-background px-2 py-0.5 rounded border border-border text-sm font-bold text-primary mx-1">{report.accountingEquation}</code> */}
           </p>
 

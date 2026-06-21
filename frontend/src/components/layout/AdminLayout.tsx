@@ -165,7 +165,7 @@ export default function AdminLayout({ children }: Props) {
             >
               <Menu className="w-6 h-6" />
             </button>
-            <span className="font-heading font-bold text-lg hidden lg:block">Quản trị viên</span>
+            <span className="font-heading font-bold text-lg hidden lg:block">{user?.fullName}</span>
             <span className="font-heading font-bold text-lg lg:hidden">Admin Panel</span>
           </div>
           <div className="flex items-center gap-4">

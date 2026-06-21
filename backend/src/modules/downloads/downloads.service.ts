@@ -24,6 +24,11 @@ export class DownloadsService {
 
     if (!doc) throw new NotFoundException('Tài liệu không tồn tại hoặc chưa được duyệt.');
 
+    // Chặn chủ tài liệu tải xuống tài liệu của chính mình
+    if (doc.seller_id === user.customerId) {
+      throw new BadRequestException('Không thể tải xuống tài liệu của chính mình.');
+    }
+
     const hasDownloadedBefore = await this.prisma.download_history.findFirst({
       where: {
         customer_id: user.customerId,

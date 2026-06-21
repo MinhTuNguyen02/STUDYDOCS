@@ -71,6 +71,7 @@ export class DocumentsService {
           slug: doc.slug,
           status: doc.status,
           price: doc.price,
+          seller_id: doc.customer_profiles.customer_id,
           sellerName: doc.customer_profiles.full_name,
           categoryName: doc.categories?.name,
           rating: doc.average_rating,
