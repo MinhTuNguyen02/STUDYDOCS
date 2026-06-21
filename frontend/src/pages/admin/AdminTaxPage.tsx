@@ -24,7 +24,7 @@ interface LedgerEntry {
 
 interface TaxReport {
   wallet: { wallet_id: number; balance: string } | null
-  summary: { totalCollected: number; totalPaid: number; totalRefunded: number; netFlow: number; entryCount: number } | null
+  summary: { totalCollected: number; totalPaid: number; totalRefunded: number; netFlow: number; entryCount: number; availableTaxToPay: number } | null
   entries: LedgerEntry[]
 }
 
@@ -63,7 +63,7 @@ export default function AdminTaxPage() {
   const handlePayTax = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!payAmount || Number(payAmount) <= 0) return toast.error('Vui lòng nhập số tiền hợp lệ')
-    if (Number(payAmount) > Number(data?.wallet?.balance ?? 0)) return toast.error('Số tiền vượt quá số dư Thuế Thu Hộ')
+    if (Number(payAmount) > Number(data?.summary?.availableTaxToPay ?? 0)) return toast.error('Số tiền vượt quá số dư thuế khả dụng (từ các yêu cầu đã duyệt)')
 
     setIsSubmitting(true)
     try {
@@ -117,7 +117,7 @@ export default function AdminTaxPage() {
         <div className="flex gap-2">
           <button
             onClick={() => {
-              setPayAmount(data?.wallet?.balance ?? '')
+              setPayAmount(String(data?.summary?.availableTaxToPay ?? ''))
               setPayNote('')
               setIsPayModalOpen(true)
             }}
@@ -179,8 +179,8 @@ export default function AdminTaxPage() {
               <HandCoins className="w-6 h-6" /> Nộp Tiền Ngân Sách
             </h3>
 
-            <div className="mb-4 bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl text-sm leading-relaxed text-foreground">
-              Thao tác này dùng để <strong>ghi nhận hệ thống</strong> sau khi kế toán đã chuyển khoản đóng thuế thành công cho Nhà Nước. Nó sẽ trừ tiền từ ví TAX_PAYABLE và trừ tiền quỹ GATEWAY_POOL.
+             <div className="mb-4 bg-purple-500/10 border border-purple-500/20 p-3 rounded-xl text-sm leading-relaxed text-foreground">
+              Thao tác này dùng để <strong>ghi nhận hệ thống</strong> sau khi kế toán đã chuyển khoản đóng thuế thành công cho Nhà Nước. Nó sẽ trừ tiền từ ví TAX_PAYABLE và trừ tiền quỹ GATEWAY_POOL. Số thuế khả dụng tối đa được nộp (từ các yêu cầu đã duyệt) là <strong>{formatBalance(Number(data?.summary?.availableTaxToPay ?? 0))}</strong>.
             </div>
 
             <div className="space-y-4 mb-6">
@@ -188,7 +188,7 @@ export default function AdminTaxPage() {
                 <label className="block text-sm font-medium mb-1.5">Số tiền đã nộp (VNĐ)</label>
                 <input
                   type="number"
-                  required min="1" max={Number(data?.wallet?.balance ?? 0)}
+                  required min="1" max={Number(data?.summary?.availableTaxToPay ?? 0)}
                   value={payAmount} onChange={e => setPayAmount(e.target.value)}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg outline-none focus:border-purple-500"
                   placeholder="VD: 15000"
@@ -234,8 +234,9 @@ export default function AdminTaxPage() {
               <div className="relative z-10">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Dư nợ Thuế Phải Nộp</p>
                 <p className="text-2xl font-black text-purple-600">{formatBalance(Number(data.wallet?.balance ?? 0))}</p>
-                <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                  Đây là khoản nợ chưa nộp
+                <p className="text-[10px] text-muted-foreground mt-1 flex flex-col gap-0.5">
+                  <span>Khoản nợ theo sổ sách</span>
+                  <span className="text-purple-600 font-bold">Khả dụng nộp: {formatBalance(data.summary?.availableTaxToPay ?? 0)}</span>
                 </p>
               </div>
             </div>

@@ -994,12 +994,37 @@ export class AdminService {
       .filter((e) => e.ledger_transactions.type === 'REFUND')
       .reduce((sum, e) => sum + Number(e.debit_amount), 0);
 
+    // Tính tổng tiền thuế từ các giao dịch rút tiền đã thành công (PAID) từ trước tới nay
+    const paidTaxAggregate = await this.prisma.withdrawal_requests.aggregate({
+      where: { status: 'PAID' },
+      _sum: { tax_amount: true }
+    });
+    const totalTaxFromPaid = Number(paidTaxAggregate._sum.tax_amount || 0);
+
+    // Tính tổng tiền thuế đã thực tế nộp cho Nhà nước (TAX_PAYMENT) từ trước tới nay
+    const paidEntries = await this.prisma.ledger_entries.findMany({
+      where: {
+        wallet_id: taxWallet.wallet_id,
+        ledger_transactions: { reference_type: 'TAX_PAYMENT' }
+      }
+    });
+    const totalTaxAlreadyPaid = paidEntries.reduce((sum, e) => sum + Number(e.debit_amount), 0);
+
+    const availableTaxToPay = Math.max(0, totalTaxFromPaid - totalTaxAlreadyPaid);
+
     return toJsonSafe({
       wallet: {
         wallet_id: taxWallet.wallet_id,
         balance: taxWallet.balance
       },
-      summary: { totalCollected, totalPaid, totalRefunded, netFlow: totalCollected - totalPaid - totalRefunded, entryCount: entries.length },
+      summary: { 
+        totalCollected, 
+        totalPaid, 
+        totalRefunded, 
+        netFlow: totalCollected - totalPaid - totalRefunded, 
+        entryCount: entries.length,
+        availableTaxToPay
+      },
       entries
     });
   }
@@ -1061,7 +1086,7 @@ export class AdminService {
 
       await tx.audit_logs.create({
         data: {
-          account_id: actor.staffId ? Number(actor.staffId) : Number(actor.accountId),
+          account_id: Number(actor.accountId),
           action: 'TAX_PAYMENT',
           target_id: ledgerTx.id,
           target_table: 'ledger_transactions',
