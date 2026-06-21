@@ -307,17 +307,6 @@ export default function AdminApprovalsPage() {
                     <XCircle className="w-4 h-4" />
                     Từ chối
                   </button>
-                  <div className="pt-3 border-t border-border mt-3">
-                    <button
-                      onClick={() => handleReviewOriginal(previewDoc.id)}
-                      disabled={processingId === previewDoc.id}
-                      className="w-full py-2 bg-muted/60 text-foreground hover:text-primary hover:bg-muted rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
-                      title="Mở toàn bộ file gốc ở tab mới"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      {processingId === previewDoc.id ? 'Đang tải...' : 'Xem toàn văn (File Gốc)'}
-                    </button>
-                  </div>
                 </div>
               </div>
 

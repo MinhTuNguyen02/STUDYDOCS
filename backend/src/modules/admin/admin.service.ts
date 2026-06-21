@@ -984,7 +984,7 @@ export class AdminService {
 
     // TAX_PAYABLE is a Liability account: CREDIT = increase (Thu hộ), DEBIT = decrease (Nộp thuế HOẶC Hoàn tiền)
     const totalCollected = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
-    
+
     // Only count explicit tax payments to the state, not refunds back to the user
     const totalPaid = entries
       .filter((e) => e.ledger_transactions.reference_type === 'TAX_PAYMENT')
