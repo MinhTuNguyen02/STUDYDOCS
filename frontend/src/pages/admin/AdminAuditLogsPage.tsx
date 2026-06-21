@@ -40,7 +40,7 @@ const ACTION_MAP: Record<string, string> = {
   ADMIN_CREATE_CATEGORY: 'Tạo danh mục',
   ADMIN_UPDATE_CATEGORY: 'Sửa danh mục',
   ADMIN_DELETE_CATEGORY: 'Xóa danh mục',
-  STAFF_REVIEW_DOCUMENT: 'Nhận xét TL',
+  STAFF_REVIEW_DOCUMENT: 'Xem xét TL',
   APPROVE_DOCUMENT: 'Duyệt tài liệu',
   REJECT_DOCUMENT: 'Từ chối tài liệu',
   STAFF_SOFT_DELETE_DOCUMENT: 'Xóa tạm tài liệu',
