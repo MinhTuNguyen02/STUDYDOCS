@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import DocumentCard from '@/components/common/DocumentCard'
 import { ArrowRight, BookOpen, GraduationCap, Calculator, Globe, Microscope, Palette, Code, Languages, Search, Shield, Truck, Headphones, Award, TrendingUp, Scale, HeartPulse, FileText, BarChart3, PenLine } from 'lucide-react'
@@ -33,33 +33,26 @@ export default function HomePage() {
   const [popularDocs, setPopularDocs] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const navigate = useNavigate()
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [docsRes, catsRes] = await Promise.all([
-          documentsApi.getDocuments({ limit: 8, sortBy: 'popular' }),
-          documentsApi.getCategories()
-        ])
-        setPopularDocs(docsRes.data || [])
-        setCategories((catsRes || []).slice(0, 8)) // Top 8
-      } catch (err) {
-        console.error('Failed to fetch homepage data', err)
-      } finally {
-        setLoading(false)
-      }
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [docsRes, catsRes] = await Promise.all([
+        documentsApi.getDocuments({ limit: 8, sortBy: 'popular' }),
+        documentsApi.getCategories(),
+      ])
+      setPopularDocs(docsRes.data || [])
+      setCategories((catsRes || []).slice(0, 8))
+    } catch {
+      setError('Không thể tải dữ liệu trang chủ. Vui lòng thử lại.')
+    } finally {
+      setLoading(false)
     }
-    fetchData()
   }, [])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/documents?keyword=${encodeURIComponent(searchQuery.trim())}`)
-    }
-  }
+  useEffect(() => { void fetchData() }, [fetchData])
 
   return (
     <>
@@ -194,8 +187,17 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {loading ? (
               [...Array(8)].map((_, i) => <div key={i} className="h-80 bg-muted animate-pulse rounded-xl" />)
-            ) : (
+            ) : error ? (
+              <div className="col-span-full text-center rounded-xl border border-danger/30 bg-card p-10" role="alert">
+                <p className="text-danger font-semibold mb-4">{error}</p>
+                <button className="btn bg-primary text-white px-5 py-2 rounded-lg" onClick={() => void fetchData()}>
+                  Thử lại
+                </button>
+              </div>
+            ) : popularDocs.length > 0 ? (
               popularDocs.map(doc => <DocumentCard key={doc.id} document={doc} />)
+            ) : (
+              <p className="col-span-full text-center text-muted-foreground py-10">Chưa có tài liệu nổi bật.</p>
             )}
           </div>
         </div>

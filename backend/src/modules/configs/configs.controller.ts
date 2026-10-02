@@ -37,7 +37,11 @@ export class ConfigsController {
 
   @Put(':key')
   @Roles('admin')
-  updateConfig(@CurrentUser() user: AuthUser, @Param('key') key: string, @Body() dto: UpdateConfigDto) {
+  updateConfig(
+    @CurrentUser() user: AuthUser,
+    @Param('key') key: string,
+    @Body() dto: UpdateConfigDto
+  ) {
     return this.configsService.updateConfig(user, key, dto.value, dto.description);
   }
 }

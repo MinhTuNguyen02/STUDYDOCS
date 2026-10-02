@@ -1,5 +1,6 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Controller, Get, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards, Req, ParseIntPipe } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { DownloadsService } from './downloads.service';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 import { PhoneVerifiedGuard } from '../../common/security/phone-verified.guard';
@@ -14,7 +15,12 @@ export class DownloadsController {
   constructor(private readonly downloadsService: DownloadsService) {}
 
   @Get(':id')
-  requestDownload(@CurrentUser() user: AuthUser, @Param('id') id: string, @Req() req: Request) {
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  requestDownload(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: Request
+  ) {
     return this.downloadsService.requestDownload(user, id, req.ip || '127.0.0.1');
   }
 }

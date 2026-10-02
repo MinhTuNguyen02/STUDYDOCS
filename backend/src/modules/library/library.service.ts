@@ -9,7 +9,7 @@ export class LibraryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService
-  ) { }
+  ) {}
 
   async listAccessibleDocuments(user: AuthUser) {
     if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong co thu vien tai lieu.');
@@ -81,10 +81,9 @@ export class LibraryService {
     return toJsonSafe(mergedList);
   }
 
-  async createDownloadLink(user: AuthUser, documentId: string, ipAddress?: string) {
-    if (!user.customerId) throw new ForbiddenException('Tài khoản này không có quyền tải xuống tài liệu.');
-
-    const docId = Number(documentId);
+  async createDownloadLink(user: AuthUser, docId: number, ipAddress?: string) {
+    if (!user.customerId)
+      throw new ForbiddenException('Tài khoản này không có quyền tải xuống tài liệu.');
 
     // 1. Kiểm tra xem user có quyền truy cập không (Đã Mua hoặc Đã Từng Tải)
     const [paidItem, dlHistory] = await Promise.all([

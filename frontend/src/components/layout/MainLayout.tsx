@@ -11,6 +11,7 @@ import { documentsApi } from '@/api/documents.api'
 import { walletsApi } from '@/api/wallets.api'
 import { formatBalance } from '@/utils/format'
 import NotificationBell from '@/components/common/NotificationBell'
+import { authApi } from '@/api/auth.api'
 
 interface Props {
   children: ReactNode
@@ -27,20 +28,12 @@ export default function MainLayout({ children }: Props) {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const isSearchHovered = useRef(false)
   const [showTopupModal, setShowTopupModal] = useState(false)
-  const [showPhoneModal, setShowPhoneModal] = useState(false)
+  const [showPhoneModal, setShowPhoneModal] = useState(user?.isPhoneVerified === false)
   const [footerCategories, setFooterCategories] = useState<any[]>([])
   const [footerPolicies, setFooterPolicies] = useState<any[]>([])
   const [wallets, setWallets] = useState<any[]>([])
 
   const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
-
-  useEffect(() => {
-    if (user) {
-      if (user.isPhoneVerified === false) {
-        setShowPhoneModal(true);
-      }
-    }
-  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -53,17 +46,17 @@ export default function MainLayout({ children }: Props) {
     documentsApi.getPolicies().then(res => setFooterPolicies(res || []))
   }, [])
 
-  const fetchWallets = () => {
+  const fetchWallets = useCallback(() => {
     if (user && !isStaff) {
       walletsApi.getMyWallets()
         .then(res => setWallets(res?.data || []))
         .catch(() => setWallets([]))
     }
-  }
+  }, [isStaff, user])
 
   useEffect(() => {
     fetchWallets()
-  }, [user, isStaff])
+  }, [fetchWallets])
 
   useEffect(() => {
     if (socket) {
@@ -74,12 +67,17 @@ export default function MainLayout({ children }: Props) {
         socket.off('wallet_updated')
       }
     }
-  }, [socket, user, isStaff])
+  }, [fetchWallets, socket])
 
   const paymentWallet = wallets.find(w => w.wallet_type === 'PAYMENT' || w.walletType === 'PAYMENT')
   const revenueWallet = wallets.find(w => w.wallet_type === 'REVENUE' || w.walletType === 'REVENUE')
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authApi.logout()
+    } catch {
+      // Local logout must still complete when the session already expired.
+    }
     logout()
     navigate('/login')
   }

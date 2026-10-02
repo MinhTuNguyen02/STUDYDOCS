@@ -21,13 +21,19 @@ export const authApi = {
     return res.data
   },
 
-  refresh: async (refreshToken: string) => {
-    const res = await api.post('/auth/refresh', { refreshToken })
+  refresh: async () => {
+    const csrf = await api.get('/auth/csrf')
+    const res = await api.post('/auth/refresh', {}, {
+      headers: { 'X-CSRF-Token': csrf.data.csrfToken },
+    })
     return res.data
   },
 
-  logout: async (refreshToken: string) => {
-    const res = await api.post('/auth/logout', { refreshToken })
+  logout: async () => {
+    const csrf = await api.get('/auth/csrf')
+    const res = await api.post('/auth/logout', {}, {
+      headers: { 'X-CSRF-Token': csrf.data.csrfToken },
+    })
     return res.data
   },
 
@@ -41,13 +47,4 @@ export const authApi = {
     return res.data
   },
 
-  setup2FA: async () => {
-    const res = await api.post('/auth/2fa/setup')
-    return res.data
-  },
-
-  verify2FA: async (code: string) => {
-    const res = await api.post('/auth/2fa/verify', { code })
-    return res.data
-  },
 }

@@ -45,8 +45,8 @@ export const useCartStore = create<CartState>((set, get) => ({
         total: calcTotal,
         count: parsedItems.length,
       })
-    } catch (err) {
-      console.error('Lỗi khi lấy giỏ hàng', err)
+    } catch {
+      set({ items: [], total: 0, count: 0 })
     } finally {
       set({ loading: false })
     }

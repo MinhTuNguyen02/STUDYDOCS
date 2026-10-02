@@ -12,7 +12,7 @@ interface Props {
  * Hard gate: blocks render AND redirects if user's role is not in allowedRoles.
  * Use inside /admin/* routes where specific pages need stricter role checks.
  */
-export default function RequireRole({ allowedRoles, children, redirectTo = '/admin' }: Props) {
+export default function RequireRole({ allowedRoles, children, redirectTo = '/forbidden' }: Props) {
   const { user } = useAuthStore()
 
   if (!user) return <Navigate to="/login" replace />

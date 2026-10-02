@@ -231,7 +231,7 @@ export default function AdminCategoriesPage() {
       .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a').replace(/[èéẹẻẽêềếệểễ]/g, 'e')
       .replace(/[ìíịỉĩ]/g, 'i').replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
       .replace(/[ùúụủũưừứựửữ]/g, 'u').replace(/[ỳýỵỷỹ]/g, 'y').replace(/đ/g, 'd')
-      .replace(/\s+/g, '-').replace(/[^\w\-]+/g, '').replace(/\-\-+/g, '-')
+      .replace(/\s+/g, '-').replace(/[^\w-]+/g, '').replace(/--+/g, '-')
       .replace(/^-+/, '').replace(/-+$/, '')
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {

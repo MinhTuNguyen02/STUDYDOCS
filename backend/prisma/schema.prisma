@@ -10,23 +10,21 @@ datasource db {
 
 // ─── Bảng Account ───────────────────────────────────────────────
 model accounts {
-  account_id            Int            @id @default(autoincrement())
-  email                 String         @unique @db.VarChar(255)
-  password_hash         String?        @db.VarChar(255)
-  role_id               Int
-  status                account_status @default(ACTIVE)
-  auth_provider         auth_provider  @default(LOCAL)
-  provider_account_id   String?        @db.VarChar(255)
-  two_factor_secret     String?        @db.VarChar(255)
-  is_two_factor_enabled Boolean        @default(false)
-  phone_otp_code        String?        @db.VarChar(10)
-  phone_otp_expires_at  DateTime?      @db.Timestamptz(6)
-  reset_password_token  String?        @db.VarChar(255)
-  reset_password_expires DateTime?     @db.Timestamptz(6)
-  created_at            DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime?      @default(now()) @db.Timestamptz(6)
-  delete_at             DateTime?      @db.Timestamptz(6)
-  banned_until          DateTime?      @db.Timestamptz(6)
+  account_id             Int            @id @default(autoincrement())
+  email                  String         @unique @db.VarChar(255)
+  password_hash          String?        @db.VarChar(255)
+  role_id                Int
+  status                 account_status @default(ACTIVE)
+  auth_provider          auth_provider  @default(LOCAL)
+  provider_account_id    String?        @db.VarChar(255)
+  phone_otp_code         String?        @db.VarChar(10)
+  phone_otp_expires_at   DateTime?      @db.Timestamptz(6)
+  reset_password_token   String?        @db.VarChar(255)
+  reset_password_expires DateTime?      @db.Timestamptz(6)
+  created_at             DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?      @default(now()) @db.Timestamptz(6)
+  delete_at              DateTime?      @db.Timestamptz(6)
+  banned_until           DateTime?      @db.Timestamptz(6)
 
   roles             roles              @relation(fields: [role_id], references: [role_id], onDelete: NoAction, onUpdate: NoAction)
   audit_logs        audit_logs[]
@@ -104,6 +102,8 @@ model user_sessions {
   created_at    DateTime @default(now()) @db.Timestamptz(6)
 
   accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([account_id, is_revoked, expires_at], map: "idx_user_sessions_account_active_expiry")
 }
 
 // ─── Bảng Documents ─────────────────────────────────────────────
@@ -131,7 +131,7 @@ model documents {
   updated_at       DateTime?       @default(now()) @db.Timestamptz(6)
   view_count       Int             @default(0)
   download_count   Int             @default(0)
-  is_user_hidden  Boolean         @default(false)
+  is_user_hidden   Boolean         @default(false)
   delete_at        DateTime?       @db.Timestamptz(6)
 
   staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
@@ -148,21 +148,25 @@ model documents {
 
   @@index([seller_id], map: "idx_documents_seller_id")
   @@index([category_id], map: "idx_documents_category_id")
+  @@index([status, delete_at, published_at], map: "idx_documents_public_listing")
+  @@index([seller_id, status], map: "idx_documents_seller_status")
 }
 
 // ─── Bảng Orders ────────────────────────────────────────────────
 model orders {
-  order_id     Int          @id @default(autoincrement())
-  buyer_id     Int
-  total_amount Decimal      @db.Decimal(10, 2)
-  status       order_status
-  created_at   DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime     @default(now()) @db.Timestamptz(6)
+  order_id        Int          @id @default(autoincrement())
+  buyer_id        Int
+  idempotency_key String?      @db.VarChar(100)
+  total_amount    Decimal      @db.Decimal(10, 2)
+  status          order_status
+  created_at      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime     @default(now()) @db.Timestamptz(6)
 
   customer_profiles customer_profiles @relation(fields: [buyer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   order_items       order_items[]
   payments          payments[]
 
+  @@unique([buyer_id, idempotency_key], map: "orders_buyer_id_idempotency_key_key")
   @@index([buyer_id], map: "idx_orders_buyer_id")
   @@index([created_at], map: "idx_orders_created_at")
 }
@@ -188,6 +192,8 @@ model order_items {
 
   @@unique([order_id, document_id])
   @@index([seller_id], map: "idx_order_items_seller_id")
+  @@index([document_id, status], map: "idx_order_items_document_status")
+  @@index([seller_id, status, created_at], map: "idx_order_items_seller_status_created")
 }
 
 // ─── Bảng Categories ────────────────────────────────────────────
@@ -252,7 +258,7 @@ model reviews {
   buyer_id      Int
   seller_reply  String?
   replied_at    DateTime? @db.Timestamptz(6)
-  is_deleted    Boolean?  @default(false)
+  is_deleted    Boolean   @default(false)
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
   updated_at    DateTime? @default(now()) @db.Timestamptz(6)
   document_id   Int
@@ -261,6 +267,7 @@ model reviews {
   documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
   order_items       order_items       @relation(fields: [order_item_id], references: [order_item_id], onDelete: NoAction, onUpdate: NoAction)
 
+  @@unique([buyer_id, document_id], map: "reviews_buyer_id_document_id_key")
   @@index([order_item_id], map: "idx_reviews_order_item_id")
   @@index([document_id], map: "idx_reviews_document_id")
 }
@@ -303,10 +310,10 @@ model wishlists {
 
 // ─── Bảng Wallets ───────────────────────────────────────────────
 model wallets {
-  wallet_id       Int         @id @default(autoincrement())
-  customer_id     Int?
-  wallet_type     wallet_type
-  balance         Decimal     @default(0) @db.Decimal(12, 2)
+  wallet_id   Int         @id @default(autoincrement())
+  customer_id Int?
+  wallet_type wallet_type
+  balance     Decimal     @default(0) @db.Decimal(12, 2)
 
   customer_profiles customer_profiles? @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   payments          payments[]
@@ -401,6 +408,8 @@ model reports {
   customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([document_id], map: "idx_reports_document_id")
+  @@index([status, created_at], map: "idx_reports_status_created")
+  @@index([customer_id, document_id], map: "idx_reports_customer_document")
 }
 
 // ─── Bảng Packages ──────────────────────────────────────────────
@@ -423,6 +432,8 @@ model user_packages {
   user_package_id Int                 @id @default(autoincrement())
   customer_id     Int
   package_id      Int
+  idempotency_key String?             @db.VarChar(100)
+  active_slot     Int?
   turns_remaining Int
   purchased_at    DateTime            @default(now()) @db.Timestamptz(6)
   expires_at      DateTime?           @db.Timestamptz(6)
@@ -431,6 +442,10 @@ model user_packages {
   customer_profiles customer_profiles  @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   packages          packages           @relation(fields: [package_id], references: [package_id], onDelete: NoAction, onUpdate: NoAction)
   download_history  download_history[]
+
+  @@unique([customer_id, idempotency_key], map: "user_packages_customer_id_idempotency_key_key")
+  @@unique([customer_id, active_slot], map: "user_packages_customer_id_active_slot_key")
+  @@index([customer_id, status, expires_at], map: "idx_user_packages_customer_status_expiry")
 }
 
 // ─── Bảng Audit_logs ────────────────────────────────────────────
@@ -469,8 +484,6 @@ model policies {
 
   staff_profiles staff_profiles? @relation(fields: [updated_by], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
 }
-
-
 
 // ─── Bảng Notifications ─────────────────────────────────────────
 model notifications {
@@ -521,7 +534,6 @@ enum download_type {
 enum order_item_status {
   PENDING
   PAID
-  RELEASED
 }
 
 enum order_status {
@@ -545,7 +557,6 @@ enum payment_provider {
 enum payment_purpose {
   ORDER_PAYMENT
   WALLET_TOPUP
-  REFUND
   PACKAGE_PURCHASE
 }
 
@@ -581,7 +592,6 @@ enum ledger_transaction_type {
   PURCHASE
   WITHDRAW
   DEPOSIT
-  REFUND
 }
 
 enum ledger_transaction_status {
@@ -596,8 +606,6 @@ enum withdrawal_status {
   REJECTED
 }
 
-
-
 enum notification_type {
   ORDER_NEW
   DOC_APPROVED
@@ -605,7 +613,6 @@ enum notification_type {
   DOC_HIDDEN
   DOC_PENDING
   TOPUP_SUCCESS
-  FUNDS_RELEASED
   WITHDRAWAL_PAID
   WITHDRAWAL_REJECTED
   WITHDRAWAL_NEW

@@ -9,4 +9,4 @@ import { NotificationsModule } from '../notifications/notifications.module';
   controllers: [AdminController],
   providers: [AdminService]
 })
-export class AdminModule { }
+export class AdminModule {}

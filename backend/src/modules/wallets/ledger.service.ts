@@ -4,9 +4,10 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class LedgerService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  async getSystemWallets(tx: any) { // Có thể thay 'any' bằng 'Prisma.TransactionClient' nếu bạn đã import Prisma
+  async getSystemWallets(tx: any) {
+    // Có thể thay 'any' bằng 'Prisma.TransactionClient' nếu bạn đã import Prisma
     // 1. Tìm trực tiếp ví GATEWAY_POOL (customer_id đang là null)
     const gatewayPool = await tx.wallets.findFirst({
       where: {
@@ -52,7 +53,11 @@ export class LedgerService {
     referenceType: string,
     referenceId: number,
     description: string,
-    entries: { wallet_id: number; debit_amount: number | Prisma.Decimal; credit_amount: number | Prisma.Decimal }[]
+    entries: {
+      wallet_id: number;
+      debit_amount: number | Prisma.Decimal;
+      credit_amount: number | Prisma.Decimal;
+    }[]
   ) {
     let totalDebit = 0;
     let totalCredit = 0;
@@ -63,7 +68,9 @@ export class LedgerService {
     }
 
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      throw new InternalServerErrorException(`Double-entry mismatch! Debit: ${totalDebit}, Credit: ${totalCredit}`);
+      throw new InternalServerErrorException(
+        `Double-entry mismatch! Debit: ${totalDebit}, Credit: ${totalCredit}`
+      );
     }
 
     const ledgerTxn = await tx.ledger_transactions.create({

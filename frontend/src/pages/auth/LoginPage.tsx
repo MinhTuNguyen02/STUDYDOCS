@@ -16,27 +16,21 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login)
   const navigate = useNavigate()
 
-  // Catch OAuth redirect tokens
+  // Complete OAuth without exposing tokens in the URL.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get('accessToken');
-    const refreshToken = params.get('refreshToken');
-    const userStr = params.get('user');
-
-    if (accessToken && refreshToken && userStr) {
-      try {
-        const user = JSON.parse(decodeURIComponent(userStr));
-        login({ accessToken, refreshToken, user });
+    if (params.get('oauth') === 'success') {
+      window.history.replaceState({}, '', '/login');
+      authApi.refresh().then((res) => {
+        login({ accessToken: res.accessToken, user: res.user });
         toast.success('Đăng nhập thành công!');
-        const role = user.roleNames?.[0]?.toLowerCase() || '';
+        const role = res.user.roleNames?.[0]?.toLowerCase() || '';
         if (['admin', 'mod', 'accountant'].includes(role)) {
           navigate('/admin');
         } else {
           navigate('/');
         }
-      } catch (e) {
-        console.error('Failed to parse OAuth user', e);
-      }
+      }).catch(() => toast.error('Không thể hoàn tất đăng nhập Google. Vui lòng thử lại.'));
     }
   }, [login, navigate]);
 
@@ -47,7 +41,6 @@ export default function LoginPage() {
       const res = await authApi.login({ email, password })
       login({
         accessToken: res.accessToken,
-        refreshToken: res.refreshToken,
         user: res.user,
       })
       toast.success('Đăng nhập thành công!')
@@ -58,7 +51,6 @@ export default function LoginPage() {
         navigate('/');
       }
     } catch (err: any) {
-      console.error('[Login Error]', err?.response?.status, err?.response?.data);
       const status = err?.response?.status;
       const msg = err?.response?.data?.message;
       if (status === 403 && msg) {

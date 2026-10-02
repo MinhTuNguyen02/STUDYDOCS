@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-﻿import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UpsertReviewDto {
   @ApiProperty({ example: 1 })
@@ -11,5 +11,6 @@ export class UpsertReviewDto {
   @ApiProperty({ example: 'example value' })
   @IsOptional()
   @IsString()
+  @MaxLength(5000)
   comment?: string;
 }

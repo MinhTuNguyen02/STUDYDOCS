@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 export default function LibraryPage() {
   const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
 
   useEffect(() => {
@@ -15,11 +16,15 @@ export default function LibraryPage() {
   }, [])
 
   const fetchMyDocuments = async () => {
+    setLoading(true)
+    setError(null)
     try {
       const res = await libraryApi.getMyDocuments()
       setDocuments(res.data || res || [])
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Không thể tải thư viện tài liệu')
+      const msg = error?.response?.data?.message || 'Không thể tải thư viện tài liệu'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -54,6 +59,18 @@ export default function LibraryPage() {
   }
 
   if (loading) return <div className="py-24 text-center text-muted-foreground">Đang tải thư viện của bạn...</div>
+
+  if (error) return (
+    <div className="max-w-7xl mx-auto py-24 px-4 text-center">
+      <p className="text-danger mb-4 font-medium">{error}</p>
+      <button
+        onClick={fetchMyDocuments}
+        className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
+      >
+        Thử lại
+      </button>
+    </div>
+  )
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4">

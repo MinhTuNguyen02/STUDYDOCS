@@ -42,8 +42,7 @@ export const getPageCount = async (file: File): Promise<number> => {
 
     // For other formats (xlsx, old doc) fallback to 1
     return 1
-  } catch (error) {
-    console.error('Lỗi khi đọc file để đếm số trang:', error)
+  } catch {
     return 1 // Fallback to 1 so the upload doesn't break
   }
 }

@@ -21,9 +21,10 @@ export default function ProtectedRoute({ children, requiredRoles, requirePhoneVe
   }
 
   if (requiredRoles && requiredRoles.length > 0) {
-    const hasRole = user.roleNames.some((r) => requiredRoles.includes(r))
+    const allowed = requiredRoles.map((role) => role.toLowerCase())
+    const hasRole = user.roleNames.some((role) => allowed.includes(role.toLowerCase()))
     if (!hasRole) {
-      return <Navigate to="/" replace />
+      return <Navigate to="/forbidden" replace />
     }
   }
 

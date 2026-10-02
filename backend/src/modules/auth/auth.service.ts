@@ -1,13 +1,21 @@
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
-import { compare, compareSync, hash } from 'bcryptjs';
-import { createHash, randomUUID } from 'crypto';
+import { compare, hash } from 'bcryptjs';
+import { createHash, randomInt, randomUUID } from 'crypto';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../database/prisma.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -16,13 +24,15 @@ import { FirebaseAdminService } from './firebase.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly firebaseAdmin: FirebaseAdminService,
     private readonly mailerService: MailerService
-  ) { }
+  ) {}
 
   private hashRefreshToken(token: string) {
     return createHash('sha256').update(token).digest('hex');
@@ -76,27 +86,29 @@ export class AuthService {
     if (account.status === 'BANNED') {
       if (account.banned_until) {
         const until = account.banned_until.toLocaleDateString('vi-VN', {
-          day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh'
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          timeZone: 'Asia/Ho_Chi_Minh'
         });
-        throw new ForbiddenException(`Tài khoản của bạn đang bị khóa tạm thời đến ngày ${until}. Nếu cần hỗ trợ, vui lòng liên hệ dịch vụ khách hàng.`);
+        throw new ForbiddenException(
+          `Tài khoản của bạn đang bị khóa tạm thời đến ngày ${until}. Nếu cần hỗ trợ, vui lòng liên hệ dịch vụ khách hàng.`
+        );
       }
-      throw new ForbiddenException('Tài khoản của bạn đã bị khóa vĩnh viễn do vi phạm quy định. Vui lòng liên hệ bộ phận hỗ trợ để biết thêm chi tiết.');
+      throw new ForbiddenException(
+        'Tài khoản của bạn đã bị khóa vĩnh viễn do vi phạm quy định. Vui lòng liên hệ bộ phận hỗ trợ để biết thêm chi tiết.'
+      );
     }
 
-    const isLegacyPlain = account.password_hash === rawPassword;
-    const isBcryptAsync = account.password_hash.startsWith('$2')
+    const passwordMatched = account.password_hash.startsWith('$2')
       ? await compare(rawPassword, account.password_hash)
       : false;
-    const isBcryptSync = account.password_hash.startsWith('$2')
-      ? compareSync(rawPassword, account.password_hash)
-      : false;
-
-    const passwordMatched = isLegacyPlain || isBcryptAsync || isBcryptSync;
     if (!passwordMatched) {
       throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
-    const profileName = account.customer_profiles?.full_name ?? account.staff_profiles?.full_name ?? null;
+    const profileName =
+      account.customer_profiles?.full_name ?? account.staff_profiles?.full_name ?? null;
     const roleNames = [account.roles.name.toLowerCase()];
     const tokens = await this.createSessionAndTokens(account.account_id, account.email);
 
@@ -116,7 +128,10 @@ export class AuthService {
         fullName: profileName,
         status: account.status,
         roleNames,
-        isPhoneVerified: account.customer_profiles?.is_phone_verified ?? account.staff_profiles?.is_phone_verified ?? false,
+        isPhoneVerified:
+          account.customer_profiles?.is_phone_verified ??
+          account.staff_profiles?.is_phone_verified ??
+          false,
         hasUploadedDocument
       }),
       accessToken: tokens.accessToken,
@@ -132,7 +147,7 @@ export class AuthService {
       throw new ConflictException('Email đã được sử dụng.');
     }
 
-    const passwordHash = await hash(dto.password, 10);
+    const passwordHash = await hash(dto.password, 12);
 
     const customerRole = await this.prisma.roles.findUnique({
       where: { name: 'CUSTOMER' }
@@ -154,10 +169,7 @@ export class AuthService {
               create: {}
             },
             wallets: {
-              create: [
-                { wallet_type: 'PAYMENT' },
-                { wallet_type: 'REVENUE' }
-              ]
+              create: [{ wallet_type: 'PAYMENT' }, { wallet_type: 'REVENUE' }]
             }
           }
         }
@@ -178,15 +190,33 @@ export class AuthService {
     };
   }
 
-  async refresh(dto: RefreshTokenDto) {
-    const tokenHash = this.hashRefreshToken(dto.refreshToken);
+  async refresh(refreshTokenValue: string) {
+    const tokenHash = this.hashRefreshToken(refreshTokenValue);
     const session = await this.prisma.user_sessions.findUnique({
       where: { refresh_token: tokenHash },
-      include: { accounts: true }
+      include: {
+        accounts: {
+          include: {
+            customer_profiles: true,
+            staff_profiles: true,
+            roles: { select: { name: true } }
+          }
+        }
+      }
     });
 
-    if (!session || session.is_revoked || session.expires_at < new Date()) {
+    if (!session || session.expires_at < new Date()) {
       throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn.');
+    }
+
+    if (session.is_revoked) {
+      await this.prisma.user_sessions.updateMany({
+        where: { account_id: session.account_id, is_revoked: false },
+        data: { is_revoked: true }
+      });
+      throw new UnauthorizedException(
+        'Refresh token đã được sử dụng lại; mọi phiên đã bị thu hồi.'
+      );
     }
 
     if (session.accounts.status === 'BANNED' || session.accounts.delete_at !== null) {
@@ -199,18 +229,62 @@ export class AuthService {
     };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('JWT_ACCESS_SECRET', 'dev_access_secret'),
+      secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
       expiresIn: '2h'
     });
 
+    const refreshToken = randomUUID() + randomUUID();
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.user_sessions.updateMany({
+        where: { session_id: session.session_id, is_revoked: false },
+        data: { is_revoked: true }
+      });
+      if (revoked.count !== 1) {
+        throw new UnauthorizedException('Refresh token đã được sử dụng.');
+      }
+      await tx.user_sessions.create({
+        data: {
+          session_id: randomUUID(),
+          account_id: session.account_id,
+          refresh_token: refreshTokenHash,
+          expires_at: expiresAt,
+          is_revoked: false
+        }
+      });
+    });
+
+    const account = session.accounts;
+    const customerId = account.customer_profiles?.customer_id;
+    const hasUploadedDocument = customerId
+      ? (await this.prisma.documents.count({ where: { seller_id: customerId } })) > 0
+      : false;
+
     return {
       message: 'Lam moi access token thanh cong.',
-      accessToken
+      accessToken,
+      refreshToken,
+      user: toJsonSafe({
+        accountId: account.account_id,
+        customerId: account.customer_profiles?.customer_id ?? null,
+        staffId: account.staff_profiles?.staff_id ?? null,
+        email: account.email,
+        fullName: account.customer_profiles?.full_name ?? account.staff_profiles?.full_name ?? null,
+        status: account.status,
+        roleNames: [account.roles.name.toLowerCase()],
+        isPhoneVerified:
+          account.customer_profiles?.is_phone_verified ??
+          account.staff_profiles?.is_phone_verified ??
+          false,
+        hasUploadedDocument
+      })
     };
   }
 
-  async logout(dto: RefreshTokenDto) {
-    const tokenHash = this.hashRefreshToken(dto.refreshToken);
+  async logout(refreshTokenValue: string) {
+    const tokenHash = this.hashRefreshToken(refreshTokenValue);
     await this.prisma.user_sessions.updateMany({
       where: { refresh_token: tokenHash },
       data: { is_revoked: true }
@@ -238,9 +312,14 @@ export class AuthService {
       };
     }
 
-    // Mode 2: Mock OTP (Development) — Lưu OTP vào DB, log ra console
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(`[OTP MOCK] Code: ${otpCode} → Phone: ${phoneNumber}`);
+    // Mock OTP must be an explicit local-development choice and is never allowed in production.
+    const mockOtpEnabled = this.configService.get<string>('ENABLE_MOCK_OTP') === 'true';
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    if (!mockOtpEnabled || nodeEnv === 'production') {
+      throw new ServiceUnavailableException('Dịch vụ xác minh số điện thoại chưa được cấu hình.');
+    }
+
+    const otpCode = randomInt(100000, 1000000).toString();
 
     await this.prisma.accounts.update({
       where: { account_id: Number(user.accountId) },
@@ -256,7 +335,11 @@ export class AuthService {
       data: { phone_number: phoneNumber }
     });
 
-    return { message: 'Ma OTP da duoc gui (che do Mock). Xem console.', mode: 'MOCK' };
+    return {
+      message: 'Mã OTP đã được tạo cho môi trường phát triển.',
+      mode: 'MOCK',
+      mockOtpCode: otpCode
+    };
   }
 
   async verifyOtp(user: AuthUser, dto: VerifyOtpDto) {
@@ -283,8 +366,13 @@ export class AuthService {
       return { message: 'Xac minh OTP qua Firebase thanh cong.' };
     }
 
+    const mockOtpEnabled = this.configService.get<string>('ENABLE_MOCK_OTP') === 'true';
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    if (!mockOtpEnabled || nodeEnv === 'production') {
+      throw new ServiceUnavailableException('Dịch vụ xác minh số điện thoại chưa được cấu hình.');
+    }
 
-    // Mode 2: Mock OTP Verification — So sánh OTP code trong DB
+    // Mode 2: explicit development-only OTP verification.
     const account = await this.prisma.accounts.findUnique({
       where: { account_id: Number(user.accountId) }
     });
@@ -349,10 +437,7 @@ export class AuthService {
               full_name: fullName,
               carts: { create: {} },
               wallets: {
-                create: [
-                  { wallet_type: 'PAYMENT' },
-                  { wallet_type: 'REVENUE' }
-                ]
+                create: [{ wallet_type: 'PAYMENT' }, { wallet_type: 'REVENUE' }]
               }
             }
           }
@@ -394,76 +479,34 @@ export class AuthService {
     };
   }
 
-  async setup2FA(user: AuthUser) {
-    const mockSecret = randomUUID(); // In real logic using Speakeasy, this is a base32 encoded string
-    const mockQr = `data:image/png;base64,mockqrcodedata_${mockSecret}`;
-
-    await this.prisma.accounts.update({
-      where: { account_id: Number(user.accountId) },
-      data: { two_factor_secret: mockSecret, is_two_factor_enabled: false } // Saved but not yet enabled
-    });
-
-    return {
-      message: 'Ma 2FA da duoc khoi tao. Vui long verify de kich hoat.',
-      secret: mockSecret,
-      qrCode: mockQr
-    };
-  }
-
-  async verify2FA(user: AuthUser, code: string) {
-    if (!code || code.length !== 6) {
-      throw new BadRequestException('Ma 2FA khong hop le.');
-    }
-
-    const account = await this.prisma.accounts.findUnique({
-      where: { account_id: Number(user.accountId) }
-    });
-
-    if (!account || !account.two_factor_secret) {
-      throw new BadRequestException('Chua setup 2FA.');
-    }
-
-    // Mock verification check: Assume any 6 digit code is correct for now (Speakeasy check would go here)
-    if (code !== '123456') {
-      // Force '123456' for demonstration
-    }
-
-    await this.prisma.accounts.update({
-      where: { account_id: Number(user.accountId) },
-      data: { is_two_factor_enabled: true }
-    });
-
-    return { message: 'Kich hoat 2FA thanh cong va luu vao Database.' };
-  }
-
   async forgotPassword(email: string) {
     const formattedEmail = email.trim().toLowerCase();
     const account = await this.prisma.accounts.findUnique({ where: { email: formattedEmail } });
 
-    if (!account) {
-      // Don't throw 404 to prevent email enumeration, but we'll throw here for UX
-      throw new NotFoundException('Khong tim thay tai khoan voi email nay.');
-    }
+    const genericMessage = 'Nếu email tồn tại, liên kết đặt lại mật khẩu sẽ được gửi.';
+    if (!account) return { message: genericMessage };
 
     const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '');
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    const tokenHash = this.hashRefreshToken(token);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await this.prisma.accounts.update({
       where: { account_id: account.account_id },
       data: {
-        reset_password_token: token,
+        reset_password_token: tokenHash,
         reset_password_expires: expiresAt
       }
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL').split(',')[0].trim();
     const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
     // Gửi email thực tế thông qua thư viện nodemailer / mailer
-    await this.mailerService.sendMail({
-      to: formattedEmail,
-      subject: 'Yêu cầu đặt lại mật khẩu - StudyDocs',
-      html: `
+    try {
+      await this.mailerService.sendMail({
+        to: formattedEmail,
+        subject: 'Yêu cầu đặt lại mật khẩu - StudyDocs',
+        html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
           <h2 style="color: #4F46E5;">Khôi Phục Mật Khẩu StudyDocs</h2>
           <p>Xin chào,</p>
@@ -480,12 +523,17 @@ export class AuthService {
           <p style="font-size: 12px; color: #999;">Nếu bạn không yêu cầu khôi phục mật khẩu, vui lòng bỏ qua email này. Tài khoản của bạn vẫn an toàn.</p>
           <p style="font-size: 12px; color: #999;">Trân trọng,<br/>Đội ngũ StudyDocs</p>
         </div>
-      `,
-    });
+        `
+      });
+    } catch (error) {
+      // Keep the public response indistinguishable to prevent account enumeration.
+      this.logger.error(
+        'Không thể gửi email đặt lại mật khẩu.',
+        error instanceof Error ? error.stack : undefined
+      );
+    }
 
-    console.log(`\n\n[MAIL SENT] Đã gửi mail reset password cho ${formattedEmail}\n\n`);
-
-    return { message: 'Liên kết đặt lại mật khẩu đã được gửi' };
+    return { message: genericMessage };
   }
 
   async resetPassword(token: string, newPassword: string) {
@@ -493,9 +541,10 @@ export class AuthService {
       throw new BadRequestException('Thiếu token hoặc mật khẩu mới.');
     }
 
+    const tokenHash = this.hashRefreshToken(token);
     const account = await this.prisma.accounts.findFirst({
       where: {
-        reset_password_token: token,
+        reset_password_token: tokenHash,
         reset_password_expires: { gt: new Date() } // Token phải còn hạn
       }
     });
@@ -515,6 +564,35 @@ export class AuthService {
       }
     });
 
+    await this.prisma.user_sessions.updateMany({
+      where: { account_id: account.account_id, is_revoked: false },
+      data: { is_revoked: true }
+    });
+
     return { message: 'Đổi mật khẩu thành công.' };
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async cleanupExpiredAuthData() {
+    const now = new Date();
+    const revokedRetention = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    await this.prisma.$transaction([
+      this.prisma.user_sessions.deleteMany({
+        where: {
+          OR: [
+            { expires_at: { lt: now } },
+            { is_revoked: true, created_at: { lt: revokedRetention } }
+          ]
+        }
+      }),
+      this.prisma.accounts.updateMany({
+        where: { phone_otp_expires_at: { lt: now } },
+        data: { phone_otp_code: null, phone_otp_expires_at: null }
+      }),
+      this.prisma.accounts.updateMany({
+        where: { reset_password_expires: { lt: now } },
+        data: { reset_password_token: null, reset_password_expires: null }
+      })
+    ]);
   }
 }

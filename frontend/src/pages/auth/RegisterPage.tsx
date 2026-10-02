@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { authApi } from '@/api/auth.api'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff, Mail, Lock, User as UserIcon, ArrowLeft } from 'lucide-react'
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/utils/password'
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('')
@@ -18,6 +19,10 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       toast.error('Mật khẩu xác nhận không khớp!')
+      return
+    }
+    if (!isStrongPassword(password)) {
+      toast.error(PASSWORD_REQUIREMENTS)
       return
     }
 
@@ -90,7 +95,8 @@ export default function RegisterPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  minLength={6}
+                  minLength={8}
+                  maxLength={72}
                   className="w-full pl-10 pr-12 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm font-medium"
                 />
                 <button
@@ -102,7 +108,7 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1.5">Mật khẩu phải có ít nhất 6 ký tự.</p>
+              <p className="text-xs text-muted-foreground mt-1.5">{PASSWORD_REQUIREMENTS}</p>
             </div>
 
             <div className="space-y-1.5">
@@ -115,7 +121,8 @@ export default function RegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  minLength={6}
+                  minLength={8}
+                  maxLength={72}
                   className={`w-full pl-10 pr-12 py-3 bg-background border rounded-xl focus:outline-none focus:ring-2 transition-all text-sm font-medium ${confirmPassword && password !== confirmPassword
                       ? 'border-danger focus:ring-danger focus:border-danger'
                       : 'border-border focus:ring-primary focus:border-primary'
@@ -201,7 +208,7 @@ export default function RegisterPage() {
               </div>
               <div>
                 <h3 className="font-bold text-foreground mb-1 text-lg">Hệ thống ví bảo mật cao</h3>
-                <p className="text-muted-foreground">Bảo vệ quyền lợi cả người mua và người bán bằng cơ chế hold tiền thông minh, rút tiền linh hoạt.</p>
+                <p className="text-muted-foreground">Bảo vệ quyền lợi người dùng bằng kiểm duyệt nội dung, lịch sử giao dịch và quy trình rút tiền minh bạch.</p>
               </div>
             </li>
             <li className="flex items-start gap-4">

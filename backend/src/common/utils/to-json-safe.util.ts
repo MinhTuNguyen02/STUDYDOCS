@@ -4,7 +4,8 @@ export function toJsonSafe<T>(value: T): JsonSafe {
   if (value === null || value === undefined) return null;
 
   if (typeof value === 'bigint') return value.toString();
-  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean')
+    return value;
 
   if (Array.isArray(value)) {
     return value.map((item) => toJsonSafe(item));

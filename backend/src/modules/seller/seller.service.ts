@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { AuthUser } from '../../common/security/auth-user.interface';
@@ -9,13 +14,19 @@ import { UpdateSellerDocumentDto } from './dto/update-seller-document.dto';
 import { PenaltyService } from '../moderation/penalty.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
+type ProcessedSellerDocumentInput = Omit<CreateSellerDocumentDto, 'fileSizeMb' | 'pageCount'> & {
+  fileSizeMb: number;
+  pageCount: number;
+  reviewKey?: string | null;
+};
+
 @Injectable()
 export class SellerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly penaltyService: PenaltyService,
     private readonly notifications: NotificationsService
-  ) { }
+  ) {}
 
   private ensureSeller(user: AuthUser) {
     if (!user.customerId) {
@@ -53,7 +64,7 @@ export class SellerService {
         _sum: { seller_earning: true },
         where: {
           documents: { seller_id: sellerId },
-          status: { in: ['PAID', 'RELEASED'] },
+          status: 'PAID',
           created_at: { gte: start, lte: end }
         }
       }),
@@ -68,7 +79,7 @@ export class SellerService {
       this.prisma.order_items.count({
         where: {
           documents: { seller_id: sellerId },
-          status: { in: ['PAID', 'RELEASED'] },
+          status: 'PAID',
           created_at: { gte: start, lte: end }
         }
       })
@@ -77,21 +88,33 @@ export class SellerService {
     const topDownloads = await this.prisma.documents.findMany({
       where: {
         seller_id: sellerId,
-        created_at: { lte: end }  // Only include docs that existed within the period
+        created_at: { lte: end } // Only include docs that existed within the period
       },
       orderBy: { download_count: 'desc' },
       take: 5,
-      select: { document_id: true, title: true, download_count: true, view_count: true, price: true }
+      select: {
+        document_id: true,
+        title: true,
+        download_count: true,
+        view_count: true,
+        price: true
+      }
     });
 
     const topViews = await this.prisma.documents.findMany({
       where: {
         seller_id: sellerId,
-        created_at: { lte: end }  // Only include docs that existed within the period
+        created_at: { lte: end } // Only include docs that existed within the period
       },
       orderBy: { view_count: 'desc' },
       take: 5,
-      select: { document_id: true, title: true, download_count: true, view_count: true, price: true }
+      select: {
+        document_id: true,
+        title: true,
+        download_count: true,
+        view_count: true,
+        price: true
+      }
     });
 
     return {
@@ -129,14 +152,14 @@ export class SellerService {
             _sum: { seller_earning: true },
             where: {
               documents: { seller_id: sellerId },
-              status: { in: ['PAID', 'RELEASED'] },
+              status: 'PAID',
               created_at: { gte: start, lte: effectiveEnd }
             }
           }),
           this.prisma.order_items.count({
             where: {
               documents: { seller_id: sellerId },
-              status: { in: ['PAID', 'RELEASED'] },
+              status: 'PAID',
               created_at: { gte: start, lte: effectiveEnd }
             }
           })
@@ -177,7 +200,9 @@ export class SellerService {
       return base;
     };
 
-    const start = startDateStr ? parseVNStart(startDateStr) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const start = startDateStr
+      ? parseVNStart(startDateStr)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
     const end = endDateStr ? parseVNEnd(endDateStr) : now;
     const effectiveEnd = end > now ? now : end;
 
@@ -185,14 +210,17 @@ export class SellerService {
     const items = await this.prisma.order_items.findMany({
       where: {
         documents: { seller_id: sellerId },
-        status: { in: ['PAID', 'RELEASED'] },
+        status: 'PAID',
         created_at: { gte: start, lte: effectiveEnd }
       },
       select: { seller_earning: true, created_at: true }
     });
 
     // Build day-keyed map
-    const dayMap = new Map<string, { date: string; label: string; earnings: number; orders: number }>();
+    const dayMap = new Map<
+      string,
+      { date: string; label: string; earnings: number; orders: number }
+    >();
     let cur = new Date(start);
     while (cur <= effectiveEnd) {
       const key = toVNDateKey(cur);
@@ -204,7 +232,7 @@ export class SellerService {
       cur.setDate(cur.getDate() + 1);
     }
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const key = toVNDateKey(item.created_at);
       if (dayMap.has(key)) {
         dayMap.get(key)!.earnings += Number(item.seller_earning ?? 0);
@@ -219,12 +247,12 @@ export class SellerService {
     user: AuthUser,
     status?: string,
     search?: string,
-    pageStr?: string,
-    limitStr?: string
+    pageValue?: number,
+    limitValue?: number
   ) {
     const sellerId = this.ensureSeller(user);
-    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
-    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const page = pageValue ?? 1;
+    const limit = limitValue ?? 10;
     const skip = (page - 1) * limit;
 
     const where: Prisma.documentsWhereInput = {
@@ -270,7 +298,7 @@ export class SellerService {
     };
   }
 
-  async createDocument(user: AuthUser, dto: CreateSellerDocumentDto) {
+  async createDocument(user: AuthUser, dto: ProcessedSellerDocumentInput) {
     const sellerId = this.ensureSeller(user);
 
     if (dto.fileSizeMb > 100) {
@@ -280,10 +308,14 @@ export class SellerService {
     const extension = this.normalizeExtension(dto.fileExtension);
     const allowedExtensions = ['DOC', 'DOCX', 'PDF', 'PPT', 'PPTX', 'XLS', 'XLSX', 'docx'];
     if (!allowedExtensions.includes(extension)) {
-      throw new BadRequestException(`Dinh dang file khong duoc ho tro. (Extension nhận được: "${extension}", File gửi lên: "${dto.fileExtension}")`);
+      throw new BadRequestException(
+        `Dinh dang file khong duoc ho tro. (Extension nhận được: "${extension}", File gửi lên: "${dto.fileExtension}")`
+      );
     }
 
-    const category = await this.prisma.categories.findUnique({ where: { category_id: Number(dto.categoryId) } });
+    const category = await this.prisma.categories.findUnique({
+      where: { category_id: Number(dto.categoryId) }
+    });
     if (!category || category.delete_at) {
       throw new NotFoundException('Danh muc khong ton tai.');
     }
@@ -300,7 +332,8 @@ export class SellerService {
     const finalPrice = dto.pageCount < 10 ? new Prisma.Decimal(0) : parsedPrice;
 
     const fileHash =
-      dto.fileHash?.trim() || createHash('sha256').update(`${dto.slug}:${Date.now()}:${sellerId.toString()}`).digest('hex');
+      dto.fileHash?.trim() ||
+      createHash('sha256').update(`${dto.slug}:${Date.now()}:${sellerId.toString()}`).digest('hex');
 
     // Check duplicate file hash
     const duplicateHash = await this.prisma.documents.findFirst({
@@ -331,7 +364,10 @@ export class SellerService {
     }
 
     const tagIdsArray = dto.tagIds
-      ? dto.tagIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+      ? dto.tagIds
+          .split(',')
+          .map((id) => parseInt(id.trim()))
+          .filter((id) => !isNaN(id))
       : [];
 
     const document = await this.prisma.documents.create({
@@ -346,13 +382,13 @@ export class SellerService {
         status: 'PENDING',
         file_url: dto.storageKey ?? `docs/${dto.slug}.${extension.toLowerCase()}`,
         preview_url: dto.previewKey ?? `preview/${dto.slug}`,
-        review_url: (dto as any).reviewKey ?? null,
+        review_url: dto.reviewKey ?? null,
         file_size: Math.floor(dto.fileSizeMb * 1024 * 1024),
         file_extension: extension.toLowerCase(),
         file_hash: fileHash,
-        ...((tagIdsArray.length > 0) && {
+        ...(tagIdsArray.length > 0 && {
           document_tags: {
-            create: tagIdsArray.map(tag_id => ({ tag_id }))
+            create: tagIdsArray.map((tag_id) => ({ tag_id }))
           }
         })
       }
@@ -370,9 +406,9 @@ export class SellerService {
     return toJsonSafe(document);
   }
 
-  async updateDocument(user: AuthUser, documentId: string, dto: UpdateSellerDocumentDto) {
+  async updateDocument(user: AuthUser, documentId: number, dto: UpdateSellerDocumentDto) {
     const sellerId = this.ensureSeller(user);
-    const id = Number(documentId);
+    const id = documentId;
 
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing || existing.seller_id !== sellerId) {
@@ -405,9 +441,9 @@ export class SellerService {
     return toJsonSafe(updated);
   }
 
-  async toggleVisibility(user: AuthUser, documentId: string, isHidden: boolean) {
+  async toggleVisibility(user: AuthUser, documentId: number, isHidden: boolean) {
     const sellerId = this.ensureSeller(user);
-    const id = Number(documentId);
+    const id = documentId;
 
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing || existing.seller_id !== sellerId) {
@@ -429,12 +465,12 @@ export class SellerService {
     user: AuthUser,
     status?: string,
     search?: string,
-    pageStr?: string,
-    limitStr?: string
+    pageValue?: number,
+    limitValue?: number
   ) {
     const sellerId = this.ensureSeller(user);
-    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
-    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const page = pageValue ?? 1;
+    const limit = limitValue ?? 10;
     const skip = (page - 1) * limit;
 
     const where: Prisma.order_itemsWhereInput = {

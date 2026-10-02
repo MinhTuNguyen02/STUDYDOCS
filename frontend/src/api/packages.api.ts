@@ -9,8 +9,8 @@ export const packagesApi = {
     const res = await api.get('/packages/my')
     return res.data
   },
-  buyPackage: async (packageId: number) => {
-    const res = await api.post(`/packages/${packageId}/buy`)
+  buyPackage: async (packageId: number, idempotencyKey: string) => {
+    const res = await api.post(`/packages/${packageId}/buy`, { idempotencyKey })
     return res.data
   }
 }

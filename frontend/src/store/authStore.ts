@@ -15,14 +15,13 @@ export interface AuthUser {
 
 interface AuthState {
   accessToken: string | null
-  refreshToken: string | null
   user: AuthUser | null
   isAuthenticated: boolean
   loginTimestamp: number | null
 
-  login(data: { accessToken: string; refreshToken: string; user: AuthUser }): void
+  login(data: { accessToken: string; user: AuthUser }): void
   logout(): void
-  setTokens(accessToken: string, refreshToken: string): void
+  setAccessToken(accessToken: string): void
   updateUser(partial: Partial<AuthUser>): void
 }
 
@@ -30,15 +29,13 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       accessToken: null,
-      refreshToken: null,
       user: null,
       isAuthenticated: false,
       loginTimestamp: null,
 
-      login: ({ accessToken, refreshToken, user }) =>
+      login: ({ accessToken, user }) =>
         set({
           accessToken,
-          refreshToken,
           user,
           isAuthenticated: true,
           loginTimestamp: Date.now(),
@@ -47,14 +44,12 @@ export const useAuthStore = create<AuthState>()(
       logout: () =>
         set({
           accessToken: null,
-          refreshToken: null,
           user: null,
           isAuthenticated: false,
           loginTimestamp: null,
         }),
 
-      setTokens: (accessToken, refreshToken) =>
-        set({ accessToken, refreshToken }),
+      setAccessToken: (accessToken) => set({ accessToken }),
 
       updateUser: (partial) =>
         set((state) => ({
@@ -63,6 +58,21 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'studydocs-auth',
+      version: 2,
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        loginTimestamp: state.loginTimestamp,
+      }),
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<AuthState>
+        return {
+          user: state.user ?? null,
+          isAuthenticated: Boolean(state.user && state.isAuthenticated),
+          loginTimestamp: state.loginTimestamp ?? null,
+          accessToken: null,
+        }
+      },
     }
   )
 )

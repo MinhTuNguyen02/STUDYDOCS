@@ -16,8 +16,8 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
       const items = res.items || res.data || []
       const ids = items.map((i: any) => i.document.id)
       set({ wishlistIds: ids })
-    } catch (err) {
-      console.error('Lỗi khi lấy wishlist global', err)
+    } catch {
+      set({ wishlistIds: [] })
     }
   },
 

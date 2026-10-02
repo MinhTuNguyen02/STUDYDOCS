@@ -21,20 +21,16 @@ export class ReviewsService {
     });
 
     const avg = aggregate._avg.rating ?? 0;
-    const count = aggregate._count._all;
-
     await this.prisma.documents.update({
       where: { document_id: documentId },
       data: {
-        average_rating: new Prisma.Decimal(avg).toDecimalPlaces(2),
+        average_rating: new Prisma.Decimal(avg).toDecimalPlaces(2)
         // rating_count: count
       }
     });
   }
 
-  async listByDocument(documentId: string) {
-    const docId = Number(documentId);
-
+  async listByDocument(docId: number) {
     const reviews = await this.prisma.reviews.findMany({
       where: { document_id: docId, is_deleted: { not: true } },
       include: {
@@ -65,10 +61,9 @@ export class ReviewsService {
     );
   }
 
-  async upsertMyReview(user: AuthUser, documentId: string, dto: UpsertReviewDto) {
+  async upsertMyReview(user: AuthUser, docId: number, dto: UpsertReviewDto) {
     if (!user.customerId) throw new ForbiddenException('Tai khoan nay khong the danh gia.');
 
-    const docId = Number(documentId);
     const document = await this.prisma.documents.findUnique({ where: { document_id: docId } });
     if (!document) throw new NotFoundException('Khong tim thay tai lieu.');
 
@@ -79,7 +74,7 @@ export class ReviewsService {
           buyer_id: user.customerId,
           status: 'PAID'
         },
-        status: { in: ['PAID', 'RELEASED'] }
+        status: 'PAID'
       },
       orderBy: { created_at: 'asc' }
     });
@@ -96,7 +91,9 @@ export class ReviewsService {
     });
 
     if (existingByDoc && existingByDoc.is_deleted) {
-      throw new ForbiddenException('Bạn chỉ được tham gia đánh giá 1 lần cho mỗi tài liệu (Đánh giá của bạn đã bị xóa)');
+      throw new ForbiddenException(
+        'Bạn chỉ được tham gia đánh giá 1 lần cho mỗi tài liệu (Đánh giá của bạn đã bị xóa)'
+      );
     }
 
     const result = existingByDoc
@@ -186,7 +183,7 @@ export class ReviewsService {
     const review = await this.prisma.reviews.findUnique({ where: { review_id: reviewId } });
     if (!review) throw new NotFoundException('Không tìm thấy đánh giá.');
 
-    const isStaff = user.roleNames?.some(r => ['admin', 'mod'].includes(r.toLowerCase()));
+    const isStaff = user.roleNames?.some((r) => ['admin', 'mod'].includes(r.toLowerCase()));
     if (!isStaff && review.buyer_id !== user.customerId) {
       throw new ForbiddenException('Bạn không có quyền xóa đánh giá này.');
     }
@@ -213,13 +210,13 @@ export class ReviewsService {
   }
 
   async deleteReply(user: AuthUser, reviewId: number) {
-    const review = await this.prisma.reviews.findUnique({ 
+    const review = await this.prisma.reviews.findUnique({
       where: { review_id: reviewId },
       include: { documents: true }
     });
     if (!review) throw new NotFoundException('Không tìm thấy đánh giá.');
 
-    const isStaff = user.roleNames?.some(r => ['admin', 'mod'].includes(r.toLowerCase()));
+    const isStaff = user.roleNames?.some((r) => ['admin', 'mod'].includes(r.toLowerCase()));
     if (!isStaff && review.documents.seller_id !== user.customerId) {
       throw new ForbiddenException('Bạn không có quyền xóa phản hồi này.');
     }

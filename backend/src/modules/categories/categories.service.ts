@@ -2,17 +2,24 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../database/prisma.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { AuthUser } from '../../common/security/auth-user.interface';
+import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: any, actor: AuthUser) {
+  async create(dto: CreateCategoryDto, actor: AuthUser) {
+    if (dto.parent_id) {
+      const parent = await this.prisma.categories.findUnique({
+        where: { category_id: dto.parent_id }
+      });
+      if (!parent) throw new BadRequestException('Danh mục cha không tồn tại.');
+    }
     const category = await this.prisma.categories.create({
       data: {
         name: dto.name,
         slug: dto.slug,
-        parent_id: dto.parent_id ? Number(dto.parent_id) : null
+        parent_id: dto.parent_id ?? null
       }
     });
 
@@ -45,11 +52,11 @@ export class CategoriesService {
     const map = new Map();
     const roots: any[] = [];
 
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       map.set(cat.category_id, { ...cat, children: [] });
     });
 
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       if (cat.parent_id) {
         const parent = map.get(cat.parent_id);
         if (parent) parent.children.push(map.get(cat.category_id));
@@ -61,15 +68,34 @@ export class CategoriesService {
     return toJsonSafe(roots);
   }
 
-  async update(id: number, dto: any, actor: AuthUser) {
+  async update(id: number, dto: UpdateCategoryDto, actor: AuthUser) {
     const exists = await this.prisma.categories.findUnique({ where: { category_id: id } });
     if (!exists) throw new NotFoundException('Danh mục không tồn tại');
 
     // Mở rộng thêm: Nếu FE gửi parent_id là null để gỡ cha của 1 danh mục
     // Chúng ta cần xử lý việc FE có thể gửi parent_id = null thay vì chỉ undefined
-    const parentIdToUpdate = dto.parent_id !== undefined
-      ? (dto.parent_id ? Number(dto.parent_id) : null)
-      : exists.parent_id;
+    const parentIdToUpdate =
+      dto.parent_id !== undefined ? (dto.parent_id ?? null) : exists.parent_id;
+
+    if (parentIdToUpdate === id) {
+      throw new BadRequestException('Danh mục không thể là cha của chính nó.');
+    }
+    if (parentIdToUpdate) {
+      const categories = await this.prisma.categories.findMany({
+        select: { category_id: true, parent_id: true }
+      });
+      const parents = new Map(
+        categories.map((category) => [category.category_id, category.parent_id])
+      );
+      if (!parents.has(parentIdToUpdate))
+        throw new BadRequestException('Danh mục cha không tồn tại.');
+      let cursor: number | null = parentIdToUpdate;
+      while (cursor !== null) {
+        if (cursor === id)
+          throw new BadRequestException('Cấu trúc danh mục không được tạo chu trình.');
+        cursor = parents.get(cursor) ?? null;
+      }
+    }
 
     const updated = await this.prisma.categories.update({
       where: { category_id: id },
@@ -83,13 +109,17 @@ export class CategoriesService {
 
     let oldParentName = null;
     if (exists.parent_id) {
-      const oldParent = await this.prisma.categories.findUnique({ where: { category_id: exists.parent_id } });
+      const oldParent = await this.prisma.categories.findUnique({
+        where: { category_id: exists.parent_id }
+      });
       oldParentName = oldParent?.name;
     }
 
     let newParentName = null;
     if (updated.parent_id) {
-      const newParent = await this.prisma.categories.findUnique({ where: { category_id: updated.parent_id } });
+      const newParent = await this.prisma.categories.findUnique({
+        where: { category_id: updated.parent_id }
+      });
       newParentName = newParent?.name;
     }
 
@@ -126,7 +156,9 @@ export class CategoriesService {
       return removed;
     } catch (error: any) {
       if (error.code === 'P2003') {
-        throw new BadRequestException('Không thể xóa danh mục. Hiện đang có danh mục con hoặc tài liệu thuộc danh mục này.');
+        throw new BadRequestException(
+          'Không thể xóa danh mục. Hiện đang có danh mục con hoặc tài liệu thuộc danh mục này.'
+        );
       }
       throw error;
     }

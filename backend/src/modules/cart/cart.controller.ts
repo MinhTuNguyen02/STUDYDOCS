@@ -1,5 +1,14 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Controller, Get, Post, Delete, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Body,
+  Param,
+  ParseIntPipe,
+  UseGuards
+} from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CartActionDto } from './dto/cart.dto';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
@@ -24,7 +33,7 @@ export class CartController {
 
   @Delete('remove/:documentId')
   removeFromCart(
-    @CurrentUser() user: AuthUser, 
+    @CurrentUser() user: AuthUser,
     @Param('documentId', ParseIntPipe) documentId: number
   ) {
     return this.cartService.removeFromCart(user, documentId);

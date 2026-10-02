@@ -8,16 +8,18 @@ export class WishlistsService {
 
   async toggleWishlist(user: AuthUser, documentId: number) {
     if (!user.customerId) throw new NotFoundException('Chỉ khách hàng mới có wishlist.');
-    
+
     // Check if doc exists
     const doc = await this.prisma.documents.findUnique({
       where: { document_id: documentId }
     });
-    
+
     if (!doc) throw new NotFoundException('Tài liệu không tồn tại.');
 
     if (doc.seller_id === user.customerId) {
-      throw new ConflictException('Không thể thêm tài liệu của chính mình vào danh sách yêu thích.');
+      throw new ConflictException(
+        'Không thể thêm tài liệu của chính mình vào danh sách yêu thích.'
+      );
     }
 
     const existing = await this.prisma.wishlists.findFirst({
@@ -47,16 +49,16 @@ export class WishlistsService {
 
   async getWishlists(user: AuthUser) {
     if (!user.customerId) throw new NotFoundException('Chỉ khách hàng mới có wishlist.');
-    
+
     const items = await this.prisma.wishlists.findMany({
       where: { customer_id: user.customerId },
       orderBy: { created_at: 'desc' },
       include: {
         documents: {
-          select: { 
-            document_id: true, 
-            title: true, 
-            price: true, 
+          select: {
+            document_id: true,
+            title: true,
+            price: true,
             slug: true,
             file_extension: true,
             preview_url: true,
@@ -68,7 +70,7 @@ export class WishlistsService {
 
     return {
       message: 'Lấy trạng thái wishlist thành công.',
-      items: items.map(i => ({
+      items: items.map((i) => ({
         addedAt: i.created_at,
         document: {
           id: i.documents.document_id,

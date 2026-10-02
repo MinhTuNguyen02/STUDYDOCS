@@ -1,24 +1,38 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  ParseIntPipe
+} from '@nestjs/common';
 import { PoliciesService } from './policies.service';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 import { RolesGuard } from '../../common/security/roles.guard';
 import { Roles } from '../../common/security/roles.decorator';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 export class CreatePolicyDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
   title!: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   slug!: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(500_000)
   content!: string;
 
   @IsOptional()
@@ -36,16 +50,16 @@ export class PoliciesController {
     return this.policiesService.findAll(true);
   }
 
-  @Get(':slug')
-  getDetail(@Param('slug') slug: string) {
-    return this.policiesService.findBySlug(slug);
-  }
-
   @Get('admin/all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
   getListAdmin() {
     return this.policiesService.findAll(false);
+  }
+
+  @Get(':slug')
+  getDetail(@Param('slug') slug: string) {
+    return this.policiesService.findBySlug(slug);
   }
 
   @Post()

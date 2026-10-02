@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import { reviewsApi } from '@/api/reviews.api'
@@ -24,6 +24,7 @@ export default function DocumentDetailPage() {
   const [doc, setDoc] = useState<any>(null)
   const [reviews, setReviews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [addingToCart, setAddingToCart] = useState(false)
   const [addingToWishlist, setAddingToWishlist] = useState(false)
   const [isPurchased, setIsPurchased] = useState(false)
@@ -53,11 +54,14 @@ export default function DocumentDetailPage() {
     }
   }
 
-  const fetchDocAndReviews = async () => {
+  const fetchDocAndReviews = useCallback(async () => {
+    if (!id) return
+    setLoading(true)
+    setError(null)
     try {
       const [docRes, revRes] = await Promise.all([
-        documentsApi.getDocumentById(id!),
-        documentsApi.getReviews(id!).catch(() => ({ data: [] }))
+        documentsApi.getDocumentById(id),
+        documentsApi.getReviews(id).catch(() => ({ data: [] }))
       ])
       const docData = docRes.data || docRes;
       setDoc(docData)
@@ -66,21 +70,23 @@ export default function DocumentDetailPage() {
       // Check if purchased uses the backend provided flag
       setIsPurchased(!!docData.hasPurchased)
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Lỗi khi tải tài liệu')
+      const msg = err?.response?.data?.message || 'Lỗi khi tải tài liệu'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
-    if (id) fetchDocAndReviews()
-  }, [id, user])
+    if (id) void fetchDocAndReviews()
+  }, [fetchDocAndReviews, id, user])
 
   useEffect(() => {
     if (id) {
       const viewedDocs = JSON.parse(localStorage.getItem('viewedDocs') || '[]')
       if (!viewedDocs.includes(id)) {
-        documentsApi.incrementView(id).catch(console.error)
+        documentsApi.incrementView(id).catch(() => undefined)
         viewedDocs.push(id)
         localStorage.setItem('viewedDocs', JSON.stringify(viewedDocs))
       }
@@ -143,7 +149,20 @@ export default function DocumentDetailPage() {
     }
   }
 
-  if (loading) return <div className="text-center py-24 text-muted-foreground">Đang tải...</div>
+  if (loading) return <div className="text-center py-24 text-muted-foreground">Đang tải tài liệu...</div>
+
+  if (error) return (
+    <div className="max-w-4xl mx-auto py-24 px-4 text-center">
+      <p className="text-danger mb-4 font-medium">{error}</p>
+      <button
+        onClick={fetchDocAndReviews}
+        className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
+      >
+        Thử lại
+      </button>
+    </div>
+  )
+
   if (!doc) return <div className="text-center py-24 text-muted-foreground">Không tìm thấy tài liệu</div>
 
   const isFree = !doc.price || Number(doc.price) === 0

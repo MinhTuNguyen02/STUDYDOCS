@@ -7,8 +7,10 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(user: AuthUser, status?: string, pageStr?: string, limitStr?: string) {
-    const isInternalRole = user.roleNames.some((role) => ['admin', 'mod', 'accountant'].includes(role));
+  async findAll(user: AuthUser, status?: string, pageValue?: number, limitValue?: number) {
+    const isInternalRole = user.roleNames.some((role) =>
+      ['admin', 'mod', 'accountant'].includes(role)
+    );
 
     const where = isInternalRole
       ? undefined
@@ -21,8 +23,8 @@ export class OrdersService {
       whereConfig.status = status;
     }
 
-    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
-    const limit = limitStr ? parseInt(limitStr, 10) : 10;
+    const page = pageValue ?? 1;
+    const limit = limitValue ?? 10;
     const skip = (page - 1) * limit;
 
     const [total, orders] = await Promise.all([
@@ -52,24 +54,24 @@ export class OrdersService {
     return {
       meta: { page, limit, total },
       data: toJsonSafe(
-      orders.map((order) => ({
-        id: order.order_id,
-        buyerId: order.buyer_id,
-        buyerName: order.customer_profiles.full_name,
-        totalAmount: order.total_amount,
-        status: order.status,
-        createdAt: order.created_at,
-        items: order.order_items.map((item) => ({
-          id: item.order_item_id,
-          status: item.status,
-          unitPrice: item.unit_price,
-          document: {
-            id: item.documents.document_id,
-            title: item.documents.title,
-            slug: item.documents.slug
-          }
+        orders.map((order) => ({
+          id: order.order_id,
+          buyerId: order.buyer_id,
+          buyerName: order.customer_profiles.full_name,
+          totalAmount: order.total_amount,
+          status: order.status,
+          createdAt: order.created_at,
+          items: order.order_items.map((item) => ({
+            id: item.order_item_id,
+            status: item.status,
+            unitPrice: item.unit_price,
+            document: {
+              id: item.documents.document_id,
+              title: item.documents.title,
+              slug: item.documents.slug
+            }
+          }))
         }))
-      }))
       )
     };
   }

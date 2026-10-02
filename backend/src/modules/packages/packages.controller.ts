@@ -7,6 +7,7 @@ import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { Roles } from '../../common/security/roles.decorator';
 import { PhoneVerifiedGuard } from '../../common/security/phone-verified.guard';
+import { BuyPackageDto, CreatePackageDto, UpdatePackageDto } from './dto/package.dto';
 
 @ApiTags('Financial & Packages')
 @Controller('packages')
@@ -34,21 +35,29 @@ export class PackagesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  createPackage(@CurrentUser() user: AuthUser, @Body() dto: any) {
+  createPackage(@CurrentUser() user: AuthUser, @Body() dto: CreatePackageDto) {
     return this.packagesService.createPackage(dto, user);
   }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  updatePackage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number, @Body() dto: any) {
+  updatePackage(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePackageDto
+  ) {
     return this.packagesService.updatePackage(id, dto, user);
   }
 
   @Post(':id/buy')
   @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
-  buyPackage(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
-    return this.packagesService.buyPackage(user, id);
+  buyPackage(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: BuyPackageDto
+  ) {
+    return this.packagesService.buyPackage(user, id, dto.idempotencyKey);
   }
 
   @Put(':id/delete')

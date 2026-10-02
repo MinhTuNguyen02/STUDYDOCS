@@ -1,26 +1,26 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { LedgerService } from '../wallets/ledger.service';
-import { Prisma } from '@prisma/client';
-import { AuthUser } from '../../common/security/auth-user.interface';
-import { toJsonSafe } from '../../common/utils/to-json-safe.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PenaltyService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ledger: LedgerService
+    private readonly notifications: NotificationsService
   ) {}
 
-  // Automatically count violations and apply actions
+  /**
+   * Áp dụng sanction phi tài chính cho hành vi tải file trùng lặp.
+   * Mốc 3 lần: cảnh báo chính thức. Mốc 5 lần: khóa tài khoản và thu hồi session.
+   */
   async evaluateUserViolations(customerId: number) {
     const profile = await this.prisma.customer_profiles.findUnique({
-      where: { customer_id: customerId }
+      where: { customer_id: customerId },
+      include: { accounts: true }
     });
 
     if (!profile) return;
 
-    // Count UPLOAD_VIOLATION in audit_logs for this accountId
     const violationCount = await this.prisma.audit_logs.count({
       where: {
         account_id: profile.account_id,
@@ -29,84 +29,59 @@ export class PenaltyService {
     });
 
     if (violationCount === 3) {
-      // Third violation: Deduct 50,000 from REVENUE wallet as fine
-      await this.applyFine(profile.account_id, customerId, 50000, 'Phat 50,000 VND do vi pham ban quyen nhieu lan.');
-    } else if (violationCount >= 5) {
-      // Fifth violation: Block account
-      await this.prisma.accounts.update({
-        where: { account_id: profile.account_id },
-        data: { status: 'BANNED' }
-      });
-      await this.prisma.user_sessions.updateMany({
-        where: { account_id: profile.account_id, is_revoked: false },
-        data: { is_revoked: true }
-      });
-      console.log(`[PenaltyService] Banned user ${profile.account_id} due to 5 violations.`);
-    }
-  }
-
-  async applyFine(accountId: number, customerId: number, amount: number, reason: string) {
-    await this.prisma.$transaction(async (tx) => {
-      const { systemRevenue } = await this.ledger.getSystemWallets(tx);
-
-      const sellerWallet = await tx.wallets.findUnique({
-        where: { customer_id_wallet_type: { customer_id: customerId, wallet_type: 'REVENUE' } }
-      });
-
-      if (!sellerWallet) {
-        throw new BadRequestException('Khong tim thay vi REVENUE cua user de phat.');
-      }
-
-      const fineAmount = new Prisma.Decimal(amount);
-      const debitAmount = Prisma.Decimal.min(sellerWallet.balance, fineAmount);
-
-      if (debitAmount.gt(0)) {
-        await tx.wallets.update({
-          where: { wallet_id: sellerWallet.wallet_id },
-          data: { balance: { decrement: debitAmount } }
-        });
-
-        await tx.wallets.update({
-          where: { wallet_id: systemRevenue.wallet_id },
-          data: { balance: { increment: debitAmount } }
-        });
-
-        // Add ledger record: type WITHDRAW/REFUND equivalent, let's use REFUND or a custom type if exists, but schema enum has PURCHASE | WITHDRAW | DEPOSIT | REFUND.
-        // Penalty is effectively a system "REFUND" or "WITHDRAW" taking from seller to system. Let's use WITHDRAW.
-        await this.ledger.recordTransaction(
-          tx,
-          'WITHDRAW',
-          'PENALTY',
-          sellerWallet.wallet_id,
-          reason,
-          [
-            { wallet_id: sellerWallet.wallet_id, debit_amount: debitAmount, credit_amount: 0 },
-            { wallet_id: systemRevenue.wallet_id, debit_amount: 0, credit_amount: debitAmount }
-          ]
-        );
-      }
-
-      await tx.audit_logs.create({
+      await this.prisma.audit_logs.create({
         data: {
-          account_id: accountId,
-          action: 'PENALTY_APPLIED',
-          target_table: 'wallets',
-          target_id: sellerWallet.wallet_id,
-          old_value: { balance: sellerWallet.balance },
-          new_value: { reason, amountFined: debitAmount }
+          account_id: profile.account_id,
+          action: 'UPLOAD_WARNING',
+          target_table: 'accounts',
+          target_id: profile.account_id,
+          old_value: { status: profile.accounts.status },
+          new_value: { violationCount, sanction: 'MANUAL_REVIEW' }
         }
       });
-    });
-  }
 
-  // Callable by Moderation or Admin
-  async manualPenalty(actor: AuthUser, targetCustomerId: number, amount: number, reason: string) {
-    const profile = await this.prisma.customer_profiles.findUnique({
-      where: { customer_id: targetCustomerId }
-    });
-    if (!profile) throw new BadRequestException('Khach hang khong hop le.');
-    
-    await this.applyFine(profile.account_id, targetCustomerId, amount, reason);
-    return { message: 'Da xu phat thanh cong.' };
+      await this.notifications.notify({
+        accountId: profile.account_id,
+        type: 'SYSTEM',
+        title: 'Cảnh báo vi phạm tải tài liệu',
+        message:
+          'Bạn đã có 3 lần tải tài liệu trùng lặp. Các lần vi phạm tiếp theo có thể khiến tài khoản bị khóa.',
+        referenceId: profile.account_id,
+        referenceType: 'ACCOUNT'
+      });
+      return;
+    }
+
+    if (violationCount >= 5 && profile.accounts.status !== 'BANNED') {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.accounts.update({
+          where: { account_id: profile.account_id },
+          data: { status: 'BANNED', banned_until: null }
+        });
+        await tx.user_sessions.updateMany({
+          where: { account_id: profile.account_id, is_revoked: false },
+          data: { is_revoked: true }
+        });
+        await tx.audit_logs.create({
+          data: {
+            account_id: profile.account_id,
+            action: 'ACCOUNT_BANNED',
+            target_table: 'accounts',
+            target_id: profile.account_id,
+            old_value: { status: profile.accounts.status },
+            new_value: { status: 'BANNED', violationCount, reason: 'UPLOAD_VIOLATION' }
+          }
+        });
+      });
+
+      await this.notifications.notify({
+        accountId: profile.account_id,
+        type: 'ACCOUNT_BANNED',
+        title: 'Tài khoản đã bị khóa',
+        message: 'Tài khoản bị khóa do nhiều lần tải lên tài liệu trùng lặp.',
+        referenceId: profile.account_id,
+        referenceType: 'ACCOUNT'
+      });
+    }
   }
 }

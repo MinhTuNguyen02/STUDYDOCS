@@ -1,5 +1,5 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
@@ -39,7 +39,11 @@ export class WalletsController {
   @Patch('withdrawals/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('accountant', 'admin')
-  processWithdrawal(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ProcessWithdrawalDto) {
+  processWithdrawal(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ProcessWithdrawalDto
+  ) {
     return this.walletsService.processWithdrawal(user, id, dto);
   }
 }

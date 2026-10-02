@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from '@/store/authStore'
 import SellerLayout from '@/components/layout/SellerLayout'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts'
+import toast from 'react-hot-toast'
 
 type FilterMode = 'DAY' | 'MONTH' | 'YEAR'
 
@@ -95,6 +96,8 @@ export default function SellerDashboardPage() {
 
   useEffect(() => {
     applyFilter()
+    // Initial dashboard load only; later draft filter changes are applied by the user action.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const applyFilter = () => {
@@ -125,8 +128,8 @@ export default function SellerDashboardPage() {
     try {
       const res = await sellerApi.getDashboardStats(startDate, endDate)
       setStats(res.data || res)
-    } catch (err) {
-      console.error(err)
+    } catch {
+      toast.error('Không thể tải thống kê người bán')
     } finally {
       setLoadingStats(false)
     }
@@ -137,8 +140,8 @@ export default function SellerDashboardPage() {
     try {
       const res = await sellerApi.getMonthlyTrend(y)
       setTrend(res.data || res || [])
-    } catch (err) {
-      console.error(err)
+    } catch {
+      toast.error('Không thể tải xu hướng theo tháng')
     } finally {
       setLoadingTrend(false)
     }
@@ -149,8 +152,8 @@ export default function SellerDashboardPage() {
     try {
       const res = await sellerApi.getDailyTrend(startDate, endDate)
       setTrend(res.data || res || [])
-    } catch (err) {
-      console.error(err)
+    } catch {
+      toast.error('Không thể tải xu hướng theo ngày')
     } finally {
       setLoadingTrend(false)
     }

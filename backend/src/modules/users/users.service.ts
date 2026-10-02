@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -9,7 +8,7 @@ import { compare, hash } from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async getProfile(user: AuthUser) {
     if (!user.customerId) {
@@ -39,7 +38,8 @@ export class UsersService {
   }
 
   async updateProfile(user: AuthUser, dto: UpdateProfileDto) {
-    if (!user.customerId) throw new BadRequestException('Khong the cap nhat hobo staff tu endpoint nay.');
+    if (!user.customerId)
+      throw new BadRequestException('Khong the cap nhat hobo staff tu endpoint nay.');
 
     const updated = await this.prisma.customer_profiles.update({
       where: { customer_id: user.customerId },
@@ -64,16 +64,21 @@ export class UsersService {
     const { currentPassword, newPassword } = dto;
     const isMatched = account.password_hash.startsWith('$2')
       ? await compare(currentPassword, account.password_hash)
-      : account.password_hash === currentPassword;
+      : false;
 
     if (!isMatched) {
       throw new BadRequestException('Mật khẩu hiện tại không chính xác.');
     }
 
-    const newHash = await hash(newPassword, 10);
+    const newHash = await hash(newPassword, 12);
     await this.prisma.accounts.update({
       where: { account_id: account.account_id },
       data: { password_hash: newHash }
+    });
+
+    await this.prisma.user_sessions.updateMany({
+      where: { account_id: account.account_id, is_revoked: false },
+      data: { is_revoked: true }
     });
 
     return { message: 'Đổi mật khẩu thành công.' };

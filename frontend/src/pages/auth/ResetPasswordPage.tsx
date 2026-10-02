@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { authApi } from '@/api/auth.api';
 import toast from 'react-hot-toast';
 import { Lock, ArrowRight, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/utils/password';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -29,8 +30,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error('Mật khẩu phải từ 6 ký tự trở lên.');
+    if (!isStrongPassword(password)) {
+      toast.error(PASSWORD_REQUIREMENTS);
       return;
     }
 
@@ -87,6 +88,8 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    minLength={8}
+                    maxLength={72}
                     className="w-full pl-10 pr-12 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm font-medium"
                   />
                   <button
@@ -97,6 +100,7 @@ export default function ResetPasswordPage() {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                <p className="text-xs text-muted-foreground">{PASSWORD_REQUIREMENTS}</p>
               </div>
 
               <div className="space-y-2">
@@ -109,6 +113,8 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    minLength={8}
+                    maxLength={72}
                     className="w-full pl-10 pr-12 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all text-sm font-medium"
                   />
                 </div>

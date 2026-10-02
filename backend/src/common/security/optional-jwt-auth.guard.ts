@@ -27,7 +27,9 @@ export class OptionalJwtAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest<{ headers: Record<string, string | undefined>; user?: AuthUser }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ headers: Record<string, string | undefined>; user?: AuthUser }>();
     const token = this.extractBearerToken(request.headers.authorization);
 
     if (!token) {
@@ -36,7 +38,7 @@ export class OptionalJwtAuthGuard implements CanActivate {
 
     try {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
-        secret: this.configService.get<string>('JWT_ACCESS_SECRET', 'dev_access_secret')
+        secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET')
       });
 
       const accountId = Number(payload.sub);

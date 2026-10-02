@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { DocumentSearchDto } from './dto/document-search.dto';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
@@ -10,14 +10,15 @@ export class DocumentsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: DocumentSearchDto) {
-    const page = query.page ? Number(query.page) : 1;
-    const limit = query.limit ? Number(query.limit) : 20;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
-    
+
     // Build query
     const where: Prisma.documentsWhereInput = {
       status: 'APPROVED',
-      delete_at: null
+      delete_at: null,
+      is_user_hidden: false
     };
 
     if (query.keyword) {
@@ -26,7 +27,7 @@ export class DocumentsService {
         { description: { contains: query.keyword, mode: 'insensitive' } }
       ];
     }
-    
+
     if (query.categoryId) {
       const categoryIds = await this.getCategoryIdsRecursively(query.categoryId);
       where.category_id = { in: categoryIds };
@@ -86,13 +87,13 @@ export class DocumentsService {
     };
   }
 
-  async findOne(id: string, user?: AuthUser) {
-    const documentId = Number(id);
+  async findOne(documentId: number, user?: AuthUser) {
     const document = await this.prisma.documents.findFirst({
       where: {
         document_id: documentId,
         status: 'APPROVED',
-        delete_at: null
+        delete_at: null,
+        is_user_hidden: false
       },
       include: {
         customer_profiles: true,
@@ -151,7 +152,7 @@ export class DocumentsService {
       categoryName: document.categories?.name,
       sellerId: document.customer_profiles?.customer_id,
       sellerName: document.customer_profiles?.full_name,
-      tags: document.document_tags.map(t => t.tags.tag_name),
+      tags: document.document_tags.map((t) => t.tags.tag_name),
       previewUrl: document.preview_url,
       hasPurchased,
       hasReviewed,
@@ -160,27 +161,32 @@ export class DocumentsService {
     });
   }
 
-  async incrementViewCount(id: string) {
+  async incrementViewCount(id: number) {
     await this.prisma.documents.updateMany({
-      where: { document_id: Number(id), status: 'APPROVED' },
+      where: { document_id: id, status: 'APPROVED' },
       data: { view_count: { increment: 1 } }
     });
     return { success: true };
   }
 
   private async getCategoryIdsRecursively(categoryId: number): Promise<number[]> {
-    const ids: number[] = [categoryId];
-
-    const children = await this.prisma.categories.findMany({
-      where: { parent_id: categoryId, delete_at: null },
-      select: { category_id: true }
+    const categories = await this.prisma.categories.findMany({
+      where: { delete_at: null },
+      select: { category_id: true, parent_id: true }
     });
+    const ids = new Set<number>([categoryId]);
+    const queue = [categoryId];
 
-    for (const child of children) {
-      const childIds = await this.getCategoryIdsRecursively(child.category_id);
-      ids.push(...childIds);
+    while (queue.length > 0) {
+      const parentId = queue.shift()!;
+      for (const category of categories) {
+        if (category.parent_id === parentId && !ids.has(category.category_id)) {
+          ids.add(category.category_id);
+          queue.push(category.category_id);
+        }
+      }
     }
 
-    return ids;
+    return [...ids];
   }
 }

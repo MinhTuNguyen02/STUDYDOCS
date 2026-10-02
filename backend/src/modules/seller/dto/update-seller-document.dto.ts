@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-﻿import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateSellerDocumentDto {
   @ApiProperty({ example: 'Mẫu tài liệu/Sản phẩm' })

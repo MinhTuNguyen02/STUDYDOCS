@@ -1,12 +1,12 @@
-import api from './client';
+import api from "./client";
 
 export const adminApi = {
   getDashboardStats: async (params?: any) => {
-    const res = await api.get('/admin/dashboard', { params });
+    const res = await api.get("/admin/dashboard", { params });
     return res.data;
   },
-  getApprovals: async () => {
-    const res = await api.get('/admin/approvals/documents');
+  getApprovals: async (params?: any) => {
+    const res = await api.get("/admin/approvals/documents", { params });
     return res.data;
   },
   approveDocument: async (id: number) => {
@@ -14,7 +14,9 @@ export const adminApi = {
     return res.data;
   },
   rejectDocument: async (id: number, reason: string) => {
-    const res = await api.patch(`/admin/approvals/documents/${id}/reject`, { reason });
+    const res = await api.patch(`/admin/approvals/documents/${id}/reject`, {
+      reason,
+    });
     return res.data;
   },
   getDocumentReviewUrl: async (id: number) => {
@@ -23,20 +25,27 @@ export const adminApi = {
   },
 
   getUsers: async (params?: any) => {
-    const res = await api.get('/admin/users', { params });
+    const res = await api.get("/admin/users", { params });
     return res.data;
   },
   toggleUserStatus: async (id: number, durationDays: number | null = null) => {
-    const res = await api.patch(`/admin/users/${id}/toggle-active`, { durationDays });
+    const res = await api.patch(`/admin/users/${id}/toggle-active`, {
+      durationDays,
+    });
     return res.data;
   },
-  createStaffAccount: async (data: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }) => {
-    const res = await api.post('/admin/users/staff', data);
+  createStaffAccount: async (data: {
+    email: string;
+    fullName: string;
+    password: string;
+    role: "MOD" | "ACCOUNTANT";
+  }) => {
+    const res = await api.post("/admin/users/staff", data);
     return res.data;
   },
 
   getAllDocuments: async (params?: any) => {
-    const res = await api.get('/admin/documents', { params });
+    const res = await api.get("/admin/documents", { params });
     return res.data;
   },
   softDeleteDocument: async (id: number) => {
@@ -48,17 +57,20 @@ export const adminApi = {
     return res.data;
   },
 
-  getWithdrawals: async () => {
-    const res = await api.get('/admin/withdrawals');
+  getWithdrawals: async (params?: any) => {
+    const res = await api.get("/admin/withdrawals", { params });
     return res.data;
   },
-  processWithdrawal: async (id: number, data: { status: string; note?: string }) => {
+  processWithdrawal: async (
+    id: number,
+    data: { status: string; note?: string },
+  ) => {
     const res = await api.patch(`/wallets/withdrawals/${id}`, data);
     return res.data;
   },
 
-  getReports: async () => {
-    const res = await api.get('/reports');
+  getReports: async (params?: any) => {
+    const res = await api.get("/reports", { params });
     return res.data;
   },
   resolveReport: async (id: number, data: { status: string }) => {
@@ -67,40 +79,50 @@ export const adminApi = {
   },
 
   getReconciliation: async () => {
-    const res = await api.get('/admin/reconciliation');
+    const res = await api.get("/admin/reconciliation");
     return res.data;
   },
   getRevenueReport: async (params?: any) => {
-    const res = await api.get('/admin/reports/revenue', { params });
+    const res = await api.get("/admin/reports/revenue", { params });
     return res.data;
   },
   getGatewayWallet: async (params?: any) => {
-    const res = await api.get('/admin/wallets/gateway', { params });
+    const res = await api.get("/admin/wallets/gateway", { params });
     return res.data;
   },
   getTaxWallet: async (params?: any) => {
-    const res = await api.get('/admin/wallets/tax', { params });
+    const res = await api.get("/admin/wallets/tax", { params });
     return res.data;
   },
   payTax: async (data: { amount: number; note: string }) => {
-    const res = await api.post('/admin/wallets/tax/pay', data);
+    const res = await api.post("/admin/wallets/tax/pay", data);
     return res.data;
   },
 
   getConfigs: async () => {
-    const res = await api.get('/configs');
+    const res = await api.get("/configs");
     return res.data;
   },
-  updateConfig: async (key: string, data: { value: string; description?: string }) => {
+  updateConfig: async (
+    key: string,
+    data: { value: string; description?: string },
+  ) => {
     const res = await api.put(`/configs/${key}`, data);
     return res.data;
   },
   getPackages: async () => {
-    const res = await api.get('/packages/admin/all');
+    const res = await api.get("/packages/admin/all");
     return res.data;
   },
-  createPackage: async (data: { name: string; description: string; price: number; download_turns: number; duration_days: number; is_active?: boolean }) => {
-    const res = await api.post('/packages', data);
+  createPackage: async (data: {
+    name: string;
+    description: string;
+    price: number;
+    download_turns: number;
+    duration_days: number;
+    is_active?: boolean;
+  }) => {
+    const res = await api.post("/packages", data);
     return res.data;
   },
   updatePackage: async (id: number, data: any) => {
@@ -113,11 +135,18 @@ export const adminApi = {
   },
 
   // ── Categories ──
-  createCategory: async (data: { name: string; slug: string; parent_id?: number }) => {
-    const res = await api.post('/categories', data);
+  createCategory: async (data: {
+    name: string;
+    slug: string;
+    parent_id?: number;
+  }) => {
+    const res = await api.post("/categories", data);
     return res.data;
   },
-  updateCategory: async (id: number, data: { name?: string; slug?: string; parent_id?: number }) => {
+  updateCategory: async (
+    id: number,
+    data: { name?: string; slug?: string; parent_id?: number },
+  ) => {
     const res = await api.patch(`/categories/${id}`, data);
     return res.data;
   },
@@ -128,7 +157,7 @@ export const adminApi = {
 
   // ── Tags ──
   createTag: async (data: { tag_name: string; slug: string }) => {
-    const res = await api.post('/tags', data);
+    const res = await api.post("/tags", data);
     return res.data;
   },
   updateTag: async (id: number, data: { tag_name?: string; slug?: string }) => {
@@ -142,14 +171,22 @@ export const adminApi = {
 
   // ── Policies ──
   getPolicies: async () => {
-    const res = await api.get('/policies/admin/all');
+    const res = await api.get("/policies/admin/all");
     return res.data;
   },
-  createPolicy: async (data: { title: string; slug: string; content: string; isActive?: boolean }) => {
-    const res = await api.post('/policies', data);
+  createPolicy: async (data: {
+    title: string;
+    slug: string;
+    content: string;
+    isActive?: boolean;
+  }) => {
+    const res = await api.post("/policies", data);
     return res.data;
   },
-  updatePolicy: async (id: number, data: { title: string; slug: string; content: string; isActive?: boolean }) => {
+  updatePolicy: async (
+    id: number,
+    data: { title: string; slug: string; content: string; isActive?: boolean },
+  ) => {
     const res = await api.put(`/policies/${id}`, data);
     return res.data;
   },
@@ -160,13 +197,16 @@ export const adminApi = {
 
   // ── Audit Logs ──
   getAuditLogs: async (params?: any) => {
-    const res = await api.get('/admin/audit-logs', { params });
+    const res = await api.get("/admin/audit-logs", { params });
     return res.data;
   },
 
   // ── Gateway Wallet ──
-  getGatewayWalletReport: async (params?: { startDate?: string; endDate?: string }) => {
-    const res = await api.get('/admin/wallets/gateway', { params });
+  getGatewayWalletReport: async (params?: {
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const res = await api.get("/admin/wallets/gateway", { params });
     return res.data;
-  }
+  },
 };

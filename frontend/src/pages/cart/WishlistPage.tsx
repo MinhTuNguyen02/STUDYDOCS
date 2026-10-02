@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 export default function WishlistPage() {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchWishlist()
@@ -15,18 +16,35 @@ export default function WishlistPage() {
 
   const fetchWishlist = async () => {
     try {
+      setLoading(true)
+      setError(null)
       const res = await wishlistApi.getWishlist()
       setItems(res.items || res.data || [])
     } catch (err: any) {
-      toast.error('Không thể tải danh sách yêu thích')
-      console.error(err)
+      const msg = err?.response?.data?.message || 'Không thể tải danh sách yêu thích'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
   }
 
   if (loading) {
-    return <div className="text-center py-24 text-muted-foreground">Đang tải...</div>
+    return <div className="text-center py-24 text-muted-foreground">Đang tải danh sách yêu thích...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-24 bg-card border border-border rounded-2xl shadow-sm max-w-xl mx-auto my-8 p-8">
+        <p className="text-danger mb-4 font-medium">{error}</p>
+        <button
+          onClick={fetchWishlist}
+          className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
+        >
+          Thử lại
+        </button>
+      </div>
+    )
   }
 
   return (

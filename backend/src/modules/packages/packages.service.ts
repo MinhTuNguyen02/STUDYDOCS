@@ -1,10 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Logger
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { LedgerService } from '../wallets/ledger.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { NotificationsService } from '../notifications/notifications.service';
+import { CreatePackageDto, UpdatePackageDto } from './dto/package.dto';
 
 @Injectable()
 export class PackagesService {
@@ -14,7 +22,32 @@ export class PackagesService {
     private readonly prisma: PrismaService,
     private readonly ledger: LedgerService,
     private readonly notifications: NotificationsService
-  ) { }
+  ) {}
+
+  private async resolvePurchaseReplay(
+    customerId: number,
+    packageId: number,
+    idempotencyKey: string
+  ) {
+    const previous = await this.prisma.user_packages.findUnique({
+      where: {
+        customer_id_idempotency_key: {
+          customer_id: customerId,
+          idempotency_key: idempotencyKey
+        }
+      },
+      include: { packages: { select: { name: true } } }
+    });
+    if (!previous) return null;
+    if (previous.package_id !== packageId) {
+      throw new ConflictException('Idempotency key đã được dùng cho một gói khác.');
+    }
+    return {
+      message: `Yêu cầu mua gói ${previous.packages.name} đã được xử lý.`,
+      data: previous,
+      replayed: true
+    };
+  }
 
   async getActivePackages() {
     const packages = await this.prisma.packages.findMany({
@@ -65,7 +98,7 @@ export class PackagesService {
     };
   }
 
-  async createPackage(dto: any, actor: AuthUser) {
+  async createPackage(dto: CreatePackageDto, actor: AuthUser) {
     const pkg = await this.prisma.packages.create({
       data: {
         name: dto.name,
@@ -89,7 +122,7 @@ export class PackagesService {
     return { message: 'Tạo gói tải xuống thành công.', data: pkg };
   }
 
-  async updatePackage(id: number, dto: any, actor: AuthUser) {
+  async updatePackage(id: number, dto: UpdatePackageDto, actor: AuthUser) {
     const existing = await this.prisma.packages.findUnique({ where: { package_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy gói này.');
 
@@ -101,7 +134,8 @@ export class PackagesService {
         price: dto.price,
         download_turns: dto.download_turns,
         duration_days: dto.duration_days,
-        status: dto.is_active !== undefined ? (dto.is_active ? 'ACTIVE' : 'INACTIVE') : existing.status
+        status:
+          dto.is_active !== undefined ? (dto.is_active ? 'ACTIVE' : 'INACTIVE') : existing.status
       }
     });
 
@@ -133,8 +167,11 @@ export class PackagesService {
     return { message: 'Cập nhật thành công.', data: pkg };
   }
 
-  async buyPackage(user: AuthUser, packageId: number) {
+  async buyPackage(user: AuthUser, packageId: number, idempotencyKey: string) {
     if (!user.customerId) throw new NotFoundException('Chỉ khách hàng mới có thể mua gói.');
+
+    const previous = await this.resolvePurchaseReplay(user.customerId, packageId, idempotencyKey);
+    if (previous) return previous;
 
     const pkg = await this.prisma.packages.findUnique({
       where: { package_id: packageId, status: 'ACTIVE', delete_at: null }
@@ -163,83 +200,130 @@ export class PackagesService {
     const expiresAt = hasActivePackage
       ? null
       : (() => {
-        const d = new Date();
-        d.setDate(d.getDate() + pkg.duration_days);
-        return d;
-      })();
+          const d = new Date();
+          d.setDate(d.getDate() + pkg.duration_days);
+          return d;
+        })();
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // Deduct balance
-      await tx.wallets.update({
-        where: { wallet_id: paymentWallet.wallet_id },
-        data: { balance: { decrement: pkg.price } }
-      });
+    let result;
+    try {
+      result = await this.prisma.$transaction(
+        async (tx) => {
+          const deducted = await tx.wallets.updateMany({
+            where: { wallet_id: paymentWallet.wallet_id, balance: { gte: pkg.price } },
+            data: { balance: { decrement: pkg.price } }
+          });
+          if (deducted.count !== 1) {
+            throw new BadRequestException('Số dư ví thanh toán không đủ. Vui lòng nạp thêm.');
+          }
 
-      // Get system wallets for double-entry
-      const { systemRevenue } = await this.ledger.getSystemWallets(tx);
+          // Get system wallets for double-entry
+          const { systemRevenue } = await this.ledger.getSystemWallets(tx);
 
-      await tx.wallets.update({
-        where: { wallet_id: systemRevenue.wallet_id },
-        data: { balance: { increment: pkg.price } }
-      });
+          await tx.wallets.update({
+            where: { wallet_id: systemRevenue.wallet_id },
+            data: { balance: { increment: pkg.price } }
+          });
 
-      // Create package
-      const userPkg = await tx.user_packages.create({
-        data: {
-          customer_id: user.customerId!,
-          package_id: pkg.package_id,
-          turns_remaining: pkg.download_turns,
-          expires_at: expiresAt,
-          status: newStatus
-        }
-      });
+          // Create package
+          const userPkg = await tx.user_packages.create({
+            data: {
+              customer_id: user.customerId!,
+              package_id: pkg.package_id,
+              idempotency_key: idempotencyKey,
+              turns_remaining: pkg.download_turns,
+              expires_at: expiresAt,
+              status: newStatus,
+              active_slot: newStatus === 'ACTIVE' ? 1 : null
+            }
+          });
 
-      // Record Ledger: Debit paymentWallet, Credit SYSTEM_REVENUE
-      await this.ledger.recordTransaction(
-        tx,
-        'PURCHASE',
-        'USER_PACKAGE',
-        userPkg.user_package_id,
-        `Mua gói dịch vụ: ${pkg.name}`,
-        [
-          { wallet_id: paymentWallet.wallet_id, debit_amount: pkg.price, credit_amount: 0 },
-          { wallet_id: systemRevenue.wallet_id, debit_amount: 0, credit_amount: pkg.price }
-        ]
+          // Record Ledger: Debit paymentWallet, Credit SYSTEM_REVENUE
+          await this.ledger.recordTransaction(
+            tx,
+            'PURCHASE',
+            'USER_PACKAGE',
+            userPkg.user_package_id,
+            `Mua gói dịch vụ: ${pkg.name}`,
+            [
+              { wallet_id: paymentWallet.wallet_id, debit_amount: pkg.price, credit_amount: 0 },
+              { wallet_id: systemRevenue.wallet_id, debit_amount: 0, credit_amount: pkg.price }
+            ]
+          );
+
+          return userPkg;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const replayed = await this.resolvePurchaseReplay(
+          user.customerId,
+          packageId,
+          idempotencyKey
+        );
+        if (replayed) return replayed;
+        throw new ConflictException('Trạng thái gói vừa thay đổi. Vui lòng thử lại yêu cầu.');
+      }
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
+        // A concurrent request with the same key may still be committing. Give the
+        // winning transaction a short bounded window, then return its result.
+        for (let attempt = 1; attempt <= 4; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 25));
+          const replayed = await this.resolvePurchaseReplay(
+            user.customerId,
+            packageId,
+            idempotencyKey
+          );
+          if (replayed) return replayed;
+        }
+        throw new ConflictException('Giao dịch đang bị xung đột. Vui lòng thử lại.');
+      }
+      throw error;
+    }
 
-      return userPkg;
-    });
-
-    const statusMessage = newStatus === 'PENDING'
-      ? `Gói "${pkg.name}" đã được thêm vào hàng chờ. Sẽ tự động kích hoạt khi gói hiện tại hết hạn hoặc hết lượt tải xuống.`
-      : `Mua thành công gói ${pkg.name}.`;
+    const statusMessage =
+      newStatus === 'PENDING'
+        ? `Gói "${pkg.name}" đã được thêm vào hàng chờ. Sẽ tự động kích hoạt khi gói hiện tại hết hạn hoặc hết lượt tải xuống.`
+        : `Mua thành công gói ${pkg.name}.`;
 
     // Notify buyer wallet update
     this.notifications.notifyAccountWalletChange(Number(user.accountId));
 
-    return { message: statusMessage, data: result };
+    return { message: statusMessage, data: result, replayed: false };
   }
 
   // ── Helper: Kích hoạt gói PENDING tiếp theo của user ──────────
   async activateNextPending(customerId: number) {
-    const pending = await this.prisma.user_packages.findFirst({
-      where: { customer_id: customerId, status: 'PENDING' },
-      include: { packages: { select: { duration_days: true, name: true } } },
-      orderBy: { purchased_at: 'asc' } // Gói mua trước → kích hoạt trước
-    });
+    const activated = await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${customerId})`;
+        const active = await tx.user_packages.findFirst({
+          where: { customer_id: customerId, status: 'ACTIVE' },
+          select: { user_package_id: true }
+        });
+        if (active) return null;
 
-    if (!pending) return null;
+        const pending = await tx.user_packages.findFirst({
+          where: { customer_id: customerId, status: 'PENDING' },
+          include: { packages: { select: { duration_days: true } } },
+          orderBy: { purchased_at: 'asc' }
+        });
+        if (!pending) return null;
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + pending.packages.duration_days);
+        const expiresAt = new Date(Date.now() + pending.packages.duration_days * 86_400_000);
+        return tx.user_packages.update({
+          where: { user_package_id: pending.user_package_id },
+          data: { status: 'ACTIVE', active_slot: 1, expires_at: expiresAt }
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
 
-    const activated = await this.prisma.user_packages.update({
-      where: { user_package_id: pending.user_package_id },
-      data: { status: 'ACTIVE', expires_at: expiresAt }
-    });
+    if (!activated) return null;
 
     this.logger.log(
-      `Activated pending package #${pending.user_package_id} for customer ${customerId}. Expires at ${expiresAt.toISOString()}`
+      `Activated pending package #${activated.user_package_id} for customer ${customerId}.`
     );
 
     return activated;
@@ -284,15 +368,15 @@ export class PackagesService {
     }
 
     // 2. Đánh dấu EXPIRED
-    const expiredIds = expiredPackages.map(p => p.user_package_id);
+    const expiredIds = expiredPackages.map((p) => p.user_package_id);
     await this.prisma.user_packages.updateMany({
       where: { user_package_id: { in: expiredIds } },
-      data: { status: 'EXPIRED' }
+      data: { status: 'EXPIRED', active_slot: null }
     });
     this.logger.log(`Expired ${expiredPackages.length} packages.`);
 
     // 3. Với mỗi customer bị expire, kích hoạt gói PENDING tiếp theo (nếu có)
-    const uniqueCustomerIds = [...new Set(expiredPackages.map(p => p.customer_id))];
+    const uniqueCustomerIds = [...new Set(expiredPackages.map((p) => p.customer_id))];
     for (const customerId of uniqueCustomerIds) {
       await this.activateNextPending(customerId);
     }

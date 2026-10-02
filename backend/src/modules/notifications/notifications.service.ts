@@ -20,7 +20,7 @@ export class NotificationsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gateway: EventsGateway,
+    private readonly gateway: EventsGateway
   ) {}
 
   // ── Core: tạo notification + push realtime ────────────────────
@@ -30,42 +30,66 @@ export class NotificationsService {
    * GỌI SAU KHI TRANSACTION COMMIT, không gọi bên trong $transaction.
    */
   async notify(params: CreateNotificationParams) {
-    const notification = await this.prisma.notifications.create({
-      data: {
-        account_id: params.accountId,
-        type: params.type,
-        title: params.title,
-        message: params.message,
-        reference_id: params.referenceId ?? null,
-        reference_type: params.referenceType ?? null,
-      },
-    });
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const notification = await this.prisma.notifications.create({
+          data: {
+            account_id: params.accountId,
+            type: params.type,
+            title: params.title,
+            message: params.message,
+            reference_id: params.referenceId ?? null,
+            reference_type: params.referenceType ?? null
+          }
+        });
 
-    // Push realtime
-    this.gateway.sendToUser(params.accountId, 'notification', {
-      id: notification.id,
-      type: notification.type,
-      title: notification.title,
-      message: notification.message,
-      referenceId: notification.reference_id,
-      referenceType: notification.reference_type,
-      isRead: notification.is_read,
-      createdAt: notification.created_at,
-    });
-
-    return notification;
+        this.gateway.sendToUser(params.accountId, 'notification', {
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          referenceId: notification.reference_id,
+          referenceType: notification.reference_type,
+          isRead: notification.is_read,
+          createdAt: notification.created_at
+        });
+        return notification;
+      } catch (error) {
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+          continue;
+        }
+        this.logger.error(
+          `Không thể tạo thông báo cho account ${params.accountId} sau 3 lần thử.`,
+          error instanceof Error ? error.stack : undefined
+        );
+      }
+    }
+    return null;
   }
 
   async notifyCustomerWalletChange(customerId: number) {
-    await this.gateway.sendToCustomer(customerId, 'wallet_updated', {
-      timestamp: new Date().toISOString()
-    });
+    try {
+      await this.gateway.sendToCustomer(customerId, 'wallet_updated', {
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Không thể đẩy cập nhật ví cho customer ${customerId}: ${error instanceof Error ? error.message : 'unknown error'}`
+      );
+    }
   }
 
   async notifyAccountWalletChange(accountId: number) {
-    this.gateway.sendToUser(accountId, 'wallet_updated', {
-      timestamp: new Date().toISOString()
-    });
+    try {
+      this.gateway.sendToUser(accountId, 'wallet_updated', {
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Không thể đẩy cập nhật ví cho account ${accountId}: ${error instanceof Error ? error.message : 'unknown error'}`
+      );
+    }
   }
 
   /**
@@ -90,9 +114,9 @@ export class NotificationsService {
     const accounts = await this.prisma.accounts.findMany({
       where: {
         roles: { name: { equals: role, mode: 'insensitive' } },
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
-      select: { account_id: true },
+      select: { account_id: true }
     });
 
     if (accounts.length === 0) return;
@@ -110,9 +134,9 @@ export class NotificationsService {
     const accounts = await this.prisma.accounts.findMany({
       where: {
         roles: { name: { in: roles, mode: 'insensitive' } },
-        status: 'ACTIVE',
+        status: 'ACTIVE'
       },
-      select: { account_id: true },
+      select: { account_id: true }
     });
 
     if (accounts.length === 0) return;
@@ -124,9 +148,9 @@ export class NotificationsService {
 
   // ── REST API methods ──────────────────────────────────────────
 
-  async getMyNotifications(accountId: number, pageStr?: string, limitStr?: string) {
-    const page = pageStr ? Math.max(1, parseInt(pageStr, 10)) : 1;
-    const limit = limitStr ? Math.min(50, parseInt(limitStr, 10)) : 20;
+  async getMyNotifications(accountId: number, pageValue?: number, limitValue?: number) {
+    const page = pageValue ?? 1;
+    const limit = Math.min(50, limitValue ?? 20);
     const skip = (page - 1) * limit;
 
     const [total, notifications] = await Promise.all([
@@ -135,8 +159,8 @@ export class NotificationsService {
         where: { account_id: accountId },
         orderBy: { created_at: 'desc' },
         skip,
-        take: limit,
-      }),
+        take: limit
+      })
     ]);
 
     return {
@@ -150,28 +174,28 @@ export class NotificationsService {
           referenceId: n.reference_id,
           referenceType: n.reference_type,
           isRead: n.is_read,
-          createdAt: n.created_at,
-        })),
-      ),
+          createdAt: n.created_at
+        }))
+      )
     };
   }
 
   async getUnreadCount(accountId: number) {
     const count = await this.prisma.notifications.count({
-      where: { account_id: accountId, is_read: false },
+      where: { account_id: accountId, is_read: false }
     });
     return { unreadCount: count };
   }
 
   async markAsRead(accountId: number, notificationId: number) {
     const notification = await this.prisma.notifications.findFirst({
-      where: { id: notificationId, account_id: accountId },
+      where: { id: notificationId, account_id: accountId }
     });
     if (!notification) throw new NotFoundException('Không tìm thấy thông báo.');
 
     await this.prisma.notifications.update({
       where: { id: notificationId },
-      data: { is_read: true },
+      data: { is_read: true }
     });
 
     return { success: true };
@@ -180,7 +204,7 @@ export class NotificationsService {
   async markAllAsRead(accountId: number) {
     await this.prisma.notifications.updateMany({
       where: { account_id: accountId, is_read: false },
-      data: { is_read: true },
+      data: { is_read: true }
     });
 
     return { success: true };
@@ -196,9 +220,9 @@ export class NotificationsService {
       const result = await this.prisma.notifications.deleteMany({
         where: {
           created_at: {
-            lt: date30DaysAgo,
-          },
-        },
+            lt: date30DaysAgo
+          }
+        }
       });
 
       this.logger.log(`Đã xóa ${result.count} thông báo cũ.`);

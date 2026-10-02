@@ -10,14 +10,43 @@ export default function VnpayReturnPage() {
   const [message, setMessage] = useState('Đang xử lý thanh toán...')
 
   useEffect(() => {
-    const vnp_ResponseCode = searchParams.get('vnp_ResponseCode')
+    const paymentId = Number(searchParams.get('vnp_TxnRef'))
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
 
-    if (vnp_ResponseCode === '00') {
-      setStatus('SUCCESS')
-      setMessage('Giao dịch thành công! Số tiền đã được thêm vào ví của bạn.')
-    } else {
-      setStatus('FAILED')
-      setMessage('Giao dịch thất bại hoặc đã bị hủy.')
+    const verifyWithServer = async (attempt = 0) => {
+      if (!Number.isSafeInteger(paymentId) || paymentId <= 0) {
+        setStatus('FAILED')
+        setMessage('Không xác định được mã giao dịch.')
+        return
+      }
+      try {
+        const payment = await checkoutApi.getPaymentStatus(paymentId)
+        if (cancelled) return
+        if (payment.status === 'COMPLETED') {
+          setStatus('SUCCESS')
+          setMessage('Giao dịch thành công! Số tiền đã được thêm vào ví của bạn.')
+        } else if (payment.status === 'FAILED') {
+          setStatus('FAILED')
+          setMessage('Giao dịch thất bại hoặc đã bị hủy.')
+        } else if (attempt < 9) {
+          timer = setTimeout(() => void verifyWithServer(attempt + 1), 1_000)
+        } else {
+          setStatus('FAILED')
+          setMessage('Giao dịch đang chờ VNPay xác nhận. Vui lòng kiểm tra lại lịch sử ví sau ít phút.')
+        }
+      } catch {
+        if (!cancelled) {
+          setStatus('FAILED')
+          setMessage('Không thể xác minh giao dịch với máy chủ. Vui lòng kiểm tra lịch sử ví.')
+        }
+      }
+    }
+
+    void verifyWithServer()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
     }
   }, [searchParams])
 

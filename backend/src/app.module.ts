@@ -23,18 +23,22 @@ import { StorageModule } from './modules/storage/storage.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AppThrottlerGuard } from './common/security/app-throttler.guard';
 import { DownloadsModule } from './modules/downloads/downloads.module';
 import { ReportsModule } from './modules/reports/reports.module';
 
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { validateEnvironment } from './config/env.validation';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     SecurityModule,
+    HealthModule,
     PrismaModule,
     GatewayModule,
     NotificationsModule,
@@ -58,10 +62,12 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     CategoriesModule,
     TagsModule,
     ScheduleModule.forRoot(),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100, // 100 requests per minute max per IP
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100 // 100 requests per minute max per IP
+      }
+    ]),
     DownloadsModule,
     ReportsModule,
     MailerModule.forRootAsync({
@@ -73,20 +79,20 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
           secure: false, // TLS
           auth: {
             user: config.get<string>('MAIL_USER'),
-            pass: config.get<string>('MAIL_PASS'),
-          },
+            pass: config.get<string>('MAIL_PASS')
+          }
         },
         defaults: {
-          from: `"StudyDocs Support" <${config.get<string>('MAIL_USER')}>`,
-        },
-      }),
-    }),
+          from: `"StudyDocs Support" <${config.get<string>('MAIL_USER')}>`
+        }
+      })
+    })
   ],
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
+      useClass: AppThrottlerGuard
+    }
+  ]
 })
 export class AppModule {}

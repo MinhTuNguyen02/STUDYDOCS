@@ -1,65 +1,123 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ordersApi } from '@/api/orders.api'
-import { formatPrice, formatDate } from '@/utils/format'
-import { Package, Clock, CheckCircle2, XCircle, Eye } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useCallback, useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ordersApi } from "@/api/orders.api";
+import { formatPrice, formatDate } from "@/utils/format";
+import { Package, Clock, CheckCircle2, XCircle, Eye } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [filter, setFilter] = useState('ALL')
-  const [page, setPage] = useState(1)
-  const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0 })
+  const filter = searchParams.get("status") || "ALL";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0 });
 
-  useEffect(() => {
-    fetchOrders()
-  }, [filter, page])
-
-  const fetchOrders = async () => {
-    setLoading(true)
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await ordersApi.getOrders({
-        status: filter === 'ALL' ? undefined : filter,
+        status: filter === "ALL" ? undefined : filter,
         page,
-        limit: 10
-      })
-      setOrders(res.data || res || [])
-      if (res.meta) setMeta(res.meta)
+        limit: 10,
+      });
+      setOrders(res.data || res || []);
+      if (res.meta) setMeta(res.meta);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Không thể tải lịch sử đơn hàng')
+      const msg =
+        error?.response?.data?.message || "Không thể tải lịch sử đơn hàng";
+      setError(msg);
+      toast.error(msg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  }, [filter, page]);
+
+  useEffect(() => {
+    void fetchOrders();
+  }, [fetchOrders]);
+
+  const updateQuery = (updates: { status?: string; page?: number }) => {
+    const next = new URLSearchParams(searchParams);
+    if (updates.status !== undefined) {
+      updates.status === "ALL"
+        ? next.delete("status")
+        : next.set("status", updates.status);
+    }
+    if (updates.page !== undefined) {
+      updates.page <= 1
+        ? next.delete("page")
+        : next.set("page", String(updates.page));
+    }
+    setSearchParams(next);
+  };
 
   const getStatusBadge = (order: any) => {
     const status = order.status;
 
     switch (status) {
-      case 'PAID':
-        return <span className="bg-success/10 text-success px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> Đã thanh toán</span>
-      case 'PENDING_PAYMENT':
-        return <span className="bg-warning/10 text-warning px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><Clock className="w-3.5 h-3.5" /> Chờ thanh toán</span>
-      case 'CANCELLED':
-        return <span className="bg-danger/10 text-danger px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><XCircle className="w-3.5 h-3.5" /> Đã hủy</span>
+      case "PAID":
+        return (
+          <span className="bg-success/10 text-success px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Đã thanh toán
+          </span>
+        );
+      case "PENDING_PAYMENT":
+        return (
+          <span className="bg-warning/10 text-warning px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit">
+            <Clock className="w-3.5 h-3.5" /> Chờ thanh toán
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="bg-danger/10 text-danger px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 w-fit">
+            <XCircle className="w-3.5 h-3.5" /> Đã hủy
+          </span>
+        );
       default:
-        return <span className="bg-gray-100 text-gray-600 px-3 py-1 text-xs font-semibold rounded-full">{status}</span>
+        return (
+          <span className="bg-gray-100 text-gray-600 px-3 py-1 text-xs font-semibold rounded-full">
+            {status}
+          </span>
+        );
     }
-  }
+  };
 
-  if (loading) return <div className="py-24 text-center text-muted-foreground">Đang tải lịch sử đơn hàng...</div>
+  if (loading)
+    return (
+      <div className="py-24 text-center text-muted-foreground">
+        Đang tải lịch sử đơn hàng...
+      </div>
+    );
+
+  if (error)
+    return (
+      <div className="max-w-7xl mx-auto py-24 px-4 text-center">
+        <p className="text-danger mb-4 font-medium">{error}</p>
+        <button
+          onClick={fetchOrders}
+          className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8 border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <Package className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl font-bold font-heading text-foreground">Lịch sử đơn hàng</h1>
+          <h1 className="text-3xl font-bold font-heading text-foreground">
+            Lịch sử đơn hàng
+          </h1>
         </div>
         <select
-          value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}
+          value={filter}
+          onChange={(e) => updateQuery({ status: e.target.value, page: 1 })}
           className="px-4 py-2 border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none bg-background font-medium"
         >
           <option value="ALL">Tất cả trạng thái</option>
@@ -72,8 +130,12 @@ export default function OrdersPage() {
         <div className="text-center py-20 bg-card rounded-2xl border border-border shadow-sm">
           <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-xl font-semibold mb-2">Không có đơn hàng nào</h3>
-          <p className="text-muted-foreground mb-6">Thử thay đổi trạng thái bộ lọc hoặc khám phá tài liệu.</p>
-          <Link to="/documents" className="btn btn-primary inline-flex">Khám phá ngay</Link>
+          <p className="text-muted-foreground mb-6">
+            Thử thay đổi trạng thái bộ lọc hoặc khám phá tài liệu.
+          </p>
+          <Link to="/documents" className="btn btn-primary inline-flex">
+            Khám phá ngay
+          </Link>
         </div>
       ) : (
         <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
@@ -90,7 +152,10 @@ export default function OrdersPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {orders.map((order) => (
-                  <tr key={order.order_id || order.id} className="hover:bg-muted/50 transition-colors">
+                  <tr
+                    key={order.order_id || order.id}
+                    className="hover:bg-muted/50 transition-colors"
+                  >
                     <td className="p-4 font-medium text-foreground">
                       #{order.order_id || order.id}
                     </td>
@@ -100,9 +165,7 @@ export default function OrdersPage() {
                     <td className="p-4 font-bold text-primary">
                       {formatPrice(order.total_amount || order.totalAmount)}
                     </td>
-                    <td className="p-4">
-                      {getStatusBadge(order)}
-                    </td>
+                    <td className="p-4">{getStatusBadge(order)}</td>
                     <td className="p-4 text-right">
                       <Link
                         to={`/orders/${order.order_id || order.id}`}
@@ -126,7 +189,7 @@ export default function OrdersPage() {
               <div className="flex items-center gap-2">
                 <button
                   disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
+                  onClick={() => updateQuery({ page: page - 1 })}
                   className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg disabled:opacity-50 hover:bg-muted"
                 >
                   Trang trước
@@ -136,7 +199,7 @@ export default function OrdersPage() {
                 </span>
                 <button
                   disabled={page * meta.limit >= meta.total}
-                  onClick={() => setPage(page + 1)}
+                  onClick={() => updateQuery({ page: page + 1 })}
                   className="px-3 py-1.5 text-sm font-semibold bg-background border border-border rounded-lg disabled:opacity-50 hover:bg-muted"
                 >
                   Trang sau
@@ -144,9 +207,8 @@ export default function OrdersPage() {
               </div>
             </div>
           )}
-
         </div>
       )}
     </div>
-  )
+  );
 }

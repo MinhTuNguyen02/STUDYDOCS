@@ -7,4 +7,4 @@ import { StorageService } from '../storage/storage.service';
   controllers: [LibraryController],
   providers: [LibraryService, StorageService]
 })
-export class LibraryModule { }
+export class LibraryModule {}

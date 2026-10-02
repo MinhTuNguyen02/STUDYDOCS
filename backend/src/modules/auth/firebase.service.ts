@@ -23,7 +23,8 @@ export class FirebaseAdminService {
   }
 
   async verifyPhoneToken(idToken: string): Promise<admin.auth.DecodedIdToken> {
-    if (!admin.apps.length) throw new UnauthorizedException('Firebase chua duoc config. Hay dien ENV.');
+    if (!admin.apps.length)
+      throw new UnauthorizedException('Firebase chua duoc config. Hay dien ENV.');
     try {
       const decodedToken = await admin.auth().verifyIdToken(idToken);
       if (!decodedToken.phone_number) {

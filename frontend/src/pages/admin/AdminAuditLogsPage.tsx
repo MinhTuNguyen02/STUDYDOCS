@@ -1,99 +1,161 @@
-import { useEffect, useState } from 'react'
-import { adminApi } from '@/api/admin.api'
-import { Activity, Search, ChevronRight, FileJson } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { formatDateTime, formatDateTimeSec } from '@/utils/format'
-import { usePagination } from '@/hooks/usePagination'
-import Pagination from '@/components/common/Pagination'
+import { useCallback, useEffect, useState } from "react";
+import { adminApi } from "@/api/admin.api";
+import { Activity, Search, ChevronRight, FileJson } from "lucide-react";
+import toast from "react-hot-toast";
+import { formatDateTime, formatDateTimeSec } from "@/utils/format";
+import Pagination from "@/components/common/Pagination";
+import { useSearchParams } from "react-router-dom";
 
 interface AuditLog {
-  log_id: number
-  account_id: number
-  action: string
-  target_id: number
-  target_table: string
-  old_value: any
-  new_value: any
-  created_at: string
+  log_id: number;
+  account_id: number;
+  action: string;
+  target_id: number;
+  target_table: string;
+  old_value: any;
+  new_value: any;
+  created_at: string;
   accounts: {
-    email: string
-  }
+    email: string;
+  };
 }
 
 const ACTION_MAP: Record<string, string> = {
-  ADMIN_CREATE_TAG: 'Tạo thẻ',
-  ADMIN_UPDATE_TAG: 'Cập nhật thẻ',
-  ADMIN_DELETE_TAG: 'Xóa thẻ',
-  UPLOAD_VIOLATION: 'Vi phạm tải lên',
-  STAFF_DELETE_REVIEW: 'Xóa đánh giá',
-  STAFF_DELETE_REPLY: 'Xóa phản hồi',
-  STAFF_RESOLVE_REPORT: 'Xử lý báo cáo',
-  ADMIN_CREATE_POLICY: 'Tạo chính sách',
-  ADMIN_UPDATE_POLICY: 'Cập nhật chính sách',
-  ADMIN_DELETE_POLICY: 'Xóa chính sách',
-  ADMIN_CREATE_PACKAGE: 'Tạo gói',
-  ADMIN_UPDATE_PACKAGE: 'Cập nhật gói',
-  ADMIN_DELETE_PACKAGE: 'Xóa gói',
-  PENALTY_APPLIED: 'Xử phạt tài khoản',
-  REPORT_HANDLED: 'Xử lý báo cáo TL',
-  ADMIN_UPDATE_CONFIG: 'Sửa cấu hình HT',
-  ADMIN_CREATE_CATEGORY: 'Tạo danh mục',
-  ADMIN_UPDATE_CATEGORY: 'Sửa danh mục',
-  ADMIN_DELETE_CATEGORY: 'Xóa danh mục',
-  STAFF_REVIEW_DOCUMENT: 'Xem xét TL',
-  APPROVE_DOCUMENT: 'Duyệt tài liệu',
-  REJECT_DOCUMENT: 'Từ chối tài liệu',
-  STAFF_SOFT_DELETE_DOCUMENT: 'Xóa tạm tài liệu',
-  STAFF_RESTORE_DOCUMENT: 'Khôi phục tài liệu',
-  STAFF_TOGGLE_USER_STATUS: 'Khóa/Mở tài khoản',
-  ADMIN_CREATE_STAFF: 'Tạo tài khoản NV',
-  TAX_PAYMENT: 'Thanh toán thuế/phí',
-  PROCESS_WITHDRAWAL: 'Xử lý rút tiền',
-}
+  ADMIN_CREATE_TAG: "Tạo thẻ",
+  ADMIN_UPDATE_TAG: "Cập nhật thẻ",
+  ADMIN_DELETE_TAG: "Xóa thẻ",
+  UPLOAD_VIOLATION: "Vi phạm tải lên",
+  STAFF_DELETE_REVIEW: "Xóa đánh giá",
+  STAFF_DELETE_REPLY: "Xóa phản hồi",
+  STAFF_RESOLVE_REPORT: "Xử lý báo cáo",
+  ADMIN_CREATE_POLICY: "Tạo chính sách",
+  ADMIN_UPDATE_POLICY: "Cập nhật chính sách",
+  ADMIN_DELETE_POLICY: "Xóa chính sách",
+  ADMIN_CREATE_PACKAGE: "Tạo gói",
+  ADMIN_UPDATE_PACKAGE: "Cập nhật gói",
+  ADMIN_DELETE_PACKAGE: "Xóa gói",
+  UPLOAD_WARNING: "Cảnh báo tải lên",
+  ACCOUNT_BANNED: "Khóa tài khoản",
+  REPORT_HANDLED: "Xử lý báo cáo TL",
+  ADMIN_UPDATE_CONFIG: "Sửa cấu hình HT",
+  ADMIN_CREATE_CATEGORY: "Tạo danh mục",
+  ADMIN_UPDATE_CATEGORY: "Sửa danh mục",
+  ADMIN_DELETE_CATEGORY: "Xóa danh mục",
+  STAFF_REVIEW_DOCUMENT: "Xem xét TL",
+  APPROVE_DOCUMENT: "Duyệt tài liệu",
+  REJECT_DOCUMENT: "Từ chối tài liệu",
+  STAFF_SOFT_DELETE_DOCUMENT: "Xóa tạm tài liệu",
+  STAFF_RESTORE_DOCUMENT: "Khôi phục tài liệu",
+  STAFF_TOGGLE_USER_STATUS: "Khóa/Mở tài khoản",
+  ADMIN_CREATE_STAFF: "Tạo tài khoản NV",
+  TAX_PAYMENT: "Thanh toán thuế/phí",
+  PROCESS_WITHDRAWAL: "Xử lý rút tiền",
+};
 
 export default function AdminAuditLogsPage() {
-  const [logs, setLogs] = useState<AuditLog[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchEmail, setSearchEmail] = useState('')
-  const [actionFilter, setActionFilter] = useState('')
-  const [limit, setLimit] = useState(100)
-  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const searchEmail = searchParams.get("search") || "";
+  const [searchInput, setSearchInput] = useState(searchEmail);
+  const actionFilter = searchParams.get("action") || "";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const limit = Math.min(
+    100,
+    Math.max(1, Number(searchParams.get("limit")) || 20),
+  );
+  const [total, setTotal] = useState(0);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminApi.getAuditLogs({
+        action: actionFilter || undefined,
+        search: searchEmail || undefined,
+        page,
+        limit,
+      });
+      setLogs(res.data || res);
+      setTotal(res.meta?.total ?? (res.data || res).length);
+    } catch (caughtError) {
+      const message =
+        (caughtError as any)?.response?.data?.message ||
+        "Lỗi tải nhật ký hệ thống";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [actionFilter, limit, page, searchEmail]);
 
   useEffect(() => {
-    fetchLogs()
-  }, [])
+    void fetchLogs();
+  }, [fetchLogs]);
+  useEffect(() => {
+    setSearchInput(searchEmail);
+  }, [searchEmail]);
 
-  const fetchLogs = async () => {
-    setLoading(true)
-    try {
-      const res = await adminApi.getAuditLogs({ action: actionFilter || undefined, limit })
-      setLogs(res.data || res)
-    } catch (error) {
-      toast.error('Lỗi tải nhật ký hệ thống')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const updateQuery = useCallback(
+    (updates: Record<string, string | number | undefined>) => {
+      const next = new URLSearchParams(searchParams);
+      for (const [key, value] of Object.entries(updates)) {
+        const isDefault =
+          value === undefined ||
+          value === "" ||
+          (key === "page" && value === 1) ||
+          (key === "limit" && value === 20);
+        isDefault ? next.delete(key) : next.set(key, String(value));
+      }
+      if (next.toString() !== searchParams.toString()) {
+        setSearchParams(next, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
+  );
 
-  const handleApplyFilter = () => {
-    fetchLogs()
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => updateQuery({ search: searchInput.trim(), page: 1 }),
+      500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [searchInput, updateQuery]);
 
-  const filteredLogs = logs.filter(log => {
-    if (!searchEmail.trim()) return true
-    return log.accounts?.email?.toLowerCase().includes(searchEmail.toLowerCase())
-  })
-
-  const { page, setPage, totalPages, total, paginatedItems } = usePagination(filteredLogs, 20);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const getActionBadge = (action: string) => {
-    if (action.includes('CREATE') || action.includes('INSERT') || action.includes('RESTORE')) return 'bg-success/10 text-success border-success/20'
-    if (action.includes('UPDATE') || action.includes('EDIT') || action.includes('TOGGLE')) return 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-    if (action.includes('DELETE') || action.includes('REMOVE') || action.includes('VIOLATION') || action.includes('PENALTY')) return 'bg-danger/10 text-danger border-danger/20'
-    if (action.includes('APPROVE') || action.includes('RESOLVE') || action.includes('HANDLED')) return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-    if (action.includes('REJECT')) return 'bg-orange-500/10 text-orange-600 border-orange-500/20'
-    return 'bg-muted text-muted-foreground border-border'
-  }
+    if (
+      action.includes("CREATE") ||
+      action.includes("INSERT") ||
+      action.includes("RESTORE")
+    )
+      return "bg-success/10 text-success border-success/20";
+    if (
+      action.includes("UPDATE") ||
+      action.includes("EDIT") ||
+      action.includes("TOGGLE")
+    )
+      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+    if (
+      action.includes("DELETE") ||
+      action.includes("REMOVE") ||
+      action.includes("VIOLATION") ||
+      action.includes("PENALTY")
+    )
+      return "bg-danger/10 text-danger border-danger/20";
+    if (
+      action.includes("APPROVE") ||
+      action.includes("RESOLVE") ||
+      action.includes("HANDLED")
+    )
+      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+    if (action.includes("REJECT"))
+      return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+    return "bg-muted text-muted-foreground border-border";
+  };
 
   return (
     <div className="pb-10">
@@ -110,8 +172,8 @@ export default function AdminAuditLogsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            value={searchEmail}
-            onChange={e => setSearchEmail(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Tìm theo email người thực hiện..."
             className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
           />
@@ -119,71 +181,112 @@ export default function AdminAuditLogsPage() {
         <div className="w-full md:w-auto">
           <select
             value={actionFilter}
-            onChange={e => setActionFilter(e.target.value)}
+            onChange={(e) => updateQuery({ action: e.target.value, page: 1 })}
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">Mọi hành động (Tất cả)</option>
             {Object.entries(ACTION_MAP).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
+              <option key={key} value={key}>
+                {label}
+              </option>
             ))}
           </select>
         </div>
         <div className="w-full md:w-auto">
           <select
             value={limit}
-            onChange={e => setLimit(Number(e.target.value))}
+            onChange={(e) =>
+              updateQuery({ limit: Number(e.target.value), page: 1 })
+            }
             className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
-            <option value={50}>50 dòng gần nhất</option>
-            <option value={100}>100 dòng gần nhất</option>
-            <option value={500}>500 dòng gần nhất</option>
+            <option value={20}>20 dòng mỗi trang</option>
+            <option value={50}>50 dòng mỗi trang</option>
+            <option value={100}>100 dòng mỗi trang</option>
           </select>
         </div>
-        <button
-          onClick={handleApplyFilter}
-          className="btn bg-primary text-white hover:bg-primary-hover px-6 py-2 rounded-xl text-sm font-semibold shadow-sm w-full md:w-auto"
-        >
-          Truy xuất
-        </button>
+        {(searchInput || actionFilter) && (
+          <button
+            onClick={() => {
+              setSearchInput("");
+              updateQuery({ search: undefined, action: undefined, page: 1 });
+            }}
+            className="btn border border-border hover:bg-muted px-6 py-2 rounded-xl text-sm font-semibold w-full md:w-auto"
+          >
+            Xóa lọc
+          </button>
+        )}
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         {loading ? (
-          <div className="text-center py-16 text-muted-foreground animate-pulse">Đang nạp dữ liệu phân tích...</div>
-        ) : filteredLogs.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground">Không tìm thấy bản ghi Audit Log nào.</div>
+          <div className="text-center py-16 text-muted-foreground animate-pulse">
+            Đang nạp dữ liệu phân tích...
+          </div>
+        ) : error ? (
+          <div className="text-center py-16">
+            <p className="text-danger mb-4 font-medium">{error}</p>
+            <button
+              onClick={fetchLogs}
+              className="btn bg-primary text-white px-5 py-2 rounded-xl"
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            Không tìm thấy bản ghi Audit Log nào.
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider border-b border-border">
                   <tr>
-                    <th className="px-6 py-4 rounded-tl-2xl w-[15%]">TG Thực hiện</th>
+                    <th className="px-6 py-4 rounded-tl-2xl w-[15%]">
+                      TG Thực hiện
+                    </th>
                     <th className="px-6 py-4 w-[20%]">Tác nhân</th>
                     <th className="px-6 py-4 w-[25%]">Hành động</th>
                     <th className="px-6 py-4 w-[25%]">Mục tiêu</th>
-                    <th className="px-6 py-4 text-right rounded-tr-2xl w-[15%]">Tra soát</th>
+                    <th className="px-6 py-4 text-right rounded-tr-2xl w-[15%]">
+                      Tra soát
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {paginatedItems.map(log => (
-                    <tr key={log.log_id} className="hover:bg-muted/30 transition-colors group cursor-pointer" onClick={() => setSelectedLog(log)}>
+                  {logs.map((log) => (
+                    <tr
+                      key={log.log_id}
+                      className="hover:bg-muted/30 transition-colors group cursor-pointer"
+                      onClick={() => setSelectedLog(log)}
+                    >
                       <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
                         {formatDateTimeSec(log.created_at)}
                       </td>
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-primary">{log.accounts?.email || 'System'}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">UID: {log.account_id}</div>
+                        <div className="font-semibold text-primary">
+                          {log.accounts?.email || "System"}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          UID: {log.account_id}
+                        </div>
                       </td>
                       <td className="p-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getActionBadge(log.action)}`}>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getActionBadge(log.action)}`}
+                        >
                           {ACTION_MAP[log.action] || log.action}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 text-xs">
-                          <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">[{log.target_table}]</span>
-                          <span className="font-semibold">ID: {log.target_id}</span>
+                          <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                            [{log.target_table}]
+                          </span>
+                          <span className="font-semibold">
+                            ID: {log.target_id}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -196,7 +299,13 @@ export default function AdminAuditLogsPage() {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              limit={limit}
+              onPageChange={(nextPage) => updateQuery({ page: nextPage })}
+            />
           </>
         )}
       </div>
@@ -210,7 +319,10 @@ export default function AdminAuditLogsPage() {
                 <FileJson className="w-5 h-5 text-primary" />
                 Chi tiết Bản ghi (Log ID: {selectedLog.log_id})
               </h3>
-              <button onClick={() => setSelectedLog(null)} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setSelectedLog(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 Đóng
               </button>
             </div>
@@ -218,20 +330,39 @@ export default function AdminAuditLogsPage() {
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
-                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Thời gian</p>
-                  <p className="font-mono text-sm">{formatDateTimeSec(selectedLog.created_at)}</p>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                    Thời gian
+                  </p>
+                  <p className="font-mono text-sm">
+                    {formatDateTimeSec(selectedLog.created_at)}
+                  </p>
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
-                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Tác nhân</p>
-                  <p className="font-semibold text-sm">{selectedLog.accounts?.email}</p>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                    Tác nhân
+                  </p>
+                  <p className="font-semibold text-sm">
+                    {selectedLog.accounts?.email}
+                  </p>
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
-                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Hành động</p>
-                  <p className="font-bold text-sm text-primary">{ACTION_MAP[selectedLog.action] || selectedLog.action} <span className="text-xs font-mono text-muted-foreground font-normal ml-1">({selectedLog.action})</span></p>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                    Hành động
+                  </p>
+                  <p className="font-bold text-sm text-primary">
+                    {ACTION_MAP[selectedLog.action] || selectedLog.action}{" "}
+                    <span className="text-xs font-mono text-muted-foreground font-normal ml-1">
+                      ({selectedLog.action})
+                    </span>
+                  </p>
                 </div>
                 <div className="bg-muted/40 p-4 rounded-xl border border-border">
-                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Mục tiêu (Target)</p>
-                  <p className="font-mono text-sm">{selectedLog.target_table} ({selectedLog.target_id})</p>
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                    Mục tiêu (Target)
+                  </p>
+                  <p className="font-mono text-sm">
+                    {selectedLog.target_table} ({selectedLog.target_id})
+                  </p>
                 </div>
               </div>
 
@@ -239,67 +370,120 @@ export default function AdminAuditLogsPage() {
               <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden mt-6">
                 <div className="p-4 border-b border-border bg-muted/30">
                   <h4 className="font-bold text-sm flex items-center gap-2">
-                    <FileJson className="w-4 h-4 text-primary" /> Phân tích dữ liệu thay đổi
+                    <FileJson className="w-4 h-4 text-primary" /> Phân tích dữ
+                    liệu thay đổi
                   </h4>
                 </div>
                 {(() => {
                   const oldVal = selectedLog.old_value || {};
                   const newVal = selectedLog.new_value || {};
-                  const isOldObj = typeof oldVal === 'object' && oldVal !== null && !Array.isArray(oldVal);
-                  const isNewObj = typeof newVal === 'object' && newVal !== null && !Array.isArray(newVal);
+                  const isOldObj =
+                    typeof oldVal === "object" &&
+                    oldVal !== null &&
+                    !Array.isArray(oldVal);
+                  const isNewObj =
+                    typeof newVal === "object" &&
+                    newVal !== null &&
+                    !Array.isArray(newVal);
 
                   if (!isOldObj && !isNewObj) {
                     return (
                       <div className="p-6 grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Giá trị trước đó</p>
-                          <div className="p-4 bg-muted/30 rounded-lg whitespace-pre-wrap">{String(oldVal)}</div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                            Giá trị trước đó
+                          </p>
+                          <div className="p-4 bg-muted/30 rounded-lg whitespace-pre-wrap">
+                            {String(oldVal)}
+                          </div>
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">Giá trị cập nhật</p>
-                          <div className="p-4 bg-primary/5 text-primary font-medium rounded-lg whitespace-pre-wrap">{String(newVal)}</div>
+                          <p className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                            Giá trị cập nhật
+                          </p>
+                          <div className="p-4 bg-primary/5 text-primary font-medium rounded-lg whitespace-pre-wrap">
+                            {String(newVal)}
+                          </div>
                         </div>
                       </div>
                     );
                   }
 
-                  const keys = Array.from(new Set([...Object.keys(oldVal), ...Object.keys(newVal)]));
-                  if (keys.length === 0) return <p className="text-muted-foreground p-8 text-center">Không có dữ liệu chi tiết.</p>;
+                  const keys = Array.from(
+                    new Set([...Object.keys(oldVal), ...Object.keys(newVal)]),
+                  );
+                  if (keys.length === 0)
+                    return (
+                      <p className="text-muted-foreground p-8 text-center">
+                        Không có dữ liệu chi tiết.
+                      </p>
+                    );
 
                   return (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
                         <thead className="bg-muted/50 text-muted-foreground font-semibold text-xs border-b border-border uppercase tracking-wider">
                           <tr>
-                            <th className="px-6 py-4 w-[30%]">Trường Dữ liệu</th>
+                            <th className="px-6 py-4 w-[30%]">
+                              Trường Dữ liệu
+                            </th>
                             <th className="px-6 py-4 w-[35%]">Trạng thái Cũ</th>
-                            <th className="px-6 py-4 w-[35%]">Trạng thái Mới</th>
+                            <th className="px-6 py-4 w-[35%]">
+                              Trạng thái Mới
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          {keys.map(k => {
+                          {keys.map((k) => {
                             const oldD = oldVal[k];
                             const newD = newVal[k];
-                            const isChanged = JSON.stringify(oldD) !== JSON.stringify(newD);
+                            const isChanged =
+                              JSON.stringify(oldD) !== JSON.stringify(newD);
 
                             const formatD = (d: any) => {
-                              if (d === null || d === undefined || d === '') return <span className="text-muted-foreground italic">Trống</span>;
-                              if (typeof d === 'boolean') return d ? 'Có / Bật' : 'Không / Tắt';
-                              if (typeof d === 'object') return <span className="font-mono text-[11px]">{JSON.stringify(d)}</span>;
-                              if (k.toLowerCase().includes('time') || k.toLowerCase().includes('date') || k.toLowerCase().includes('_at')) {
+                              if (d === null || d === undefined || d === "")
+                                return (
+                                  <span className="text-muted-foreground italic">
+                                    Trống
+                                  </span>
+                                );
+                              if (typeof d === "boolean")
+                                return d ? "Có / Bật" : "Không / Tắt";
+                              if (typeof d === "object")
+                                return (
+                                  <span className="font-mono text-[11px]">
+                                    {JSON.stringify(d)}
+                                  </span>
+                                );
+                              if (
+                                k.toLowerCase().includes("time") ||
+                                k.toLowerCase().includes("date") ||
+                                k.toLowerCase().includes("_at")
+                              ) {
                                 const date = new Date(d);
-                                if (!isNaN(date.getTime())) return formatDateTime(date);
+                                if (!isNaN(date.getTime()))
+                                  return formatDateTime(date);
                               }
                               return String(d);
                             };
 
                             return (
-                              <tr key={k} className={`hover:bg-muted/30 transition-colors ${isChanged ? 'bg-primary/5' : ''}`}>
-                                <td className="px-6 py-4 font-mono font-bold text-foreground text-[13px]">{k}</td>
-                                <td className={`px-6 py-4 ${isChanged && oldD !== undefined ? 'text-danger line-through opacity-70 cursor-help' : 'text-muted-foreground'} `} title={String(oldD)}>
+                              <tr
+                                key={k}
+                                className={`hover:bg-muted/30 transition-colors ${isChanged ? "bg-primary/5" : ""}`}
+                              >
+                                <td className="px-6 py-4 font-mono font-bold text-foreground text-[13px]">
+                                  {k}
+                                </td>
+                                <td
+                                  className={`px-6 py-4 ${isChanged && oldD !== undefined ? "text-danger line-through opacity-70 cursor-help" : "text-muted-foreground"} `}
+                                  title={String(oldD)}
+                                >
                                   {formatD(oldD)}
                                 </td>
-                                <td className={`px-6 py-4 ${isChanged ? 'text-success font-bold bg-success/5' : 'text-foreground'}`}>
+                                <td
+                                  className={`px-6 py-4 ${isChanged ? "text-success font-bold bg-success/5" : "text-foreground"}`}
+                                >
                                   {formatD(newD)}
                                 </td>
                               </tr>
@@ -311,12 +495,10 @@ export default function AdminAuditLogsPage() {
                   );
                 })()}
               </div>
-
             </div>
           </div>
         </div>
       )}
-
     </div>
-  )
+  );
 }

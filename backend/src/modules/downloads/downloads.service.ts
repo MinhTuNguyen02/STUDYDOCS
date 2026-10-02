@@ -1,135 +1,177 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException
+} from '@nestjs/common';
+import { download_type, Prisma } from '@prisma/client';
+import { AuthUser } from '../../common/security/auth-user.interface';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { AuthUser } from '../../common/security/auth-user.interface';
-import { download_type, order_status } from '@prisma/client';
-import { PackagesService } from '../packages/packages.service';
 
 @Injectable()
 export class DownloadsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storageService: StorageService,
-    @Inject(forwardRef(() => PackagesService))
-    private readonly packagesService: PackagesService
-  ) { }
+    private readonly storageService: StorageService
+  ) {}
 
-  async requestDownload(user: AuthUser, documentId: string, ipAddress: string) {
-    if (!user.customerId) throw new ForbiddenException('Chỉ khách hàng mới có quyền tải xuống tài liệu.');
-    const docId = Number(documentId);
-
-    const doc = await this.prisma.documents.findUnique({
-      where: { document_id: docId, status: 'APPROVED' }
+  async requestDownload(user: AuthUser, docId: number, ipAddress: string) {
+    if (!user.customerId)
+      throw new ForbiddenException('Chỉ khách hàng mới có quyền tải xuống tài liệu.');
+    const customerId = user.customerId;
+    const doc = await this.prisma.documents.findFirst({
+      where: { document_id: docId, status: 'APPROVED', delete_at: null, is_user_hidden: false }
     });
-
     if (!doc) throw new NotFoundException('Tài liệu không tồn tại hoặc chưa được duyệt.');
-
-    // Chặn chủ tài liệu tải xuống tài liệu của chính mình
-    if (doc.seller_id === user.customerId) {
+    if (doc.seller_id === customerId) {
       throw new BadRequestException('Không thể tải xuống tài liệu của chính mình.');
     }
 
-    const hasDownloadedBefore = await this.prisma.download_history.findFirst({
-      where: {
-        customer_id: user.customerId,
-        document_id: docId
-      }
-    });
+    // Generate a short-lived URL first. It is never returned unless entitlement succeeds.
+    const signedUrl = await this.storageService.getPresignedUrl(doc.file_url, 300);
 
-    let downloadType: download_type = 'FREE_MONTHLY';
+    const consumeEntitlement = () =>
+      this.prisma.$transaction(
+        async (tx) => {
+          // Serialize entitlement consumption for this customer across concurrent documents.
+          // Cast PostgreSQL's void return value so Prisma can deserialize the lock statement.
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${customerId})::text AS lock_result`;
 
-    if (hasDownloadedBefore) {
-      // Nếu đã từng tải, không trừ lượt, chỉ sử dụng lại type cũ
-      downloadType = hasDownloadedBefore.download_type;
-    } else {
-      // Rule 1: Is the document free?
-      if (doc.price.equals(0)) {
-        // Check free runs
-        const profile = await this.prisma.customer_profiles.findUnique({ where: { customer_id: user.customerId } });
-        if (profile!.free_downloads_remaining <= 0) {
-          // Fallback to active packages if out of free runs
-          const activePkg = await this.useActivePackage(user.customerId);
-          if (!activePkg) {
-            throw new BadRequestException('Đã hết lượt tải xuống miễn phí. Vui lòng mua gói dịch vụ.');
-          }
-          downloadType = 'PACKAGE';
-        } else {
-          // Deduct 1 free download
-          await this.prisma.customer_profiles.update({
-            where: { customer_id: user.customerId },
-            data: { free_downloads_remaining: { decrement: 1 } }
+          const previous = await tx.download_history.findFirst({
+            where: { customer_id: customerId, document_id: docId },
+            orderBy: { download_at: 'asc' }
           });
-        }
-      } else {
-        // Rule 2: Is it purchased?
-        const orderItem = await this.prisma.order_items.findFirst({
-          where: {
-            document_id: docId,
-            orders: { buyer_id: user.customerId, status: 'PAID' }
-          }
-        });
 
-        if (orderItem) {
-          downloadType = 'PURCHASED';
-        } else {
-          // Rule 3: Do we have an active package?
-          const activePkg = await this.useActivePackage(user.customerId);
-          if (!activePkg) {
-            throw new ForbiddenException('Tài liệu có phí. Vui lòng thanh toán hoặc mua gói dịch vụ.');
+          let type: download_type = previous?.download_type ?? 'FREE_MONTHLY';
+          let orderItemId = previous?.order_item_id ?? null;
+          let userPackageId = previous?.user_package_id ?? null;
+
+          if (!previous) {
+            if (doc.price.equals(0)) {
+              const decremented = await tx.customer_profiles.updateMany({
+                where: { customer_id: customerId, free_downloads_remaining: { gt: 0 } },
+                data: { free_downloads_remaining: { decrement: 1 } }
+              });
+              if (decremented.count !== 1) {
+                const consumed = await this.consumeActivePackage(tx, customerId);
+                if (!consumed) {
+                  throw new BadRequestException(
+                    'Đã hết lượt tải xuống miễn phí. Vui lòng mua gói dịch vụ.'
+                  );
+                }
+                type = 'PACKAGE';
+                userPackageId = consumed.user_package_id;
+              }
+            } else {
+              const paidItem = await tx.order_items.findFirst({
+                where: {
+                  document_id: docId,
+                  status: 'PAID',
+                  orders: { buyer_id: customerId, status: 'PAID' }
+                },
+                orderBy: { created_at: 'asc' }
+              });
+              if (paidItem) {
+                type = 'PURCHASED';
+                orderItemId = paidItem.order_item_id;
+              } else {
+                const consumed = await this.consumeActivePackage(tx, customerId);
+                if (!consumed) {
+                  throw new ForbiddenException(
+                    'Tài liệu có phí. Vui lòng thanh toán hoặc mua gói dịch vụ.'
+                  );
+                }
+                type = 'PACKAGE';
+                userPackageId = consumed.user_package_id;
+              }
+            }
+
+            await tx.documents.update({
+              where: { document_id: docId },
+              data: { download_count: { increment: 1 } }
+            });
           }
-          downloadType = 'PACKAGE';
-        }
+
+          await tx.download_history.create({
+            data: {
+              customer_id: customerId,
+              document_id: docId,
+              order_item_id: orderItemId,
+              user_package_id: userPackageId,
+              download_type: type,
+              ip_address: ipAddress.slice(0, 45)
+            }
+          });
+
+          return type;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+
+    let downloadType: download_type | undefined;
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
+      try {
+        downloadType = await consumeEntitlement();
+        break;
+      } catch (error) {
+        const retryable =
+          error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+        if (!retryable || attempt === 4) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 25));
       }
     }
 
-    // 6.4 Generate Presigned URL
-    const signedUrl = await this.storageService.getPresignedUrl(doc.file_url);
-
-    // 6.5 Record download history
-    await this.prisma.download_history.create({
-      data: {
-        customer_id: user.customerId,
-        document_id: docId,
-        download_type: downloadType,
-        ip_address: ipAddress
-      }
-    });
-
-    // Tăng download_count trên document (cho sort popular + seller dashboard) nếu đây là lần đầu tiên tải
-    if (!hasDownloadedBefore) {
-      await this.prisma.documents.update({
-        where: { document_id: docId },
-        data: { download_count: { increment: 1 } }
-      });
+    if (!downloadType) {
+      throw new BadRequestException('KhÃ´ng thá»ƒ xÃ¡c nháº­n quyá»n táº£i xuá»‘ng.');
     }
 
     return {
       message: 'Lấy link tải file thành công.',
       downloadUrl: signedUrl,
-      download_type: downloadType
+      download_type: downloadType,
+      expiresInSeconds: 300
     };
   }
 
-  private async useActivePackage(customerId: number) {
-    const pkg = await this.prisma.user_packages.findFirst({
-      where: { customer_id: customerId, status: 'ACTIVE', turns_remaining: { gt: 0 } },
-      orderBy: { expires_at: 'asc' }
+  private async consumeActivePackage(tx: Prisma.TransactionClient, customerId: number) {
+    const pkg = await tx.user_packages.findFirst({
+      where: {
+        customer_id: customerId,
+        status: 'ACTIVE',
+        turns_remaining: { gt: 0 },
+        OR: [{ expires_at: null }, { expires_at: { gt: new Date() } }]
+      },
+      orderBy: [{ expires_at: 'asc' }, { purchased_at: 'asc' }]
     });
-
     if (!pkg) return null;
 
     const remaining = pkg.turns_remaining - 1;
-    await this.prisma.user_packages.update({
+    await tx.user_packages.update({
       where: { user_package_id: pkg.user_package_id },
       data: {
         turns_remaining: remaining,
-        status: remaining === 0 ? 'EXHAUSTED' : 'ACTIVE'
+        status: remaining === 0 ? 'EXHAUSTED' : 'ACTIVE',
+        active_slot: remaining === 0 ? null : 1
       }
     });
 
-    // Nếu gói vừa EXHAUSTED → kích hoạt gói PENDING tiếp theo trong hàng chờ
     if (remaining === 0) {
-      await this.packagesService.activateNextPending(customerId);
+      const pending = await tx.user_packages.findFirst({
+        where: { customer_id: customerId, status: 'PENDING' },
+        include: { packages: { select: { duration_days: true } } },
+        orderBy: { purchased_at: 'asc' }
+      });
+      if (pending) {
+        await tx.user_packages.update({
+          where: { user_package_id: pending.user_package_id },
+          data: {
+            status: 'ACTIVE',
+            active_slot: 1,
+            expires_at: new Date(Date.now() + pending.packages.duration_days * 86_400_000)
+          }
+        });
+      }
     }
 
     return pkg;

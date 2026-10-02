@@ -1,13 +1,11 @@
 # fly.toml app configuration file generated for studydocs-backend-minhtu on 2026-04-19T15:18:33+07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
 
 app = 'studydocs-backend-minhtu'
 primary_region = 'sin'
 
 [build]
-
 
 [http_service]
   internal_port = 4000
@@ -23,4 +21,4 @@ primary_region = 'sin'
   memory_mb = 1024
 
 [processes]
-  app = "sh -c 'npx prisma db push --accept-data-loss && node dist/src/main.js'"
+  app = "sh -c 'npx prisma migrate deploy && node dist/src/main.js'"

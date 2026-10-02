@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useNotificationStore } from '@/store/notificationStore'
 import { usersApi } from '@/api/users.api'
-import { authApi } from '@/api/auth.api'
 import { walletsApi } from '@/api/wallets.api'
 import { packagesApi } from '@/api/packages.api'
-import { User, ShieldCheck, Mail, Phone, Lock, KeyRound, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X, PackageOpen, Zap, Hourglass, RefreshCw } from 'lucide-react'
+import { User, ShieldCheck, Mail, Phone, Lock, Save, AlertTriangle, CheckCircle2, Wallet, CreditCard, History, Clock, ArrowUpRight, ArrowDownRight, Download, Calendar, Edit3, UserIcon, X, PackageOpen, Zap, Hourglass, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
-import QRCode from 'react-qr-code'
 import { formatBalance, formatDate } from '@/utils/format'
 import { Link, useSearchParams } from 'react-router-dom'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/utils/password'
 
 export default function ProfilePage() {
   const { user } = useAuthStore()
@@ -33,15 +32,15 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'INFO' | 'PASSWORD' | 'WALLET' | '2FA'>((tabQuery as any) || 'INFO')
+  const [activeTab, setActiveTab] = useState<'INFO' | 'PASSWORD' | 'WALLET'>((tabQuery as any) || 'INFO')
 
   useEffect(() => {
-    if (tabQuery && ['INFO', 'PASSWORD', 'WALLET', '2FA'].includes(tabQuery)) {
+    if (tabQuery && ['INFO', 'PASSWORD', 'WALLET'].includes(tabQuery)) {
       setActiveTab(tabQuery as any)
     }
   }, [tabQuery])
 
-  const handleTabChange = (tab: 'INFO' | 'PASSWORD' | 'WALLET' | '2FA') => {
+  const handleTabChange = (tab: 'INFO' | 'PASSWORD' | 'WALLET') => {
     setActiveTab(tab)
     setSearchParams({ tab: tab.toLowerCase() })
   }
@@ -55,9 +54,6 @@ export default function ProfilePage() {
   const [showWithdrawHistory, setShowWithdrawHistory] = useState(false)
   const [withdrawForm, setWithdrawForm] = useState({ amount: '', bank: '', account: '', accountName: '' })
 
-  // 2FA
-  const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string, qrCode: string } | null>(null)
-  const [twoFaCode, setTwoFaCode] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
 
@@ -66,10 +62,6 @@ export default function ProfilePage() {
   const [txSign, setTxSign] = useState<string>('ALL') // 'ALL' | 'CREDIT' | 'DEBIT'
 
   const { socket } = useNotificationStore()
-
-  useEffect(() => {
-    fetchData()
-  }, [])
 
   useEffect(() => {
     if (socket) {
@@ -84,7 +76,7 @@ export default function ProfilePage() {
     }
   }, [socket])
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       const [uRes, wRes, tRes, wdRes, pkgRes] = await Promise.all([
@@ -108,7 +100,9 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => { void fetchData() }, [fetchData])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -132,6 +126,9 @@ export default function ProfilePage() {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       return toast.error('Mật khẩu xác nhận không khớp')
     }
+    if (!isStrongPassword(passwordForm.newPassword)) {
+      return toast.error(PASSWORD_REQUIREMENTS)
+    }
     setIsSubmitting(true)
     try {
       await usersApi.changePassword({
@@ -142,31 +139,6 @@ export default function ProfilePage() {
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Lỗi khi đổi mật khẩu')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleSetup2FA = async () => {
-    try {
-      const res = await authApi.setup2FA()
-      setTwoFaSetup(res.data || res)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Không thể tạo mã 2FA')
-    }
-  }
-
-  const handleVerify2FA = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!twoFaCode || twoFaCode.length !== 6) return toast.error('Mã gồm 6 chữ số')
-    setIsSubmitting(true)
-    try {
-      await authApi.verify2FA(twoFaCode)
-      toast.success('Kích hoạt 2FA thành công!')
-      setTwoFaSetup(null)
-      fetchData()
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Mã xác nhận sai')
     } finally {
       setIsSubmitting(false)
     }
@@ -258,13 +230,6 @@ export default function ProfilePage() {
             </button>
           )}
 
-          {/* <button
-            onClick={() => setActiveTab('2FA')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${activeTab === '2FA' ? 'bg-primary text-white shadow-md' : 'text-foreground hover:bg-muted'
-              }`}
-          >
-            <KeyRound className="w-5 h-5" /> Bảo mật 2 lớp (2FA)
-          </button> */}
         </nav>
       </div>
 
@@ -637,63 +602,6 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* 2FA TAB */}
-          {activeTab === '2FA' && (
-            <div className="max-w-lg mx-auto text-center space-y-6 pt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                <ShieldCheck className="w-10 h-10" />
-              </div>
-              <h2 className="text-2xl font-bold font-heading">Bảo vệ 2 lớp (2FA)</h2>
-
-              {profile?.accounts?.is_2fa_enabled ? (
-                <div className="p-6 bg-success/10 border border-success/30 rounded-2xl flex flex-col items-center">
-                  <CheckCircle2 className="w-12 h-12 text-success mb-2" />
-                  <h3 className="font-bold text-success text-lg">2FA đã được kích hoạt</h3>
-                  <p className="text-sm text-muted-foreground mt-2">Tài khoản của bạn đang được bảo vệ an toàn bằng xác thực 2 lớp.</p>
-                </div>
-              ) : (
-                <>
-                  {!twoFaSetup ? (
-                    <>
-                      <p className="text-muted-foreground leading-relaxed text-sm">
-                        Chặn truy cập trái phép bằng cách yêu cầu mã xác nhận mỗi khi đăng nhập. Sử dụng ứng dụng Google Authenticator hoặc Authy, Microsoft Authenticator.
-                      </p>
-                      <button onClick={handleSetup2FA} className="btn bg-primary text-white hover:bg-primary-hover px-8 py-3 rounded-xl shadow-lg mt-4 cursor-pointer">
-                        Thiết lập 2FA ngay
-                      </button>
-                    </>
-                  ) : (
-                    <form onSubmit={handleVerify2FA} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <p className="text-sm font-semibold bg-warning/10 text-warning p-4 rounded-xl border border-warning/20">
-                        Hãy mở ứng dụng Authenticator và quét mã QR Code dưới đây để kích hoạt.
-                      </p>
-                      <div className="p-4 bg-white rounded-2xl inline-block shadow-md border border-border border-dashed mx-auto">
-                        <QRCode value={twoFaSetup.qrCode || twoFaSetup.secret} size={200} />
-                      </div>
-                      <div className="text-xs font-mono bg-muted p-2 rounded-lg text-muted-foreground select-all cursor-pointer">
-                        Secret Key: {twoFaSetup.secret}
-                      </div>
-
-                      <div className="space-y-2 text-left mt-6">
-                        <label className="text-sm font-semibold text-foreground">Mã xác nhận (6 số)</label>
-                        <input
-                          type="text"
-                          value={twoFaCode}
-                          onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').substring(0, 6))}
-                          placeholder="000000"
-                          className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-center font-mono text-2xl tracking-[0.5em]"
-                          required
-                        />
-                      </div>
-                      <button type="submit" disabled={isSubmitting} className="w-full btn bg-success text-white hover:bg-green-600 rounded-xl py-3 text-base shadow-lg cursor-pointer">
-                        {isSubmitting ? 'Đang xác nhận...' : 'Xác nhận & Kích hoạt'}
-                      </button>
-                    </form>
-                  )}
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

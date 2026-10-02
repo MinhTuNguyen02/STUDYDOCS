@@ -1,34 +1,45 @@
-import { ConflictException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { LedgerService } from '../wallets/ledger.service';
 import { StorageService } from '../storage/storage.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
-import { CreateCategoryDto } from './dto/create-category.dto';
-import { CreateTagDto } from './dto/create-tag.dto';
 import { RejectDocumentDto } from './dto/reject-document.dto';
-import { UpdateCategoryDto } from './dto/update-category.dto';
-import { UpdateTagDto } from './dto/update-tag.dto';
+import { CreateStaffAccountDto } from './dto/admin-actions.dto';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { hash } from 'bcryptjs';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import {
+  AdminUserQueryDto,
+  AuditLogQueryDto,
+  PendingDocumentQueryDto,
+  WithdrawalListQueryDto
+} from './dto/admin-query.dto';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly storageService: StorageService,
     private readonly ledger: LedgerService,
     private readonly notifications: NotificationsService
-  ) { }
+  ) {}
 
   private formatFileSize(bytes: number) {
     return `${(Number(bytes) / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  private resolveRole(roleNames: string[], hasStaffProfile: boolean, hasCustomerProfile: boolean, _documentsCount: number) {
-    const lowerRoles = roleNames.map(r => r.toLowerCase());
+  private resolveRole(roleNames: string[], hasStaffProfile: boolean) {
+    const lowerRoles = roleNames.map((r) => r.toLowerCase());
     if (lowerRoles.includes('admin')) return 'ADMIN';
     if (lowerRoles.includes('mod')) return 'MOD';
     if (lowerRoles.includes('accountant')) return 'ACCOUNTANT';
@@ -76,7 +87,15 @@ export class AdminService {
       return `${y}-${m}-${day}`;
     };
 
-    const [pendingApprovals, totalDocuments, payments, orders, documents, commissionItems, packageSales] = await Promise.all([
+    const [
+      pendingApprovals,
+      totalDocuments,
+      payments,
+      orders,
+      documents,
+      commissionItems,
+      packageSales
+    ] = await Promise.all([
       this.prisma.documents.count({ where: { status: 'PENDING' } }),
       // Only count publicly visible APPROVED documents
       this.prisma.documents.count({ where: { status: 'APPROVED' } }),
@@ -100,7 +119,7 @@ export class AdminService {
       // Doanh thu hoa hồng từ bán tài liệu (commission_fee)
       this.prisma.order_items.findMany({
         where: {
-          status: { in: ['PAID', 'RELEASED'] },
+          status: 'PAID',
           created_at: { gte: startOfDay, lte: endOfDay }
         },
         select: { commission_fee: true, created_at: true }
@@ -108,39 +127,56 @@ export class AdminService {
       // Doanh thu từ bán package (join với packages để lấy giá)
       this.prisma.user_packages.findMany({
         where: { purchased_at: { gte: startOfDay, lte: endOfDay } },
-        select: { purchased_at: true, packages: { select: { price: true, package_id: true, name: true } } }
+        select: {
+          purchased_at: true,
+          packages: { select: { price: true, package_id: true, name: true } }
+        }
       })
     ]);
 
     const depositRevenue = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-    const commissionRevenue = commissionItems.reduce((sum, p) => sum + Number(p.commission_fee ?? 0), 0);
+    const commissionRevenue = commissionItems.reduce(
+      (sum, p) => sum + Number(p.commission_fee ?? 0),
+      0
+    );
     const pkgRevenue = packageSales.reduce((sum, p) => sum + Number(p.packages?.price ?? 0), 0);
     // Platform total revenue = deposits + commissions + package sales
     const revenueRange = depositRevenue + commissionRevenue + pkgRevenue;
     const ordersRange = orders.length;
 
     // ── Build chart data keyed by VN local date ──────────────────────────────
-    const chartMap = new Map<string, {
-      date: string;
-      revenue: number;         // total (all sources)
-      depositRevenue: number;  // nạp ví
-      commissionRevenue: number; // hoa hồng tài liệu
-      packageRevenue: number;  // bán gói
-      orders: number;
-      documents: number;
-    }>();
+    const chartMap = new Map<
+      string,
+      {
+        date: string;
+        revenue: number; // total (all sources)
+        depositRevenue: number; // nạp ví
+        commissionRevenue: number; // hoa hồng tài liệu
+        packageRevenue: number; // bán gói
+        orders: number;
+        documents: number;
+      }
+    >();
     let current = new Date(startOfDay);
     while (current <= endOfDay) {
       const dateKey = toVNDateKey(current);
       if (!chartMap.has(dateKey)) {
-        chartMap.set(dateKey, { date: dateKey, revenue: 0, depositRevenue: 0, commissionRevenue: 0, packageRevenue: 0, orders: 0, documents: 0 });
+        chartMap.set(dateKey, {
+          date: dateKey,
+          revenue: 0,
+          depositRevenue: 0,
+          commissionRevenue: 0,
+          packageRevenue: 0,
+          orders: 0,
+          documents: 0
+        });
       }
       // If grouping by month, we can safely advance by 1 day because the key only gets inserted once.
       // Or we can advance by 1 month to be slightly more efficient. We'll advance by 1 day to keep it simple and robust.
       current.setDate(current.getDate() + 1);
     }
 
-    payments.forEach(p => {
+    payments.forEach((p) => {
       if (!p.created_at) return;
       const key = toVNDateKey(p.created_at);
       if (chartMap.has(key)) {
@@ -150,7 +186,7 @@ export class AdminService {
         entry.revenue += amt;
       }
     });
-    commissionItems.forEach(p => {
+    commissionItems.forEach((p) => {
       if (!p.created_at) return;
       const key = toVNDateKey(p.created_at);
       if (chartMap.has(key)) {
@@ -160,7 +196,7 @@ export class AdminService {
         entry.revenue += amt;
       }
     });
-    packageSales.forEach(p => {
+    packageSales.forEach((p) => {
       const key = toVNDateKey(p.purchased_at);
       if (chartMap.has(key)) {
         const entry = chartMap.get(key)!;
@@ -169,12 +205,12 @@ export class AdminService {
         entry.revenue += amt;
       }
     });
-    orders.forEach(o => {
+    orders.forEach((o) => {
       if (!o.created_at) return;
       const key = toVNDateKey(o.created_at);
       if (chartMap.has(key)) chartMap.get(key)!.orders += 1;
     });
-    documents.forEach(d => {
+    documents.forEach((d) => {
       const key = toVNDateKey(d.created_at);
       if (chartMap.has(key)) chartMap.get(key)!.documents += 1;
     });
@@ -189,13 +225,13 @@ export class AdminService {
       orderBy: { _count: { user_package_id: 'desc' } },
       take: 5
     });
-    const pkgIds = topPackagesGroup.map(p => p.package_id);
+    const pkgIds = topPackagesGroup.map((p) => p.package_id);
     const pkgMeta = await this.prisma.packages.findMany({
       where: { package_id: { in: pkgIds } },
       select: { package_id: true, name: true, price: true }
     });
-    const pkgMetaMap = new Map(pkgMeta.map(p => [p.package_id, p]));
-    const topPackages = topPackagesGroup.map(p => ({
+    const pkgMetaMap = new Map(pkgMeta.map((p) => [p.package_id, p]));
+    const topPackages = topPackagesGroup.map((p) => ({
       id: p.package_id,
       name: pkgMetaMap.get(p.package_id)?.name ?? 'Gói không xác định',
       price: Number(pkgMetaMap.get(p.package_id)?.price ?? 0),
@@ -211,25 +247,25 @@ export class AdminService {
       take: 5
     });
 
-    // Top Sellers by Quantity (exclude REFUNDED)
+    // Top sellers by paid item quantity.
     const topSellersGroup = await this.prisma.order_items.groupBy({
       by: ['seller_id'],
       _count: { order_item_id: true },
       where: {
         created_at: { gte: startOfDay, lte: endOfDay },
-        status: { in: ['PAID', 'RELEASED'] }
+        status: 'PAID'
       },
       orderBy: { _count: { order_item_id: 'desc' } },
       take: 5
     });
 
-    // Top Sellers by Revenue (exclude REFUNDED)
+    // Top sellers by paid revenue.
     const topRevenueGroup = await this.prisma.order_items.groupBy({
       by: ['seller_id'],
       _sum: { seller_earning: true },
       where: {
         created_at: { gte: startOfDay, lte: endOfDay },
-        status: { in: ['PAID', 'RELEASED'] }
+        status: 'PAID'
       },
       orderBy: { _sum: { seller_earning: 'desc' } },
       take: 5
@@ -237,21 +273,33 @@ export class AdminService {
 
     // Fetch user profiles for the tops
     const sellerIds = new Set([
-      ...topUploadersGroup.map(u => u.seller_id),
-      ...topSellersGroup.map(s => s.seller_id),
-      ...topRevenueGroup.map(r => r.seller_id)
+      ...topUploadersGroup.map((u) => u.seller_id),
+      ...topSellersGroup.map((s) => s.seller_id),
+      ...topRevenueGroup.map((r) => r.seller_id)
     ]);
     const profiles = await this.prisma.customer_profiles.findMany({
       where: { customer_id: { in: Array.from(sellerIds) } },
       select: { customer_id: true, full_name: true }
     });
-    const profileMap = new Map(profiles.map(p => [p.customer_id, p.full_name]));
+    const profileMap = new Map(profiles.map((p) => [p.customer_id, p.full_name]));
 
-    const topUploaders = topUploadersGroup.map(u => ({ id: u.seller_id, name: profileMap.get(u.seller_id), count: u._count.document_id }));
-    const topSellers = topSellersGroup.map(s => ({ id: s.seller_id, name: profileMap.get(s.seller_id), count: s._count.order_item_id }));
-    const topRevenueSellers = topRevenueGroup.map(r => ({ id: r.seller_id, name: profileMap.get(r.seller_id), revenue: Number(r._sum.seller_earning || 0) }));
+    const topUploaders = topUploadersGroup.map((u) => ({
+      id: u.seller_id,
+      name: profileMap.get(u.seller_id),
+      count: u._count.document_id
+    }));
+    const topSellers = topSellersGroup.map((s) => ({
+      id: s.seller_id,
+      name: profileMap.get(s.seller_id),
+      count: s._count.order_item_id
+    }));
+    const topRevenueSellers = topRevenueGroup.map((r) => ({
+      id: r.seller_id,
+      name: profileMap.get(r.seller_id),
+      revenue: Number(r._sum.seller_earning || 0)
+    }));
 
-    // Top Buyers by order count (exclude orders where all items are REFUNDED)
+    // Top buyers by paid order count.
     const topBuyersGroup = await this.prisma.orders.groupBy({
       by: ['buyer_id'],
       _count: { order_id: true },
@@ -263,26 +311,26 @@ export class AdminService {
       orderBy: { _count: { order_id: 'desc' } },
       take: 5
     });
-    const buyerIds = topBuyersGroup.map(b => b.buyer_id);
+    const buyerIds = topBuyersGroup.map((b) => b.buyer_id);
     const buyerProfiles = await this.prisma.customer_profiles.findMany({
       where: { customer_id: { in: buyerIds } },
       select: { customer_id: true, full_name: true }
     });
-    const buyerProfileMap = new Map(buyerProfiles.map(p => [p.customer_id, p.full_name]));
-    const topBuyers = topBuyersGroup.map(b => ({
+    const buyerProfileMap = new Map(buyerProfiles.map((p) => [p.customer_id, p.full_name]));
+    const topBuyers = topBuyersGroup.map((b) => ({
       id: b.buyer_id,
       name: buyerProfileMap.get(b.buyer_id),
       count: b._count.order_id,
       totalSpent: Number(b._sum.total_amount || 0)
     }));
 
-    // Top Documents by purchase count (exclude REFUNDED)
+    // Top documents by paid purchase count.
     const topDocsOrderedGroup = await this.prisma.order_items.groupBy({
       by: ['document_id'],
       _count: { order_item_id: true },
       where: {
         created_at: { gte: startOfDay, lte: endOfDay },
-        status: { in: ['PAID', 'RELEASED'] }
+        status: 'PAID'
       },
       orderBy: { _count: { order_item_id: 'desc' } },
       take: 5
@@ -295,15 +343,26 @@ export class AdminService {
       take: 5
     });
 
-    const docIds = new Set([...topDocsOrderedGroup.map(d => d.document_id), ...topDocsDownloadedGroup.map(d => d.document_id)]);
+    const docIds = new Set([
+      ...topDocsOrderedGroup.map((d) => d.document_id),
+      ...topDocsDownloadedGroup.map((d) => d.document_id)
+    ]);
     const docsMeta = await this.prisma.documents.findMany({
       where: { document_id: { in: Array.from(docIds) } },
       select: { document_id: true, title: true }
     });
-    const docMap = new Map(docsMeta.map(d => [d.document_id, d.title]));
+    const docMap = new Map(docsMeta.map((d) => [d.document_id, d.title]));
 
-    const topBoughtDocs = topDocsOrderedGroup.map(d => ({ id: d.document_id, title: docMap.get(d.document_id), count: d._count.order_item_id }));
-    const topDownloadedDocs = topDocsDownloadedGroup.map(d => ({ id: d.document_id, title: docMap.get(d.document_id), count: d._count.id }));
+    const topBoughtDocs = topDocsOrderedGroup.map((d) => ({
+      id: d.document_id,
+      title: docMap.get(d.document_id),
+      count: d._count.order_item_id
+    }));
+    const topDownloadedDocs = topDocsDownloadedGroup.map((d) => ({
+      id: d.document_id,
+      title: docMap.get(d.document_id),
+      count: d._count.id
+    }));
 
     return {
       pendingApprovals,
@@ -326,19 +385,39 @@ export class AdminService {
     };
   }
 
-  async getPendingDocuments() {
-    const docs = await this.prisma.documents.findMany({
-      where: { status: 'PENDING' },
-      orderBy: { created_at: 'desc' },
-      take: 100,
-      include: {
-        customer_profiles: true,
-        categories: true,
-        document_tags: {
-          include: { tags: true }
+  async getPendingDocuments(query: PendingDocumentQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where: Prisma.documentsWhereInput = {
+      status: 'PENDING',
+      OR: query.search
+        ? [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            {
+              customer_profiles: {
+                full_name: { contains: query.search, mode: 'insensitive' }
+              }
+            },
+            { categories: { name: { contains: query.search, mode: 'insensitive' } } }
+          ]
+        : undefined
+    };
+    const [total, docs] = await Promise.all([
+      this.prisma.documents.count({ where }),
+      this.prisma.documents.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ created_at: 'desc' }, { document_id: 'desc' }],
+        include: {
+          customer_profiles: true,
+          categories: true,
+          document_tags: {
+            include: { tags: true }
+          }
         }
-      }
-    });
+      })
+    ]);
 
     const mapped = await Promise.all(
       docs.map(async (doc) => {
@@ -348,16 +427,9 @@ export class AdminService {
         if (previewKey && !previewKey.includes('placeholder')) {
           try {
             previewSignedUrl = await this.storageService.getPresignedUrl(previewKey, 3600);
-          } catch { /* ignore */ }
-        }
-
-        // ── Review URL (100% full-page, light watermark — staff only) ──
-        let reviewSignedUrl: string | null = null;
-        const reviewKey = (doc as any).review_url;
-        if (reviewKey) {
-          try {
-            reviewSignedUrl = await this.storageService.getPresignedUrl(reviewKey, 7200); // 2h TTL
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
 
         return {
@@ -375,26 +447,25 @@ export class AdminService {
           fileExtension: doc.file_extension,
           size: this.formatFileSize(doc.file_size ?? 0),
           previewSignedUrl,
-          reviewSignedUrl  // Full-page signed URL for inline staff review (2h TTL, deleted after decision)
+          hasReviewFile: Boolean(doc.file_url)
         };
       })
     );
 
-    return toJsonSafe(mapped);
+    return { meta: { page, limit, total }, data: toJsonSafe(mapped) };
   }
 
   /**
    * Returns a presigned URL for the full original document file (60 min expiry).
    * We log this access for system audit purposes.
    */
-  async getDocumentReviewUrl(documentId: string, actor: AuthUser) {
-    const id = Number(documentId);
+  async getDocumentReviewUrl(documentId: number, actor: AuthUser) {
+    const id = documentId;
     const doc = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!doc) throw new NotFoundException('Không tìm thấy tài liệu.');
     if (!doc.file_url) throw new NotFoundException('Tài liệu chưa có file được lưu.');
 
-    // Generate a presigned URL valid for 60 minutes
-    const reviewUrl = await this.storageService.getPresignedUrl(doc.file_url, 3600);
+    const reviewUrl = await this.storageService.getPresignedUrl(doc.file_url, 600);
 
     // Audit log
     await this.prisma.audit_logs.create({
@@ -408,34 +479,38 @@ export class AdminService {
           document_title: doc.title,
           reviewer: actor.email,
           reviewedAt: new Date().toISOString(),
-          urlExpiry: '60 minutes'
+          urlExpiry: '10 minutes'
         }
       }
     });
 
     return {
       reviewUrl,
-      expiresInMinutes: 60,
+      expiresInMinutes: 10,
       documentTitle: doc.title,
       fileExtension: doc.file_extension
     };
   }
 
-  async approveDocument(documentId: string, actor: AuthUser) {
-    const id = Number(documentId);
+  async approveDocument(documentId: number, actor: AuthUser) {
+    const id = documentId;
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy tài liệu.');
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const doc = await tx.documents.update({
-        where: { document_id: id },
+      const transitioned = await tx.documents.updateMany({
+        where: { document_id: id, status: 'PENDING', delete_at: null },
         data: {
           status: 'APPROVED',
           rejection_reason: null,
-          published_at: new Date(),
+          published_at: new Date()
         }
       });
 
+      if (transitioned.count !== 1) {
+        throw new ConflictException('Tài liệu không còn ở trạng thái chờ duyệt.');
+      }
+      const doc = await tx.documents.findUniqueOrThrow({ where: { document_id: id } });
       await tx.audit_logs.create({
         data: {
           account_id: actor.accountId,
@@ -455,16 +530,27 @@ export class AdminService {
     if (reviewKey) {
       await this.storageService.deleteFile(reviewKey);
       // Clear DB field after migration is applied (use raw SQL as Prisma type not yet regenerated)
-      await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
+      await this.prisma
+        .$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
     }
 
     // Notify seller: tài liệu được duyệt
-    this.notifyDocumentSeller(id, 'DOC_APPROVED', 'Tài liệu đã được duyệt', `Tài liệu "${existing.title}" của bạn đã được duyệt và xuất bản.`);
+    this.notifyDocumentSeller(
+      id,
+      'DOC_APPROVED',
+      'Tài liệu đã được duyệt',
+      `Tài liệu "${existing.title}" của bạn đã được duyệt và xuất bản.`
+    );
 
     return toJsonSafe(updated);
   }
 
-  private async notifyDocumentSeller(documentId: number, type: 'DOC_APPROVED' | 'DOC_REJECTED' | 'DOC_HIDDEN', title: string, message: string) {
+  private async notifyDocumentSeller(
+    documentId: number,
+    type: 'DOC_APPROVED' | 'DOC_REJECTED' | 'DOC_HIDDEN',
+    title: string,
+    message: string
+  ) {
     const doc = await this.prisma.documents.findUnique({
       where: { document_id: documentId },
       select: { seller_id: true }
@@ -485,20 +571,24 @@ export class AdminService {
     });
   }
 
-  async rejectDocument(documentId: string, dto: RejectDocumentDto, actor: AuthUser) {
-    const id = Number(documentId);
+  async rejectDocument(documentId: number, dto: RejectDocumentDto, actor: AuthUser) {
+    const id = documentId;
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy tài liệu.');
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const doc = await tx.documents.update({
-        where: { document_id: id },
+      const transitioned = await tx.documents.updateMany({
+        where: { document_id: id, status: 'PENDING', delete_at: null },
         data: {
           status: 'REJECTED',
-          rejection_reason: dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.',
+          rejection_reason: dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.'
         }
       });
 
+      if (transitioned.count !== 1) {
+        throw new ConflictException('Tài liệu không còn ở trạng thái chờ duyệt.');
+      }
+      const doc = await tx.documents.findUniqueOrThrow({ where: { document_id: id } });
       await tx.audit_logs.create({
         data: {
           account_id: actor.accountId,
@@ -517,16 +607,30 @@ export class AdminService {
     const reviewKey = (existing as any).review_url;
     if (reviewKey) {
       await this.storageService.deleteFile(reviewKey);
-      await this.prisma.$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
+      await this.prisma
+        .$executeRaw`UPDATE documents SET review_url = NULL WHERE document_id = ${id}`;
     }
 
     // Notify seller: tài liệu bị từ chối
-    this.notifyDocumentSeller(id, 'DOC_REJECTED', 'Tài liệu bị từ chối', `Tài liệu "${existing.title}" bị từ chối. Lý do: ${dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.'}`);
+    this.notifyDocumentSeller(
+      id,
+      'DOC_REJECTED',
+      'Tài liệu bị từ chối',
+      `Tài liệu "${existing.title}" bị từ chối. Lý do: ${dto.reason ?? 'Không đạt tiêu chuẩn kiểm duyệt.'}`
+    );
 
     return toJsonSafe(updated);
   }
 
-  async getDocuments(filters: { status?: string; categoryId?: string; search?: string }) {
+  async getDocuments(filters: {
+    status?: string;
+    categoryId?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
     let categoryIds: number[] | undefined = undefined;
     if (filters.categoryId && filters.categoryId !== 'ALL') {
       const rootId = Number(filters.categoryId);
@@ -534,15 +638,17 @@ export class AdminService {
         where: { OR: [{ category_id: rootId }, { parent_id: rootId }] },
         select: { category_id: true }
       });
-      categoryIds = childCategories.map(c => c.category_id);
+      categoryIds = childCategories.map((c) => c.category_id);
     }
 
-    const docs = await this.prisma.documents.findMany({
-      where: {
-        status: filters.status && filters.status !== 'ALL' ? (filters.status as any) : undefined,
-        category_id: categoryIds ? { in: categoryIds } : undefined,
-        OR: filters.search
-          ? [
+    const where: Prisma.documentsWhereInput = {
+      status:
+        filters.status && filters.status !== 'ALL'
+          ? (filters.status as Prisma.Enumdocument_statusFilter)
+          : undefined,
+      category_id: categoryIds ? { in: categoryIds } : undefined,
+      OR: filters.search
+        ? [
             { title: { contains: filters.search, mode: 'insensitive' } },
             { slug: { contains: filters.search, mode: 'insensitive' } },
             {
@@ -551,39 +657,50 @@ export class AdminService {
               }
             }
           ]
-          : undefined
-      },
-      orderBy: { created_at: 'desc' },
-      include: {
-        customer_profiles: true,
-        categories: true,
-        document_tags: {
-          include: { tags: true }
-        }
-      }
-    });
+        : undefined
+    };
 
-    return toJsonSafe(
-      docs.map((doc) => ({
-        id: doc.document_id,
-        title: doc.title,
-        sellerName: doc.customer_profiles.full_name,
-        categoryName: doc.categories.name,
-        status: doc.status,
-        price: doc.price,
-        createdAt: doc.created_at,
-        description: doc.description,
-        format: doc.file_extension.toUpperCase(),
-        pages: doc.page_count,
-        size: this.formatFileSize(doc.file_size ?? 0),
-        tags: doc.document_tags.map((item) => item.tags.tag_name),
-        rejectionReason: doc.rejection_reason
-      }))
-    );
+    const [total, docs] = await Promise.all([
+      this.prisma.documents.count({ where }),
+      this.prisma.documents.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        include: {
+          customer_profiles: true,
+          categories: true,
+          document_tags: {
+            include: { tags: true }
+          }
+        }
+      })
+    ]);
+
+    return {
+      meta: { page, limit, total },
+      data: toJsonSafe(
+        docs.map((doc) => ({
+          id: doc.document_id,
+          title: doc.title,
+          sellerName: doc.customer_profiles.full_name,
+          categoryName: doc.categories.name,
+          status: doc.status,
+          price: doc.price,
+          createdAt: doc.created_at,
+          description: doc.description,
+          format: doc.file_extension.toUpperCase(),
+          pages: doc.page_count,
+          size: this.formatFileSize(doc.file_size ?? 0),
+          tags: doc.document_tags.map((item) => item.tags.tag_name),
+          rejectionReason: doc.rejection_reason
+        }))
+      )
+    };
   }
 
-  async softDeleteDocument(documentId: string, _actor: AuthUser) {
-    const id = Number(documentId);
+  async softDeleteDocument(documentId: number, _actor: AuthUser) {
+    const id = documentId;
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy tài liệu.');
 
@@ -603,13 +720,18 @@ export class AdminService {
     });
 
     // Notify seller: tài liệu bị ẩn bởi admin
-    this.notifyDocumentSeller(id, 'DOC_HIDDEN', 'Tài liệu bị ẩn', `Tài liệu "${existing.title}" đã bị quản trị viên ẩn khỏi hệ thống.`);
+    this.notifyDocumentSeller(
+      id,
+      'DOC_HIDDEN',
+      'Tài liệu bị ẩn',
+      `Tài liệu "${existing.title}" đã bị quản trị viên ẩn khỏi hệ thống.`
+    );
 
     return toJsonSafe(updated);
   }
 
-  async restoreDocument(documentId: string, _actor: AuthUser) {
-    const id = Number(documentId);
+  async restoreDocument(documentId: number, _actor: AuthUser) {
+    const id = documentId;
     const existing = await this.prisma.documents.findUnique({ where: { document_id: id } });
     if (!existing) throw new NotFoundException('Không tìm thấy tài liệu.');
 
@@ -629,47 +751,101 @@ export class AdminService {
     });
 
     // Notify seller: tài liệu được admin khôi phục
-    this.notifyDocumentSeller(id, 'DOC_APPROVED', 'Tài liệu đã được mở lại', `Tài liệu "${existing.title}" đã được quản trị viên mở lại trên hệ thống.`);
+    this.notifyDocumentSeller(
+      id,
+      'DOC_APPROVED',
+      'Tài liệu đã được mở lại',
+      `Tài liệu "${existing.title}" đã được quản trị viên mở lại trên hệ thống.`
+    );
 
     return toJsonSafe(updated);
   }
 
-  async getWithdrawals() {
-    const reqs = await this.prisma.withdrawal_requests.findMany({
-      include: {
-        customer_profiles: {
-          select: {
-            full_name: true,
-            account_id: true,
-            accounts: {
-              select: { email: true }
+  async getWithdrawals(query: WithdrawalListQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where: Prisma.withdrawal_requestsWhereInput = {
+      status: query.status && query.status !== 'ALL' ? query.status : undefined
+    };
+    const [total, reqs] = await Promise.all([
+      this.prisma.withdrawal_requests.count({ where }),
+      this.prisma.withdrawal_requests.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          customer_profiles: {
+            select: {
+              full_name: true,
+              account_id: true,
+              accounts: {
+                select: { email: true }
+              }
             }
           }
-        }
-      },
-      orderBy: { created_at: 'desc' }
-    });
-    return toJsonSafe(reqs);
+        },
+        orderBy: [{ created_at: 'desc' }, { request_id: 'desc' }]
+      })
+    ]);
+    return { meta: { page, limit, total }, data: toJsonSafe(reqs) };
   }
 
-  async getUsers(search?: string) {
-    const users = await this.prisma.accounts.findMany({
-      where: search
-        ? {
-          OR: [
-            { email: { contains: search, mode: 'insensitive' } },
-            { customer_profiles: { full_name: { contains: search, mode: 'insensitive' } } },
-            { staff_profiles: { full_name: { contains: search, mode: 'insensitive' } } }
+  async getUsers(query: AdminUserQueryDto, actor: AuthUser) {
+    const isAdmin = actor.roleNames.includes('admin');
+    if (!isAdmin && query.role === 'STAFF') {
+      throw new ForbiddenException('Chá»‰ admin Ä‘Æ°á»£c xem danh sÃ¡ch nhÃ¢n viÃªn.');
+    }
+    const effectiveRole = isAdmin ? query.role : 'CUSTOMER';
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 15;
+    const baseWhere: Prisma.accountsWhereInput = {
+      status: query.status && query.status !== 'ALL' ? query.status : undefined,
+      OR: query.search
+        ? [
+            { email: { contains: query.search, mode: 'insensitive' } },
+            {
+              customer_profiles: {
+                is: { full_name: { contains: query.search, mode: 'insensitive' } }
+              }
+            },
+            {
+              staff_profiles: {
+                is: { full_name: { contains: query.search, mode: 'insensitive' } }
+              }
+            }
           ]
-        }
-        : undefined,
-      include: {
-        customer_profiles: true,
-        staff_profiles: true,
-        roles: true
-      },
-      orderBy: { created_at: 'desc' }
-    });
+        : undefined
+    };
+    const where: Prisma.accountsWhereInput = {
+      ...baseWhere,
+      customer_profiles: effectiveRole === 'CUSTOMER' ? { isNot: null } : undefined,
+      staff_profiles: effectiveRole === 'STAFF' ? { isNot: null } : undefined
+    };
+    let orderBy: Prisma.accountsOrderByWithRelationInput = { created_at: 'desc' };
+    if (query.sort === 'DOCS_DESC') {
+      orderBy = { customer_profiles: { documents: { _count: 'desc' } } };
+    } else if (query.sort === 'SALES_DESC') {
+      orderBy = { customer_profiles: { order_items: { _count: 'desc' } } };
+    }
+
+    const [total, customerCount, staffCount, users] = await Promise.all([
+      this.prisma.accounts.count({ where }),
+      this.prisma.accounts.count({
+        where: { ...baseWhere, customer_profiles: { isNot: null } }
+      }),
+      this.prisma.accounts.count({ where: { ...baseWhere, staff_profiles: { isNot: null } } }),
+      this.prisma.accounts.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          customer_profiles: true,
+          staff_profiles: true,
+          roles: true
+        },
+        orderBy: [orderBy, { account_id: 'desc' }]
+      })
+    ]);
 
     const customerIds = users
       .filter((user) => user.customer_profiles)
@@ -679,7 +855,7 @@ export class AdminService {
       this.prisma.documents.groupBy({
         by: ['seller_id'],
         _count: { _all: true },
-        where: { seller_id: { in: customerIds }, status: 'APPROVED' }  // Only APPROVED docs
+        where: { seller_id: { in: customerIds }, status: 'APPROVED' } // Only APPROVED docs
       }),
       this.prisma.order_items.groupBy({
         by: ['seller_id'],
@@ -688,40 +864,47 @@ export class AdminService {
       })
     ]);
 
-    const documentCounts = new Map(documentCountRows.map((row) => [row.seller_id.toString(), row._count._all]));
-    const salesCounts = new Map(salesCountRows.map((row) => [row.seller_id.toString(), row._count._all]));
-
-    return toJsonSafe(
-      users.map((user) => {
-        const customerId = user.customer_profiles?.customer_id.toString();
-        const documentsCount = customerId ? (documentCounts.get(customerId) ?? 0) : 0;
-        const totalSales = customerId ? (salesCounts.get(customerId) ?? 0) : 0;
-        const role = this.resolveRole(
-          user.roles ? [user.roles.name] : [],
-          Boolean(user.staff_profiles),
-          Boolean(user.customer_profiles),
-          documentsCount
-        );
-
-        return {
-          id: user.account_id,
-          fullName: user.customer_profiles?.full_name ?? user.staff_profiles?.full_name ?? user.email,
-          email: user.email,
-          accountStatus: user.status,
-          isActive: user.status === 'ACTIVE',
-          joinedAt: user.created_at,
-          bannedUntil: user.banned_until,
-          role,
-          documentsCount,
-          totalSales
-        };
-      })
+    const documentCounts = new Map(
+      documentCountRows.map((row) => [row.seller_id.toString(), row._count._all])
     );
+    const salesCounts = new Map(
+      salesCountRows.map((row) => [row.seller_id.toString(), row._count._all])
+    );
+
+    return {
+      meta: { page, limit, total },
+      summary: { customers: customerCount, staff: isAdmin ? staffCount : 0 },
+      data: toJsonSafe(
+        users.map((user) => {
+          const customerId = user.customer_profiles?.customer_id.toString();
+          const documentsCount = customerId ? (documentCounts.get(customerId) ?? 0) : 0;
+          const totalSales = customerId ? (salesCounts.get(customerId) ?? 0) : 0;
+          const role = this.resolveRole(
+            user.roles ? [user.roles.name] : [],
+            Boolean(user.staff_profiles)
+          );
+
+          return {
+            id: user.account_id,
+            fullName:
+              user.customer_profiles?.full_name ?? user.staff_profiles?.full_name ?? user.email,
+            email: user.email,
+            accountStatus: user.status,
+            isActive: user.status === 'ACTIVE',
+            joinedAt: user.created_at,
+            bannedUntil: user.banned_until,
+            role,
+            documentsCount,
+            totalSales
+          };
+        })
+      )
+    };
   }
 
-  async toggleUserActive(userId: string, durationDays: number | null, _actor: AuthUser) {
+  async toggleUserActive(userId: number, durationDays: number | null, _actor: AuthUser) {
     const account = await this.prisma.accounts.findUnique({
-      where: { account_id: Number(userId) }
+      where: { account_id: userId }
     });
     if (!account) throw new NotFoundException('Không tìm thấy người dùng.');
 
@@ -767,14 +950,18 @@ export class AdminService {
     return toJsonSafe(updated);
   }
 
-  async createStaffAccount(dto: { email: string; fullName: string; password: string; role: 'MOD' | 'ACCOUNTANT' }, _actor: AuthUser) {
-    const existing = await this.prisma.accounts.findUnique({ where: { email: dto.email.toLowerCase().trim() } });
+  async createStaffAccount(dto: CreateStaffAccountDto, _actor: AuthUser) {
+    const existing = await this.prisma.accounts.findUnique({
+      where: { email: dto.email.toLowerCase().trim() }
+    });
     if (existing) throw new ConflictException('Email đã được sử dụng.');
 
-    const role = await this.prisma.roles.findFirst({ where: { name: { equals: dto.role, mode: 'insensitive' } } });
+    const role = await this.prisma.roles.findFirst({
+      where: { name: { equals: dto.role, mode: 'insensitive' } }
+    });
     if (!role) throw new NotFoundException(`Không tìm thấy role ${dto.role} trong hệ thống.`);
 
-    const passwordHash = await hash(dto.password, 10);
+    const passwordHash = await hash(dto.password, 12);
 
     const account = await this.prisma.accounts.create({
       data: {
@@ -864,7 +1051,7 @@ export class AdminService {
     // Aggregate user balances only (exclude SYSTEM_REVENUE and GATEWAY_POOL)
     const userWalletsAgg = await this.prisma.wallets.aggregate({
       where: {
-        wallet_type: { in: ['PAYMENT', 'REVENUE'] },
+        wallet_type: { in: ['PAYMENT', 'REVENUE'] }
       },
       _sum: { balance: true }
     });
@@ -893,18 +1080,29 @@ export class AdminService {
     });
   }
 
-  async getAuditLogs(userId?: string, action?: string, limit: number = 50) {
-    return this.prisma.audit_logs.findMany({
-      where: {
-        account_id: userId ? Number(userId) : undefined,
-        action: action ? action : undefined
-      },
-      orderBy: { created_at: 'desc' },
-      take: Number(limit),
-      include: {
-        accounts: { select: { email: true } }
-      }
-    });
+  async getAuditLogs(query: AuditLogQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 50;
+    const where: Prisma.audit_logsWhereInput = {
+      account_id: query.userId,
+      action: query.action,
+      accounts: query.search
+        ? { is: { email: { contains: query.search, mode: 'insensitive' } } }
+        : undefined
+    };
+    const [total, logs] = await Promise.all([
+      this.prisma.audit_logs.count({ where }),
+      this.prisma.audit_logs.findMany({
+        where,
+        orderBy: [{ created_at: 'desc' }, { log_id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          accounts: { select: { email: true } }
+        }
+      })
+    ]);
+    return { meta: { page, limit, total }, data: logs };
   }
 
   async exportRevenueReport(startDate: string, endDate: string) {
@@ -929,7 +1127,6 @@ export class AdminService {
   }
 
   async getGatewayWalletReport(startDate: string, endDate: string) {
-    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
     const start = new Date(new Date(startDate + 'T00:00:00+07:00').getTime());
     const end = new Date(new Date(endDate + 'T23:59:59+07:00').getTime());
 
@@ -963,7 +1160,6 @@ export class AdminService {
   }
 
   async getTaxWalletReport(startDate: string, endDate: string) {
-    const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
     const start = new Date(new Date(startDate + 'T00:00:00+07:00').getTime());
     const end = new Date(new Date(endDate + 'T23:59:59+07:00').getTime());
 
@@ -982,16 +1178,11 @@ export class AdminService {
       orderBy: { created_at: 'desc' }
     });
 
-    // TAX_PAYABLE is a Liability account: CREDIT = increase (Thu hộ), DEBIT = decrease (Nộp thuế HOẶC Hoàn tiền)
+    // TAX_PAYABLE is a liability account: CREDIT increases tax payable; DEBIT records tax payment.
     const totalCollected = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
 
-    // Only count explicit tax payments to the state, not refunds back to the user
     const totalPaid = entries
       .filter((e) => e.ledger_transactions.reference_type === 'TAX_PAYMENT')
-      .reduce((sum, e) => sum + Number(e.debit_amount), 0);
-
-    const totalRefunded = entries
-      .filter((e) => e.ledger_transactions.type === 'REFUND')
       .reduce((sum, e) => sum + Number(e.debit_amount), 0);
 
     // Tính tổng tiền thuế từ các giao dịch rút tiền đã thành công (PAID) từ trước tới nay
@@ -1017,11 +1208,10 @@ export class AdminService {
         wallet_id: taxWallet.wallet_id,
         balance: taxWallet.balance
       },
-      summary: { 
-        totalCollected, 
-        totalPaid, 
-        totalRefunded, 
-        netFlow: totalCollected - totalPaid - totalRefunded, 
+      summary: {
+        totalCollected,
+        totalPaid,
+        netFlow: totalCollected - totalPaid,
         entryCount: entries.length,
         availableTaxToPay
       },
@@ -1041,7 +1231,9 @@ export class AdminService {
         throw new BadRequestException('Số tiền nộp thuế vượt quá số dư Thuế Thu Hộ.');
       }
       if (gatewayPool.balance.lt(taxAmount)) {
-        throw new BadRequestException('Số dư cổng thanh toán không đủ để thực hiện lệnh rút nộp thuế.');
+        throw new BadRequestException(
+          'Số dư cổng thanh toán không đủ để thực hiện lệnh rút nộp thuế.'
+        );
       }
 
       await tx.wallets.update({
@@ -1117,12 +1309,13 @@ export class AdminService {
           accountId: account.account_id,
           type: 'ACCOUNT_UNBANNED',
           title: 'Tài khoản đã được mở khóa',
-          message: 'Thời hạn khóa tài khoản của bạn đã kết thúc. Bạn có thể tiếp tục sử dụng dịch vụ.',
+          message:
+            'Thời hạn khóa tài khoản của bạn đã kết thúc. Bạn có thể tiếp tục sử dụng dịch vụ.',
           referenceId: account.account_id,
           referenceType: 'ACCOUNT'
         });
       }
-      console.log(`[Cron] Auto unbanned ${expiredAccounts.length} accounts.`);
+      this.logger.log(`[Cron] Auto unbanned ${expiredAccounts.length} accounts.`);
     }
   }
 }

@@ -68,8 +68,8 @@ export default function AdminTagsPage() {
       .replace(/[ỳýỵỷỹ]/g, "y")
       .replace(/đ/g, "d")
       .replace(/\s+/g, '-')
-      .replace(/[^\w\-]+/g, '')
-      .replace(/\-\-+/g, '-')
+      .replace(/[^\w-]+/g, '')
+      .replace(/--+/g, '-')
       .replace(/^-+/, '')
       .replace(/-+$/, '');
   }

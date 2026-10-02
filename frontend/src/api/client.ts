@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/authStore'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -34,18 +35,17 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config
+    const authPath = String(originalRequest?.url ?? '')
+    const cannotAutoRefresh = [
+      '/auth/login',
+      '/auth/register',
+      '/auth/refresh',
+      '/auth/logout',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+    ].some((path) => authPath.includes(path))
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      const refreshToken = useAuthStore.getState().refreshToken
-
-      if (!refreshToken) {
-        useAuthStore.getState().logout()
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login'
-        }
-        return Promise.reject(error)
-      }
-
+    if (error.response?.status === 401 && !originalRequest._retry && !cannotAutoRefresh) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({
@@ -62,10 +62,19 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const res = await axios.post(`${import.meta.env.VITE_API_URL || '/api'}/auth/refresh`, { refreshToken })
+        const baseUrl = import.meta.env.VITE_API_URL || '/api'
+        const csrf = await axios.get(`${baseUrl}/auth/csrf`, { withCredentials: true })
+        const res = await axios.post(
+          `${baseUrl}/auth/refresh`,
+          {},
+          {
+            withCredentials: true,
+            headers: { 'X-CSRF-Token': csrf.data.csrfToken },
+          },
+        )
         const newAccessToken = res.data.accessToken
 
-        useAuthStore.getState().setTokens(newAccessToken, refreshToken)
+        useAuthStore.getState().setAccessToken(newAccessToken)
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
 
         processQueue(null, newAccessToken)

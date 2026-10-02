@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-﻿import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString } from 'class-validator';
 
 export class ProcessWithdrawalDto {
   @IsString()

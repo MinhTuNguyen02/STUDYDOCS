@@ -23,7 +23,7 @@ export class ConfigsService {
 
   async updateConfig(user: AuthUser, key: string, value: string, description?: string) {
     const upperKey = key.toUpperCase();
-    
+
     const existing = await this.prisma.configs.findUnique({ where: { config_key: upperKey } });
 
     const config = await this.prisma.configs.upsert({
@@ -31,7 +31,7 @@ export class ConfigsService {
       create: { config_key: upperKey, config_value: value, description },
       update: { config_value: value, description, updated_at: new Date() }
     });
-    
+
     await this.prisma.audit_logs.create({
       data: {
         account_id: user.accountId,

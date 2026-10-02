@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCartStore } from '@/store/cartStore'
 import { checkoutApi } from '@/api/checkout.api'
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 export default function CartPage() {
   const { items, total, loading, fetchCart, removeFromCart, clearCart } = useCartStore()
   const [checkingOut, setCheckingOut] = useState(false)
+  const checkoutKey = useRef(`order_${crypto.randomUUID()}`)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export default function CartPage() {
     setCheckingOut(true)
     try {
       const documentIds = items.map(i => i.document.id)
-      const res = await checkoutApi.createOrder(documentIds)
+      const res = await checkoutApi.createOrder(documentIds, checkoutKey.current)
 
       toast.success('Thanh toán thành công!')
       await fetchCart() // sync fresh state
@@ -110,7 +111,7 @@ export default function CartPage() {
                 <div className="w-24 h-32 bg-linear-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center shrink-0 border border-primary/20 relative overflow-hidden">
                   <FileText className="w-10 h-10 text-primary opacity-50" />
                   <div className="absolute bottom-0 w-full bg-black/40 text-white text-center text-xs py-1 font-bold tracking-widest uppercase">
-                    {item.document.fileExtension || item.document.file_extension || 'DOC'}
+                    {item.document.fileExtension || 'DOC'}
                   </div>
                 </div>
                 <div className="flex-1 flex flex-col min-w-0">

@@ -1,77 +1,128 @@
-import { useState, useEffect } from 'react';
-import { adminApi } from '@/api/admin.api';
-import toast from 'react-hot-toast';
-import { Search, FileText, Ban, CheckCircle, ExternalLink, ShieldCheck } from 'lucide-react';
-import { formatBalance, formatDate } from '@/utils/format';
-import { documentsApi } from '@/api/documents.api';
-import { Link } from 'react-router-dom';
-import { usePagination } from '@/hooks/usePagination';
-import Pagination from '@/components/common/Pagination';
+import { useCallback, useEffect, useState } from "react";
+import { adminApi } from "@/api/admin.api";
+import toast from "react-hot-toast";
+import {
+  Search,
+  FileText,
+  Ban,
+  CheckCircle,
+  ExternalLink,
+  ShieldCheck,
+} from "lucide-react";
+import { formatBalance, formatDate } from "@/utils/format";
+import { documentsApi } from "@/api/documents.api";
+import { Link, useSearchParams } from "react-router-dom";
+import Pagination from "@/components/common/Pagination";
 
 export default function AdminDocumentsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const searchTerm = searchParams.get("search") || "";
+  const [searchInput, setSearchInput] = useState(searchTerm);
   const [categories, setCategories] = useState<any[]>([]);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState('ALL');
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
-  const [subCategoryFilter, setSubCategoryFilter] = useState('ALL');
+  const statusFilter = searchParams.get("status") || "ALL";
+  const categoryFilter = searchParams.get("category") || "ALL";
+  const subCategoryFilter = searchParams.get("subcategory") || "ALL";
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const limit = 10;
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchDocuments();
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, statusFilter, categoryFilter, subCategoryFilter]);
-
   const fetchCategories = async () => {
     try {
       const res = await documentsApi.getCategories();
       setCategories(res.data || res);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      toast.error("Không thể tải danh mục tài liệu");
     }
-  }
+  };
 
   const handleToggleHide = async (id: number, currentStatus: string) => {
     try {
-      if (currentStatus === 'HIDDEN') {
+      if (currentStatus === "HIDDEN") {
         await adminApi.restoreDocument(id);
-        toast.success('Đã mở lại tài liệu');
+        toast.success("Đã mở lại tài liệu");
       } else {
         await adminApi.softDeleteDocument(id);
-        toast.success('Đã gỡ tài liệu xuống');
+        toast.success("Đã gỡ tài liệu xuống");
       }
       fetchDocuments();
     } catch (e) {
-      toast.error('Lỗi khi thay đổi trạng thái tài liệu');
+      toast.error("Lỗi khi thay đổi trạng thái tài liệu");
     }
   };
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await adminApi.getAllDocuments({
         search: searchTerm,
         status: statusFilter,
-        categoryId: subCategoryFilter !== 'ALL' ? subCategoryFilter : categoryFilter
+        categoryId:
+          subCategoryFilter !== "ALL" ? subCategoryFilter : categoryFilter,
+        page,
+        limit,
       });
       setDocuments(res.data || res);
+      setTotal(res.meta?.total ?? (res.data || res).length);
     } catch (err) {
-      // Ignore initial loaded error
+      const msg =
+        (err as any)?.response?.data?.message ||
+        "Không thể tải danh sách tài liệu";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoryFilter, page, searchTerm, statusFilter, subCategoryFilter]);
+
+  useEffect(() => {
+    void fetchDocuments();
+  }, [fetchDocuments]);
+  useEffect(() => {
+    setSearchInput(searchTerm);
+  }, [searchTerm]);
+
+  const updateQuery = useCallback(
+    (updates: Record<string, string | number | undefined>) => {
+      const next = new URLSearchParams(searchParams);
+      for (const [key, value] of Object.entries(updates)) {
+        if (
+          value === undefined ||
+          value === "" ||
+          value === "ALL" ||
+          (key === "page" && value === 1)
+        ) {
+          next.delete(key);
+        } else {
+          next.set(key, String(value));
+        }
+      }
+      if (next.toString() !== searchParams.toString()) {
+        setSearchParams(next, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => updateQuery({ search: searchInput.trim(), page: 1 }),
+      500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [searchInput, updateQuery]);
 
   const filteredDocs = documents; // Backend handles filtering now
-  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filteredDocs);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   return (
     <>
@@ -86,37 +137,61 @@ export default function AdminDocumentsPage() {
             <input
               type="text"
               placeholder="Tìm tên tài liệu hoặc người bán..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
             />
           </div>
           <div className="flex w-full md:w-auto gap-3">
             <select
               value={categoryFilter}
-              onChange={e => { setCategoryFilter(e.target.value); setSubCategoryFilter('ALL'); }}
+              onChange={(e) =>
+                updateQuery({
+                  category: e.target.value,
+                  subcategory: undefined,
+                  page: 1,
+                })
+              }
               className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
             >
               <option value="ALL">Tất cả danh mục gốc</option>
-              {categories.filter((cat: any) => !cat.parent_id).map((cat: any) => (
-                <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>{cat.name}</option>
-              ))}
+              {categories
+                .filter((cat: any) => !cat.parent_id)
+                .map((cat: any) => (
+                  <option
+                    key={cat.category_id || cat.id}
+                    value={cat.category_id || cat.id}
+                  >
+                    {cat.name}
+                  </option>
+                ))}
             </select>
-            {categoryFilter !== 'ALL' && (
+            {categoryFilter !== "ALL" && (
               <select
                 value={subCategoryFilter}
-                onChange={e => setSubCategoryFilter(e.target.value)}
+                onChange={(e) =>
+                  updateQuery({ subcategory: e.target.value, page: 1 })
+                }
                 className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
               >
                 <option value="ALL">Tất cả danh mục con</option>
-                {categories.filter((cat: any) => cat.parent_id === Number(categoryFilter)).map((cat: any) => (
-                  <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>{cat.name}</option>
-                ))}
+                {categories
+                  .filter(
+                    (cat: any) => cat.parent_id === Number(categoryFilter),
+                  )
+                  .map((cat: any) => (
+                    <option
+                      key={cat.category_id || cat.id}
+                      value={cat.category_id || cat.id}
+                    >
+                      {cat.name}
+                    </option>
+                  ))}
               </select>
             )}
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={(e) => updateQuery({ status: e.target.value, page: 1 })}
               className="bg-background border border-border rounded-lg text-sm px-3 py-2 outline-none focus:border-primary min-w-[150px]"
             >
               <option value="ALL">Tất cả trạng thái</option>
@@ -125,9 +200,15 @@ export default function AdminDocumentsPage() {
               <option value="REJECTED">Từ chối</option>
               <option value="HIDDEN">Bị gỡ (Hidden)</option>
             </select>
-            {(searchTerm || statusFilter !== 'ALL' || categoryFilter !== 'ALL' || subCategoryFilter !== 'ALL') && (
+            {(searchTerm ||
+              statusFilter !== "ALL" ||
+              categoryFilter !== "ALL" ||
+              subCategoryFilter !== "ALL") && (
               <button
-                onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setCategoryFilter('ALL'); setSubCategoryFilter('ALL'); }}
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchParams(new URLSearchParams(), { replace: true });
+                }}
                 className="text-sm px-3 py-2 text-muted-foreground hover:text-foreground transition-colors outline-none shrink-0 border border-transparent hover:border-border rounded-lg bg-transparent hover:bg-muted"
                 title="Xóa bộ lọc"
               >
@@ -151,55 +232,130 @@ export default function AdminDocumentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {paginatedItems.length === 0 ? (
-                <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">Không có dữ liệu</td></tr>
-              ) : paginatedItems.map((doc) => (
-                <tr key={doc.id} className="hover:bg-muted/10">
-                  <td className="p-4">
-                    <p className="font-semibold text-sm line-clamp-1">{doc.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{formatDate(doc.createdAt)}</p>
-                  </td>
-                  <td className="p-4 text-sm">{doc.sellerName || doc.seller?.fullName}</td>
-                  <td className="p-4 text-sm text-primary font-semibold">{formatBalance(doc.price)}</td>
-                  <td className="p-4 text-sm">
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${doc.status === 'APPROVED' ? 'bg-success/10 text-success' : doc.status === 'PENDING' ? 'bg-warning/10 text-warning' : doc.status === 'REJECTED' ? 'bg-danger/10 text-danger' : 'bg-muted text-muted-foreground'}`}>
-                      {doc.status === 'APPROVED' ? 'Đã duyệt' : doc.status === 'PENDING' ? 'Chờ duyệt' : doc.status === 'REJECTED' ? 'Từ chối' : doc.status === 'HIDDEN' ? 'Bị gỡ' : doc.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      {doc.status === 'APPROVED' && (
-                        <button onClick={() => handleToggleHide(doc.id, doc.status)} className="text-danger bg-danger/10 p-2 rounded hover:bg-danger/20 transition-colors tooltip-trigger" title="Gỡ tài liệu xuống (Ẩn khỏi chợ)">
-                          <Ban className="w-4 h-4" />
-                        </button>
-                      )}
-                      {doc.status === 'HIDDEN' && (
-                        <button onClick={() => handleToggleHide(doc.id, doc.status)} className="text-success bg-success/10 p-2 rounded hover:bg-success/20 transition-colors tooltip-trigger" title="Mở lại tài liệu">
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {doc.status === 'APPROVED' || doc.status === 'HIDDEN' ? (
-                        <Link to={`/documents/${doc.id}`} target="_blank" className="text-primary bg-primary/10 p-2 rounded hover:bg-primary/20 transition-colors" title="Xem trên cửa hàng">
-                          <ExternalLink className="w-4 h-4" />
-                        </Link>
-                      ) : doc.status === 'PENDING' ? (
-                        <Link to="/admin/approvals" className="text-warning bg-warning/10 p-2 rounded hover:bg-warning/20 transition-colors" title="Đi tới duyệt tài liệu">
-                          <ShieldCheck className="w-4 h-4" />
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground bg-muted p-2 rounded cursor-not-allowed opacity-50 block" title="Không có hành động">
-                          <Ban className="w-4 h-4" />
-                        </span>
-                      )}
-                    </div>
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="p-8 text-center text-muted-foreground"
+                  >
+                    Đang tải danh sách tài liệu...
                   </td>
                 </tr>
-              ))}
+              ) : error ? (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center">
+                    <p className="text-danger mb-4 font-medium">{error}</p>
+                    <button
+                      onClick={fetchDocuments}
+                      className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
+                    >
+                      Thử lại
+                    </button>
+                  </td>
+                </tr>
+              ) : filteredDocs.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="p-8 text-center text-muted-foreground"
+                  >
+                    Không có dữ liệu
+                  </td>
+                </tr>
+              ) : (
+                filteredDocs.map((doc) => (
+                  <tr key={doc.id} className="hover:bg-muted/10">
+                    <td className="p-4">
+                      <p className="font-semibold text-sm line-clamp-1">
+                        {doc.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDate(doc.createdAt)}
+                      </p>
+                    </td>
+                    <td className="p-4 text-sm">
+                      {doc.sellerName || doc.seller?.fullName}
+                    </td>
+                    <td className="p-4 text-sm text-primary font-semibold">
+                      {formatBalance(doc.price)}
+                    </td>
+                    <td className="p-4 text-sm">
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-bold ${doc.status === "APPROVED" ? "bg-success/10 text-success" : doc.status === "PENDING" ? "bg-warning/10 text-warning" : doc.status === "REJECTED" ? "bg-danger/10 text-danger" : "bg-muted text-muted-foreground"}`}
+                      >
+                        {doc.status === "APPROVED"
+                          ? "Đã duyệt"
+                          : doc.status === "PENDING"
+                            ? "Chờ duyệt"
+                            : doc.status === "REJECTED"
+                              ? "Từ chối"
+                              : doc.status === "HIDDEN"
+                                ? "Bị gỡ"
+                                : doc.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        {doc.status === "APPROVED" && (
+                          <button
+                            onClick={() => handleToggleHide(doc.id, doc.status)}
+                            className="text-danger bg-danger/10 p-2 rounded hover:bg-danger/20 transition-colors tooltip-trigger"
+                            title="Gỡ tài liệu xuống (Ẩn khỏi chợ)"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
+                        {doc.status === "HIDDEN" && (
+                          <button
+                            onClick={() => handleToggleHide(doc.id, doc.status)}
+                            className="text-success bg-success/10 p-2 rounded hover:bg-success/20 transition-colors tooltip-trigger"
+                            title="Mở lại tài liệu"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {doc.status === "APPROVED" ||
+                        doc.status === "HIDDEN" ? (
+                          <Link
+                            to={`/documents/${doc.id}`}
+                            target="_blank"
+                            className="text-primary bg-primary/10 p-2 rounded hover:bg-primary/20 transition-colors"
+                            title="Xem trên cửa hàng"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Link>
+                        ) : doc.status === "PENDING" ? (
+                          <Link
+                            to="/admin/approvals"
+                            className="text-warning bg-warning/10 p-2 rounded hover:bg-warning/20 transition-colors"
+                            title="Đi tới duyệt tài liệu"
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </Link>
+                        ) : (
+                          <span
+                            className="text-muted-foreground bg-muted p-2 rounded cursor-not-allowed opacity-50 block"
+                            title="Không có hành động"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={(nextPage) => updateQuery({ page: nextPage })}
+        />
       </div>
     </>
   );

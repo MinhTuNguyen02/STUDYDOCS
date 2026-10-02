@@ -1,15 +1,32 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Inject,
+  forwardRef
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { LedgerService } from './ledger.service';
-import { IsNumber, IsNotEmpty, IsObject, IsIn, IsString, IsOptional } from 'class-validator';
+import {
+  IsNumber,
+  IsNotEmpty,
+  IsObject,
+  IsIn,
+  IsString,
+  IsOptional,
+  MaxLength,
+  Min
+} from 'class-validator';
 import { NotificationsService } from '../notifications/notifications.service';
 
 export class RequestWithdrawalDto {
   @IsNumber()
   @IsNotEmpty()
+  @Min(1)
   amount!: number;
 
   @IsObject()
@@ -24,6 +41,7 @@ export class ProcessWithdrawalDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   note?: string;
 }
 
@@ -34,7 +52,7 @@ export class WalletsService {
     private readonly ledger: LedgerService,
     @Inject(forwardRef(() => NotificationsService))
     private readonly notifications: NotificationsService
-  ) { }
+  ) {}
 
   async getMyWallets(user: AuthUser) {
     if (!user.customerId) throw new NotFoundException('Tai khoan khong hop le.');
@@ -82,7 +100,9 @@ export class WalletsService {
 
     const minAmount = new Prisma.Decimal(configMap.get('MIN_WITHDRAWAL') ?? '200000');
     if (amount.lt(minAmount)) {
-      throw new BadRequestException('So tien rut thap hon muc toi thieu (' + minAmount.toString() + ').');
+      throw new BadRequestException(
+        'So tien rut thap hon muc toi thieu (' + minAmount.toString() + ').'
+      );
     }
 
     const taxRate = new Prisma.Decimal(configMap.get('WITHDRAWAL_FEE_RATE') ?? '0.0');
@@ -92,12 +112,12 @@ export class WalletsService {
     const created = await this.prisma.$transaction(async (tx) => {
       const { gatewayPool, taxPayable } = await this.ledger.getSystemWallets(tx);
 
-      const updatedWallet = await tx.wallets.update({
-        where: { wallet_id: wallet.wallet_id },
-        data: {
-          balance: wallet.balance.sub(amount)
-        }
+      const debited = await tx.wallets.updateMany({
+        where: { wallet_id: wallet.wallet_id, balance: { gte: amount } },
+        data: { balance: { decrement: amount } }
       });
+      if (debited.count !== 1)
+        throw new BadRequestException('Số dư khả dụng không đủ để thực hiện lệnh rút tiền.');
 
       const request = await tx.withdrawal_requests.create({
         data: {
@@ -110,11 +130,13 @@ export class WalletsService {
         }
       });
 
-      // Credit system wallets directly as part of withdrawal liability 
-      await tx.wallets.update({
-        where: { wallet_id: gatewayPool.wallet_id },
+      // Credit system wallets directly as part of withdrawal liability
+      const gatewayDebited = await tx.wallets.updateMany({
+        where: { wallet_id: gatewayPool.wallet_id, balance: { gte: netAmount } },
         data: { balance: { decrement: netAmount } } // GATEWAY asset decreases instantly (Escrow lock)
       });
+      if (gatewayDebited.count !== 1)
+        throw new BadRequestException('Số dư cổng thanh toán không đủ để xử lý lệnh rút.');
       await tx.wallets.update({
         where: { wallet_id: taxPayable.wallet_id },
         data: { balance: { increment: taxAmount } } // TAX_PAYABLE keeps tax for state
@@ -151,8 +173,8 @@ export class WalletsService {
     return toJsonSafe(created);
   }
 
-  async processWithdrawal(actor: AuthUser, requestId: string, dto: ProcessWithdrawalDto) {
-    const id = Number(requestId);
+  async processWithdrawal(actor: AuthUser, requestId: number, dto: ProcessWithdrawalDto) {
+    const id = requestId;
 
     const request = await this.prisma.withdrawal_requests.findUnique({ where: { request_id: id } });
     if (!request) throw new NotFoundException('Khong tim thay lenh rut tien.');
@@ -177,19 +199,24 @@ export class WalletsService {
     const result = await this.prisma.$transaction(async (tx) => {
       const { gatewayPool, taxPayable } = await this.ledger.getSystemWallets(tx);
 
-      const updatedRequest = await tx.withdrawal_requests.update({
-        where: { request_id: id },
+      const claimed = await tx.withdrawal_requests.updateMany({
+        where: { request_id: id, status: 'PENDING' },
         data: {
           status: nextStatus,
           accountant_id: actor.staffId ? Number(actor.staffId) : undefined,
           updated_at: new Date()
         }
       });
+      if (claimed.count !== 1)
+        throw new ConflictException('Lệnh rút tiền đã được xử lý bởi yêu cầu khác.');
+      const updatedRequest = await tx.withdrawal_requests.findUniqueOrThrow({
+        where: { request_id: id }
+      });
 
       if (nextStatus === 'REJECTED') {
-        const restoredWallet = await tx.wallets.update({
+        await tx.wallets.update({
           where: { wallet_id: wallet.wallet_id },
-          data: { balance: wallet.balance.add(request.amount) }
+          data: { balance: { increment: request.amount } }
         });
 
         await tx.wallets.update({
@@ -203,12 +230,16 @@ export class WalletsService {
 
         await this.ledger.recordTransaction(
           tx,
-          'REFUND',
-          'WITHDRAWAL_REQUEST',
+          'DEPOSIT',
+          'WITHDRAWAL_REVERSED',
           id,
-          'Hoan tien rut that bai',
+          'Khoi phuc so du do yeu cau rut tien bi tu choi',
           [
-            { wallet_id: gatewayPool.wallet_id, debit_amount: request.net_amount, credit_amount: 0 },
+            {
+              wallet_id: gatewayPool.wallet_id,
+              debit_amount: request.net_amount,
+              credit_amount: 0
+            },
             { wallet_id: taxPayable.wallet_id, debit_amount: request.tax_amount, credit_amount: 0 },
             { wallet_id: wallet.wallet_id, debit_amount: 0, credit_amount: request.amount }
           ]
@@ -242,7 +273,6 @@ export class WalletsService {
     return toJsonSafe(result);
   }
 
-
   async getLedgerHistory(user: AuthUser) {
     if (!user.customerId) throw new BadRequestException('Khong phai khach hang.');
 
@@ -263,7 +293,7 @@ export class WalletsService {
     });
 
     return toJsonSafe(
-      entries.map(e => ({
+      entries.map((e) => ({
         entryId: e.id,
         walletType: e.wallets.wallet_type,
         debit: Number(e.debit_amount),

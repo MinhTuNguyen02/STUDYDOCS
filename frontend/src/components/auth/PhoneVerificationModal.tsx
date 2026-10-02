@@ -11,12 +11,47 @@ interface Props {
 }
 
 export default function PhoneVerificationModal({ onClose }: Props) {
-  const { user, updateUser } = useAuthStore();
+  const { updateUser } = useAuthStore();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previousFocus.current = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLElement>('button, input')?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus.current?.focus();
+    };
+  }, [onClose]);
 
   const initRecaptcha = () => {
     if (!(window as any).recaptchaVerifier && import.meta.env.VITE_FIREBASE_API_KEY) {
@@ -24,8 +59,8 @@ export default function PhoneVerificationModal({ onClose }: Props) {
         (window as any).recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
           size: 'invisible'
         });
-      } catch (err) {
-        console.error('Lỗi khi khởi tạo RecaptchaVerifier', err);
+      } catch {
+        toast.error('Không thể khởi tạo xác minh Firebase. Vui lòng tải lại trang.');
       }
     }
   };
@@ -70,16 +105,17 @@ export default function PhoneVerificationModal({ onClose }: Props) {
         setStep(2);
       } else {
         // MOCK mode
-        toast.success('Mã OTP giả lập đã được gửi: 123456!');
+        toast.success(`Mã OTP phát triển: ${res.mockOtpCode}`);
         setStep(2);
       }
     } catch (err: any) {
-      console.error(err);
       toast.error(err?.response?.data?.message || err.message || 'Không thể gửi mã OTP');
       if ((window as any).recaptchaVerifier) {
         try {
           (window as any).recaptchaVerifier.clear();
-        } catch(e) {}
+        } catch {
+          // The verifier may already have been disposed by Firebase.
+        }
         (window as any).recaptchaVerifier = null;
       }
     } finally {
@@ -115,11 +151,18 @@ export default function PhoneVerificationModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
-      <div className="bg-card w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="phone-verification-title"
+        className="bg-card w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+      >
         <div className="flex justify-between items-center p-6 border-b border-border">
-          <h2 className="text-xl font-bold font-heading">Xác minh SĐT</h2>
+          <h2 id="phone-verification-title" className="text-xl font-bold font-heading">Xác minh SĐT</h2>
           <button 
             onClick={onClose}
+            aria-label="Đóng cửa sổ xác minh số điện thoại"
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />

@@ -3,19 +3,14 @@ import {
   WebSocketGateway,
   WebSocketServer,
   OnGatewayConnection,
-  OnGatewayDisconnect,
+  OnGatewayDisconnect
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
 
-@WebSocketGateway({
-  cors: {
-    origin: '*', // Vite dev proxy handles this; tighten in production
-    credentials: true,
-  },
-})
+@WebSocketGateway()
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
@@ -25,7 +20,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    private readonly prisma: PrismaService
   ) {}
 
   // ── Connection lifecycle ──────────────────────────────────────
@@ -42,7 +37,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      const secret = this.configService.get<string>('JWT_ACCESS_SECRET', 'dev_access_secret');
+      const secret = this.configService.getOrThrow<string>('JWT_ACCESS_SECRET');
       const payload = this.jwtService.verify(token, { secret });
       const accountId = Number(payload.sub);
 
@@ -55,7 +50,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Resolve role and join role-based room (for staff broadcasts)
       const account = await this.prisma.accounts.findUnique({
         where: { account_id: accountId },
-        include: { roles: { select: { name: true } } },
+        include: { roles: { select: { name: true } } }
       });
 
       if (account?.roles?.name) {
@@ -73,7 +68,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id} (account: ${client.data?.accountId ?? 'unknown'})`);
+    this.logger.log(
+      `Client disconnected: ${client.id} (account: ${client.data?.accountId ?? 'unknown'})`
+    );
   }
 
   // ── Emit helpers (called by NotificationsService) ─────────────

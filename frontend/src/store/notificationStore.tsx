@@ -60,17 +60,14 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     });
 
     socket.on('connect', () => {
-      console.log('[NotificationStore] Socket connected');
       set({ isConnected: true });
     });
 
     socket.on('disconnect', () => {
-      console.log('[NotificationStore] Socket disconnected');
       set({ isConnected: false });
     });
 
     socket.on('notification', (payload: any) => {
-      console.log('[NotificationStore] Received notification:', payload);
       const newNotif: Notification = {
         id: payload.id || Date.now(), // Fallback if backend doesn't send ID initially
         type: payload.type,
@@ -84,7 +81,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       
       // Hiển thị toast popup ở góc phải dưới hoặc trên
       toast(
-        (t) => (
+        () => (
           <div className="flex flex-col gap-1">
             <span className="font-bold text-sm text-primary">{newNotif.title}</span>
             <span className="text-xs text-foreground/80">{newNotif.message}</span>
@@ -126,8 +123,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         hasMore: items.length === 20,
         isLoading: false
       });
-    } catch (error) {
-      console.error('[NotificationStore] Fetch initial error:', error);
+    } catch {
       set({ isLoading: false, hasMore: false });
     }
   },
@@ -147,8 +143,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         hasMore: newItems.length === 20,
         isLoading: false
       }));
-    } catch (error) {
-      console.error('[NotificationStore] Fetch more error:', error);
+    } catch {
       set({ isLoading: false, hasMore: false });
     }
   },
@@ -162,8 +157,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         ),
         unreadCount: Math.max(0, state.unreadCount - 1)
       }));
-    } catch (error) {
-      console.error('[NotificationStore] Mark read error:', error);
+    } catch {
+      toast.error('Không thể đánh dấu thông báo đã đọc.');
     }
   },
 
@@ -174,8 +169,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: state.notifications.map(n => ({ ...n, isRead: true })),
         unreadCount: 0
       }));
-    } catch (error) {
-      console.error('[NotificationStore] Mark all read error:', error);
+    } catch {
+      toast.error('Không thể đánh dấu tất cả thông báo đã đọc.');
     }
   },
 

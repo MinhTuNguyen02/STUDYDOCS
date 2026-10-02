@@ -5,7 +5,7 @@ import { CartActionDto } from './dto/cart.dto';
 
 @Injectable()
 export class CartService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   private async getOrCreateCart(customerId: number) {
     let cart = await this.prisma.carts.findUnique({
@@ -27,10 +27,10 @@ export class CartService {
       where: { cart_id: cart.cart_id },
       include: {
         documents: {
-          select: { 
-            document_id: true, 
-            title: true, 
-            price: true, 
+          select: {
+            document_id: true,
+            title: true,
+            price: true,
             slug: true,
             file_extension: true,
             customer_profiles: { select: { full_name: true } }
@@ -42,7 +42,7 @@ export class CartService {
     return {
       message: 'Lấy trạng thái giỏ hàng thành công.',
       cartId: cart.cart_id,
-      items: items.map(item => ({
+      items: items.map((item) => ({
         cartItemId: item.cart_item_id,
         document: {
           id: item.documents.document_id,
@@ -60,8 +60,13 @@ export class CartService {
   async addToCart(user: AuthUser, dto: CartActionDto) {
     if (!user.customerId) throw new NotFoundException('Chỉ khách hàng mới có giỏ hàng.');
 
-    const doc = await this.prisma.documents.findUnique({
-      where: { document_id: dto.documentId, status: 'APPROVED' }
+    const doc = await this.prisma.documents.findFirst({
+      where: {
+        document_id: dto.documentId,
+        status: 'APPROVED',
+        delete_at: null,
+        is_user_hidden: false
+      }
     });
     if (!doc) throw new NotFoundException('Tài liệu không tồn tại hoặc chưa được duyệt.');
 

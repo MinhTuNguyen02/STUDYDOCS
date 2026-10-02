@@ -2,13 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../database/prisma.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { AuthUser } from '../../common/security/auth-user.interface';
+import { TagDto } from './dto/tag.dto';
 
 @Injectable()
 export class TagsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // 1. Sửa lại hàm create để nhận object chứa tag_name và slug
-  async create(dto: { tag_name: string; slug: string }, actor: AuthUser) {
+  async create(dto: TagDto, actor: AuthUser) {
     if (!dto.tag_name || !dto.slug) {
       throw new BadRequestException('Tên tag và slug không được để trống.');
     }
@@ -43,7 +44,7 @@ export class TagsService {
   }
 
   // 2. Bổ sung thêm hàm update mà FE đang gọi
-  async update(id: number, dto: { tag_name: string; slug: string }, actor: AuthUser) {
+  async update(id: number, dto: TagDto, actor: AuthUser) {
     if (!dto.tag_name || !dto.slug) {
       throw new BadRequestException('Tên tag và slug không được để trống.');
     }
@@ -120,7 +121,9 @@ export class TagsService {
       return removed;
     } catch (error: any) {
       if (error.code === 'P2003') {
-        throw new BadRequestException('Không thể xóa thẻ này. Hiện trạng đang có tài liệu sử dụng thẻ này.');
+        throw new BadRequestException(
+          'Không thể xóa thẻ này. Hiện trạng đang có tài liệu sử dụng thẻ này.'
+        );
       }
       throw error;
     }

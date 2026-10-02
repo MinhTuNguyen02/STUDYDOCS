@@ -3,16 +3,19 @@ import { useParams, Link } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import { formatDate } from '@/utils/format'
 import "react-quill-new/dist/quill.snow.css"
+import DOMPurify from 'dompurify'
 
 export default function PolicyPage() {
   const { slug } = useParams()
   const [policy, setPolicy] = useState<any>(null)
   const [allPolicies, setAllPolicies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchPolicy = async () => {
       setLoading(true)
+      setError(null)
       try {
         const listRes = await documentsApi.getPolicies()
         setAllPolicies(listRes || [])
@@ -27,7 +30,8 @@ export default function PolicyPage() {
           setPolicy(detailRes || null)
         }
       } catch (err) {
-        console.error(err)
+        const msg = (err as any)?.response?.data?.message || 'Không thể tải điều khoản & chính sách'
+        setError(msg)
       } finally {
         setLoading(false)
       }
@@ -35,7 +39,38 @@ export default function PolicyPage() {
     fetchPolicy()
   }, [slug])
 
-  if (loading) return <div style={{ padding: '60px', textAlign: 'center' }}>Đang tải...</div>
+  if (loading) return <div style={{ padding: '60px', textAlign: 'center' }}>Đang tải điều khoản & chính sách...</div>
+
+  if (error) return (
+    <div style={{ padding: '60px', textAlign: 'center' }}>
+      <p style={{ color: 'var(--danger)', marginBottom: '16px', fontWeight: 500 }}>{error}</p>
+      <button
+        onClick={() => {
+          setLoading(true);
+          setError(null);
+          documentsApi.getPolicies().then((listRes: any) => {
+            setAllPolicies(listRes || []);
+            const targetSlug = slug || (listRes && listRes.length > 0 ? listRes[0].slug : null);
+            if (targetSlug) {
+              return documentsApi.getPolicyBySlug(targetSlug).then((detailRes: any) => setPolicy(detailRes || null));
+            }
+          }).catch((e: any) => setError(e?.response?.data?.message || 'Không thể tải điều khoản & chính sách'))
+            .finally(() => setLoading(false));
+        }}
+        style={{
+          padding: '8px 20px',
+          background: 'var(--primary)',
+          color: '#fff',
+          borderRadius: '8px',
+          border: 'none',
+          cursor: 'pointer',
+          fontWeight: 600
+        }}
+      >
+        Thử lại
+      </button>
+    </div>
+  )
 
   if (!policy) return <div style={{ padding: '60px', textAlign: 'center' }}>Không tìm thấy chính sách.</div>
 
@@ -112,7 +147,7 @@ export default function PolicyPage() {
           <div 
             className="ql-editor"
             style={{ padding: 0, fontSize: 'var(--text-base)', lineHeight: 1.8 }}
-            dangerouslySetInnerHTML={{ __html: policy.content }} 
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(policy.content) }}
           />
         </div>
       </div>

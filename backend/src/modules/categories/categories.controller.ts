@@ -1,11 +1,22 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  ParseIntPipe
+} from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { RolesGuard } from '../../common/security/roles.guard';
 import { Roles } from '../../common/security/roles.decorator';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
+import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 
 @ApiTags('Metadata')
 @Controller('categories')
@@ -25,21 +36,25 @@ export class CategoriesController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  create(@Body() dto: any, @CurrentUser() user: AuthUser) {
+  create(@Body() dto: CreateCategoryDto, @CurrentUser() user: AuthUser) {
     return this.categoriesService.create(dto, user);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  update(@Param('id') id: string, @Body() dto: any, @CurrentUser() user: AuthUser) {
-    return this.categoriesService.update(+id, dto, user);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCategoryDto,
+    @CurrentUser() user: AuthUser
+  ) {
+    return this.categoriesService.update(id, dto, user);
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'mod')
-  remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.categoriesService.remove(+id, user);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: AuthUser) {
+    return this.categoriesService.remove(id, user);
   }
 }

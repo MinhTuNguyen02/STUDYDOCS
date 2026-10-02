@@ -6,14 +6,13 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  transformIgnorePatterns: [
-    "/node_modules/(?!(@scure|otplib|@otplib|@noble)/)"
-  ],
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  setupFiles: ['<rootDir>/test/setup-env.ts'],
   roots: ['<rootDir>/test/'],
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/src/$1',
+    '^sanitize-html$': '<rootDir>/test/mocks/sanitize-html.ts',
   },
 };

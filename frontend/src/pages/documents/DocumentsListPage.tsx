@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { documentsApi } from '@/api/documents.api'
 import DocumentCard from '@/components/common/DocumentCard'
 import { Search, Filter, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, XCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function DocumentsListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -10,72 +11,68 @@ export default function DocumentsListPage() {
   const [documents, setDocuments] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [meta, setMeta] = useState({ page: 1, limit: 12, total: 0 })
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
 
   const keyword = searchParams.get('keyword') || ''
   const categoryId = searchParams.get('categoryId') || ''
   const sortBy = searchParams.get('sortBy') || 'popular'
+  const page = Number.parseInt(searchParams.get('page') || '1', 10)
 
   const [localKeyword, setLocalKeyword] = useState(keyword)
 
+  const handleFilterChange = useCallback((key: string, value: string, scroll = true) => {
+    const newParams = new URLSearchParams(searchParams)
+    if (value) newParams.set(key, value)
+    else newParams.delete(key)
+
+    if (key !== 'page') newParams.set('page', '1')
+    setSearchParams(newParams)
+    if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [searchParams, setSearchParams])
+
+  const fetchDocs = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const params = {
+        keyword,
+        categoryId: categoryId === 'ALL' ? '' : categoryId,
+        sortBy,
+        page,
+        limit: 9,
+      }
+      const res = await documentsApi.getDocuments(params)
+      setDocuments(res.data || [])
+      setMeta(res.meta || { page, limit: 9, total: 0 })
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Không thể tải danh sách tài liệu'
+      setError(message)
+      toast.error(message)
+    } finally {
+      setLoading(false)
+    }
+  }, [categoryId, keyword, page, sortBy])
+
   useEffect(() => {
-    setLocalKeyword(searchParams.get('keyword') || '')
-  }, [searchParams.get('keyword')])
+    setLocalKeyword(keyword)
+  }, [keyword])
 
   useEffect(() => {
     const t = setTimeout(() => {
-      if (localKeyword !== (searchParams.get('keyword') || '')) {
+      if (localKeyword !== keyword) {
         handleFilterChange('keyword', localKeyword, false)
       }
     }, 500)
     return () => clearTimeout(t)
-  }, [localKeyword])
+  }, [handleFilterChange, keyword, localKeyword])
 
   useEffect(() => {
     documentsApi.getCategories().then(res => setCategories(res || []))
   }, [])
 
-  useEffect(() => {
-    const fetchDocs = async () => {
-      setLoading(true)
-      try {
-        const page = parseInt(searchParams.get('page') || '1', 10)
-        const params = {
-          keyword,
-          categoryId: categoryId === 'ALL' ? '' : categoryId,
-          sortBy,
-          page,
-          limit: 9
-        }
-        const res = await documentsApi.getDocuments(params)
-        setDocuments(res.data || [])
-        setMeta(res.meta || { page, limit: 9, total: 0 })
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchDocs()
-  }, [searchParams])
-
-  const handleFilterChange = (key: string, value: string, scroll = true) => {
-    const newParams = new URLSearchParams(searchParams)
-    if (value) {
-      newParams.set(key, value)
-    } else {
-      newParams.delete(key)
-    }
-    // Only reset to page 1 if the user is changing other filters (not navigating pages)
-    if (key !== 'page') {
-      newParams.set('page', '1')
-    }
-    setSearchParams(newParams)
-    if (scroll) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }
+  useEffect(() => { void fetchDocs() }, [fetchDocs])
 
   const clearFilters = () => {
     setSearchParams(new URLSearchParams())
@@ -231,6 +228,18 @@ export default function DocumentsListPage() {
             {Array(12).fill(0).map((_, i) => (
               <div key={i} className="h-80 bg-muted rounded-xl animate-pulse" />
             ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-24 bg-card border border-danger/30 rounded-xl mt-4" role="alert">
+            <XCircle className="w-16 h-16 text-danger mx-auto mb-4 opacity-60" />
+            <h3 className="text-xl font-bold mb-2">Không thể tải tài liệu</h3>
+            <p className="text-muted-foreground mb-6">{error}</p>
+            <button
+              className="bg-primary text-white font-medium px-6 py-2.5 rounded-lg hover:bg-primary-hover transition-colors"
+              onClick={() => void fetchDocs()}
+            >
+              Thử lại
+            </button>
           </div>
         ) : documents.length > 0 ? (
           <div className="flex flex-col gap-10">

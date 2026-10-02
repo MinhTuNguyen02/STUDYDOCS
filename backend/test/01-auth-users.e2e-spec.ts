@@ -2,13 +2,12 @@
  * ═══════════════════════════════════════════════════════════
  * PHẦN 1/4: AUTH & USER MANAGEMENT
  * ═══════════════════════════════════════════════════════════
- * 
+ *
  * Bao gồm:
  * - Đăng ký / Đăng nhập / Refresh / Logout
  * - OTP xác minh SĐT
  * - Profile CRUD
  * - Ban/Unban user
- * - 2FA setup
  */
 import * as request from 'supertest';
 import {
@@ -16,10 +15,11 @@ import {
   closeTestApp,
   getApp,
   registerAndLogin,
-  loginAs,
   authGet,
   authPost,
   authPatch,
+  ensureTestStaff,
+  sessionPost,
   TestUser
 } from './test-utils';
 
@@ -30,13 +30,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
 
   beforeAll(async () => {
     await createTestApp();
-    // Admin phải là tài khoản seed sẵn trong DB
-    // Nếu DB trống thì test này sẽ fail — cần seed data trước
-    try {
-      adminUser = await loginAs('admin@studydocs.vn', 'admin123');
-    } catch {
-      console.warn('⚠️  Admin seed account not found. Admin tests will be skipped.');
-    }
+    adminUser = await ensureTestStaff('admin-e2e@studydocs.test', 'Admin@Test123', 'ADMIN');
   }, 30000);
 
   afterAll(async () => {
@@ -58,7 +52,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
         })
         .expect(201);
 
-      expect(res.body.message).toContain('thanh cong');
+      expect(res.body.message).toContain('thành công');
       expect(res.body.user.email).toBe(uniqueEmail);
       expect(res.body.user.customerId).toBeDefined();
     });
@@ -73,7 +67,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
         })
         .expect(409);
 
-      expect(res.body.message).toContain('su dung');
+      expect(res.body.message).toContain('sử dụng');
     });
 
     it('❌ Đăng ký thất bại: thiếu email', async () => {
@@ -102,7 +96,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
 
     it('✅ Đăng nhập thành công', () => {
       expect(customerUser.accessToken).toBeDefined();
-      expect(customerUser.refreshToken).toBeDefined();
+      expect(customerUser.refreshCookie).toMatch(/^studydocs_refresh=/);
       expect(customerUser.accountId).toBeGreaterThan(0);
     });
 
@@ -124,20 +118,21 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
   // ─── REFRESH TOKEN ───────────────────────────────────────
 
   describe('POST /auth/refresh', () => {
-    it('✅ Refresh token thành công', async () => {
-      const res = await request(getApp().getHttpServer())
+    it('❌ Refresh thất bại khi thiếu CSRF token', async () => {
+      await request(getApp().getHttpServer())
         .post('/auth/refresh')
-        .send({ refreshToken: customerUser.refreshToken })
-        .expect(201);
+        .set('Cookie', customerUser.refreshCookie)
+        .expect(401);
+    });
+
+    it('✅ Refresh token thành công', async () => {
+      const res = await sessionPost('/auth/refresh', customerUser.refreshCookie, 201);
 
       expect(res.body.accessToken).toBeDefined();
     });
 
     it('❌ Refresh thất bại: token rác', async () => {
-      await request(getApp().getHttpServer())
-        .post('/auth/refresh')
-        .send({ refreshToken: 'invalid-garbage-token' })
-        .expect(401);
+      await sessionPost('/auth/refresh', 'studydocs_refresh=invalid-garbage-token', 401);
     });
   });
 
@@ -147,28 +142,26 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
     it('✅ Logout thành công', async () => {
       // Tạo 1 session mới để logout mà không ảnh hưởng customerUser chính
       const tempUser = await registerAndLogin(
-        `logout_${Date.now()}@example.com`, 'Logout@123', 'Logout Test'
+        `logout_${Date.now()}@example.com`,
+        'Logout@123',
+        'Logout Test'
       );
 
-      const res = await request(getApp().getHttpServer())
-        .post('/auth/logout')
-        .send({ refreshToken: tempUser.refreshToken })
-        .expect(201);
+      const res = await sessionPost('/auth/logout', tempUser.refreshCookie, 201);
 
-      expect(res.body.message).toContain('xuat');
+      expect(res.body.message).toContain('xuất');
 
       // Sau khi logout, refresh token phải bị revoke
-      await request(getApp().getHttpServer())
-        .post('/auth/refresh')
-        .send({ refreshToken: tempUser.refreshToken })
-        .expect(401);
+      await sessionPost('/auth/refresh', tempUser.refreshCookie, 401);
     });
   });
 
   // ─── OTP XÁC MINH SĐT ──────────────────────────────────
 
   describe('POST /auth/send-otp & /auth/verify-otp', () => {
-    const uniquePhone = `09${Math.floor(Math.random() * 100000000).toString().padStart(8, '0')}`;
+    const uniquePhone = `09${Math.floor(Math.random() * 100000000)
+      .toString()
+      .padStart(8, '0')}`;
     it('✅ Gửi OTP thành công (Mock mode)', async () => {
       const res = await authPost('/auth/send-otp', customerUser.accessToken)
         .send({ phoneNumber: uniquePhone })
@@ -206,8 +199,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
 
   describe('GET/PATCH /users/me', () => {
     it('✅ Xem profile thành công', async () => {
-      const res = await authGet('/users/me', customerUser.accessToken)
-        .expect(200);
+      const res = await authGet('/users/me', customerUser.accessToken).expect(200);
 
       expect(res.body.accounts.email).toBe(customerUser.email);
     });
@@ -222,9 +214,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
     });
 
     it('❌ Xem profile thất bại: không có token', async () => {
-      await request(getApp().getHttpServer())
-        .get('/users/me')
-        .expect(401);
+      await request(getApp().getHttpServer()).get('/users/me').expect(401);
     });
   });
 
@@ -249,7 +239,7 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
         .send({ currentPassword: 'OldPass@123', newPassword: 'NewPass@123' })
         .expect(201);
 
-      expect(res.body.message).toContain('mat khau');
+      expect(res.body.message).toContain('mật khẩu');
 
       // Verify: đăng nhập bằng mật khẩu mới
       await request(getApp().getHttpServer())
@@ -266,21 +256,31 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
 
     beforeAll(async () => {
       victimUser = await registerAndLogin(
-        `victim_${Date.now()}@example.com`, 'Victim@123', 'Victim User'
+        `victim_${Date.now()}@example.com`,
+        'Victim@123',
+        'Victim User'
       );
     });
 
     it('❌ Ban thất bại: customer không có quyền', async () => {
-      await authPatch(`/users/${victimUser.accountId}/ban`, customerUser.accessToken)
+      await authPatch(
+        `/admin/users/${victimUser.accountId}/toggle-active`,
+        customerUser.accessToken
+      )
+        .send({ durationDays: null })
         .expect(403);
     });
 
     it('✅ Ban user thành công (Admin)', async () => {
       if (!adminUser) return;
-      const res = await authPatch(`/users/${victimUser.accountId}/ban`, adminUser.accessToken)
+      const res = await authPatch(
+        `/admin/users/${victimUser.accountId}/toggle-active`,
+        adminUser.accessToken
+      )
+        .send({ durationDays: null })
         .expect(200);
 
-      expect(res.body.message).toContain('BANNED');
+      expect(res.body.status).toBe('BANNED');
     });
 
     it('✅ User bị ban không thể đăng nhập', async () => {
@@ -293,28 +293,14 @@ describe('PHẦN 1: Auth & User Management (e2e)', () => {
 
     it('✅ Unban user thành công (Admin)', async () => {
       if (!adminUser) return;
-      const res = await authPatch(`/users/${victimUser.accountId}/unban`, adminUser.accessToken)
+      const res = await authPatch(
+        `/admin/users/${victimUser.accountId}/toggle-active`,
+        adminUser.accessToken
+      )
+        .send({ durationDays: null })
         .expect(200);
 
-      expect(res.body.message).toContain('ACTIVE');
-    });
-  });
-
-  // ─── 2FA ──────────────────────────────────────────────────
-
-  describe('POST /auth/2fa/setup & /auth/2fa/verify', () => {
-    it('✅ Setup 2FA thành công', async () => {
-      const res = await authPost('/auth/2fa/setup', customerUser.accessToken)
-        .expect(201);
-
-      expect(res.body.secret).toBeDefined();
-      expect(res.body.qrCode).toBeDefined();
-    });
-
-    it('❌ Verify 2FA thất bại: mã sai format', async () => {
-      await authPost('/auth/2fa/verify', customerUser.accessToken)
-        .send({ code: '12' }) // Quá ngắn
-        .expect(400);
+      expect(res.body.status).toBe('ACTIVE');
     });
   });
 });

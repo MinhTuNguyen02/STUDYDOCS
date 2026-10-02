@@ -1,10 +1,20 @@
-import { useState, useEffect } from 'react';
-import { adminApi } from '@/api/admin.api';
-import toast from 'react-hot-toast';
-import { FileCheck, XCircle, Search, X, FileText, Tag, Info, Eye, ExternalLink } from 'lucide-react';
-import { formatBalance, formatDate } from '@/utils/format';
-import { usePagination } from '@/hooks/usePagination';
-import Pagination from '@/components/common/Pagination';
+import { useState, useEffect, useCallback } from "react";
+import { adminApi } from "@/api/admin.api";
+import toast from "react-hot-toast";
+import {
+  FileCheck,
+  XCircle,
+  Search,
+  X,
+  FileText,
+  Tag,
+  Info,
+  Eye,
+  ExternalLink,
+} from "lucide-react";
+import { formatBalance, formatDate } from "@/utils/format";
+import Pagination from "@/components/common/Pagination";
+import { useSearchParams } from "react-router-dom";
 
 interface PendingDoc {
   id: number;
@@ -20,56 +30,96 @@ interface PendingDoc {
   pageCount: number;
   fileExtension: string;
   size: string;
-  previewSignedUrl?: string | null;  // 30% watermarked preview (for buyers sample)
-  reviewSignedUrl?: string | null;   // 100% full-page review PDF (staff only, 2h TTL)
+  previewSignedUrl?: string | null; // 30% watermarked preview (for buyers sample)
+  reviewSignedUrl?: string | null; // short-lived full file URL loaded only after an audited action
+  hasReviewFile?: boolean;
 }
 
 export default function AdminApprovalsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<PendingDoc[]>([]);
-  const [filtered, setFiltered] = useState<PendingDoc[]>([]);
-  const [search, setSearch] = useState('');
+  const search = searchParams.get("search") || "";
+  const [searchInput, setSearchInput] = useState(search);
+  const page = Math.max(1, Number(searchParams.get("page")) || 1);
+  const limit = 10;
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<number | null>(null);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState("");
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [previewDoc, setPreviewDoc] = useState<PendingDoc | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
-  useEffect(() => { fetchPendingDocuments(); }, []);
-
-  useEffect(() => {
-    const q = search.toLowerCase();
-    setFiltered(q ? documents.filter(d =>
-      d.title.toLowerCase().includes(q) ||
-      d.sellerName.toLowerCase().includes(q) ||
-      d.categoryName.toLowerCase().includes(q)
-    ) : documents);
-  }, [search, documents]);
-
-  const { page, setPage, totalPages, total, limit, paginatedItems } = usePagination(filtered);
-
-  const fetchPendingDocuments = async () => {
+  const fetchPendingDocuments = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await adminApi.getApprovals();
+      setError(null);
+      const res = await adminApi.getApprovals({
+        search: search || undefined,
+        page,
+        limit,
+      });
       const data = res.data || res;
       setDocuments(data);
-      setFiltered(data);
-    } catch {
-      toast.error('Lỗi khi tải danh sách kiểm duyệt');
+      setTotal(res.meta?.total ?? data.length);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message || "Lỗi khi tải danh sách kiểm duyệt";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, search]);
+
+  useEffect(() => {
+    void fetchPendingDocuments();
+  }, [fetchPendingDocuments]);
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  const updateQuery = useCallback(
+    (updates: { search?: string; page?: number }) => {
+      const next = new URLSearchParams(searchParams);
+      if (updates.search !== undefined) {
+        updates.search
+          ? next.set("search", updates.search)
+          : next.delete("search");
+      }
+      if (updates.page !== undefined) {
+        updates.page <= 1
+          ? next.delete("page")
+          : next.set("page", String(updates.page));
+      }
+      if (next.toString() !== searchParams.toString()) {
+        setSearchParams(next, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => updateQuery({ search: searchInput.trim(), page: 1 }),
+      500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [searchInput, updateQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const handleApprove = async (id: number) => {
     setProcessingId(id);
     try {
       await adminApi.approveDocument(id);
-      toast.success('Đã duyệt tài liệu thành công');
-      setDocuments(docs => docs.filter(d => d.id !== id));
+      toast.success("Đã duyệt tài liệu thành công");
+      if (documents.length === 1 && page > 1) updateQuery({ page: page - 1 });
+      else await fetchPendingDocuments();
       if (previewDoc?.id === id) setPreviewDoc(null);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Có lỗi xảy ra');
+      toast.error(err?.response?.data?.message || "Có lỗi xảy ra");
     } finally {
       setProcessingId(null);
     }
@@ -77,48 +127,55 @@ export default function AdminApprovalsPage() {
 
   const handleReject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectId || !reason.trim()) return toast.error('Vui lòng nhập lý do');
+    if (!rejectId || !reason.trim()) return toast.error("Vui lòng nhập lý do");
     setProcessingId(rejectId);
     try {
       await adminApi.rejectDocument(rejectId, reason);
-      toast.success('Đã từ chối tài liệu');
-      setDocuments(docs => docs.filter(d => d.id !== rejectId));
+      toast.success("Đã từ chối tài liệu");
+      if (documents.length === 1 && page > 1) updateQuery({ page: page - 1 });
+      else await fetchPendingDocuments();
       if (previewDoc?.id === rejectId) setPreviewDoc(null);
       setRejectId(null);
-      setReason('');
+      setReason("");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Có lỗi xảy ra');
+      toast.error(err?.response?.data?.message || "Có lỗi xảy ra");
     } finally {
       setProcessingId(null);
     }
   };
 
   // Prefer full review PDF if available, fall back to 30% preview
-  const getViewUrl = (doc: PendingDoc) => doc.reviewSignedUrl || doc.previewSignedUrl || null;
+  const getViewUrl = (doc: PendingDoc) =>
+    doc.reviewSignedUrl || doc.previewSignedUrl || null;
 
-  const handleReviewOriginal = async (id: number) => {
-    // Audit log will still be recorded on backend reliably without halting UX
-    setProcessingId(id);
+  const handleOpenPreview = async (doc: PendingDoc) => {
+    setPreviewDoc(doc);
+    if (!doc.hasReviewFile) return;
+    setReviewLoading(true);
     try {
-      const res = await adminApi.getDocumentReviewUrl(id);
-      if (res && res.reviewUrl) {
-        window.open(res.reviewUrl, '_blank');
-      } else {
-        toast.error("Không thể lấy link bản gốc.");
-      }
+      const result = await adminApi.getDocumentReviewUrl(doc.id);
+      setPreviewDoc((current) =>
+        current?.id === doc.id
+          ? { ...current, reviewSignedUrl: result.reviewUrl }
+          : current,
+      );
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Có lỗi xảy ra khi lấy bản gốc');
+      toast.error(
+        err?.response?.data?.message ||
+          "Không thể cấp quyền xem file đầy đủ; đang dùng bản preview nếu có.",
+      );
     } finally {
-      setProcessingId(null);
+      setReviewLoading(false);
     }
   };
 
-  if (loading) return (
-    <div className="p-12 text-center text-muted-foreground">
-      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-      Đang tải danh sách kiểm duyệt...
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="p-12 text-center text-muted-foreground">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        Đang tải danh sách kiểm duyệt...
+      </div>
+    );
 
   return (
     <>
@@ -126,8 +183,10 @@ export default function AdminApprovalsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold font-heading text-foreground">
             Kiểm duyệt Tài liệu
-            {documents.length > 0 && (
-              <span className="ml-2 px-2 py-0.5 bg-warning/10 text-warning rounded-full text-sm">{documents.length}</span>
+            {total > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-warning/10 text-warning rounded-full text-sm">
+                {total}
+              </span>
             )}
           </h1>
         </div>
@@ -138,23 +197,48 @@ export default function AdminApprovalsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Tìm theo tên, người gửi, danh mục..."
               className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
             />
           </div>
-          <span className="text-xs text-muted-foreground">{filtered.length} tài liệu</span>
+          <span className="text-xs text-muted-foreground">
+            {total} tài liệu
+          </span>
         </div>
       </div>
 
       <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="p-12 text-center text-muted-foreground animate-pulse flex flex-col items-center">
+              <FileCheck className="w-12 h-12 mb-3 text-muted-foreground/30 animate-bounce" />
+              <p>Đang tải danh sách kiểm duyệt...</p>
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center">
+              <p className="text-danger mb-4 font-medium">{error}</p>
+              <button
+                onClick={fetchPendingDocuments}
+                className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : documents.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
               <FileCheck className="w-12 h-12 mb-3 text-muted-foreground/50" />
-              <p>{search ? 'Không tìm thấy kết quả.' : 'Không có tài liệu nào đang chờ kiểm duyệt.'}</p>
-              {!search && <p className="text-sm mt-1">Tuyệt vời, bạn đã xử lý xong mọi việc!</p>}
+              <p>
+                {searchInput
+                  ? "Không tìm thấy kết quả."
+                  : "Không có tài liệu nào đang chờ kiểm duyệt."}
+              </p>
+              {!searchInput && (
+                <p className="text-sm mt-1">
+                  Tuyệt vời, bạn đã xử lý xong mọi việc!
+                </p>
+              )}
             </div>
           ) : (
             <table className="w-full text-left">
@@ -168,30 +252,43 @@ export default function AdminApprovalsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {paginatedItems.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-muted/10 transition-colors">
+                {documents.map((doc) => (
+                  <tr
+                    key={doc.id}
+                    className="hover:bg-muted/10 transition-colors"
+                  >
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                          {doc.format || 'DOC'}
+                          {doc.format || "DOC"}
                         </div>
                         <div>
-                          <p className="font-semibold text-sm line-clamp-1">{doc.title}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{doc.categoryName} · {doc.size}</p>
+                          <p className="font-semibold text-sm line-clamp-1">
+                            {doc.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {doc.categoryName} · {doc.size}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="p-4 text-sm">{doc.sellerName}</td>
                     <td className="p-4 text-sm font-semibold">
-                      {Number(doc.price) === 0
-                        ? <span className="text-success">Miễn phí</span>
-                        : <span className="text-primary">{formatBalance(doc.price)}</span>}
+                      {Number(doc.price) === 0 ? (
+                        <span className="text-success">Miễn phí</span>
+                      ) : (
+                        <span className="text-primary">
+                          {formatBalance(doc.price)}
+                        </span>
+                      )}
                     </td>
-                    <td className="p-4 text-sm text-muted-foreground">{formatDate(doc.createdAt)}</td>
+                    <td className="p-4 text-sm text-muted-foreground">
+                      {formatDate(doc.createdAt)}
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => setPreviewDoc(doc)}
+                          onClick={() => void handleOpenPreview(doc)}
                           className="px-3 py-1.5 bg-accent text-foreground hover:bg-muted rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" /> Xem
@@ -218,7 +315,13 @@ export default function AdminApprovalsPage() {
             </table>
           )}
         </div>
-        <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPageChange={(nextPage) => updateQuery({ page: nextPage })}
+        />
       </div>
 
       {/* ── Preview Modal ── */}
@@ -228,12 +331,18 @@ export default function AdminApprovalsPage() {
             {/* Header */}
             <div className="p-5 border-b border-border flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-bold text-lg line-clamp-2">{previewDoc.title}</h2>
+                <h2 className="font-bold text-lg line-clamp-2">
+                  {previewDoc.title}
+                </h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Bởi <strong>{previewDoc.sellerName}</strong> · {previewDoc.categoryName} · {previewDoc.size}
+                  Bởi <strong>{previewDoc.sellerName}</strong> ·{" "}
+                  {previewDoc.categoryName} · {previewDoc.size}
                 </p>
               </div>
-              <button onClick={() => setPreviewDoc(null)} className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0">
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -244,14 +353,24 @@ export default function AdminApprovalsPage() {
                 {/* Price, pages */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-muted/40 rounded-xl p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Giá bán</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Giá bán
+                    </p>
                     <p className="font-bold text-base">
-                      {Number(previewDoc.price) === 0 ? <span className="text-success">Miễn phí</span> : formatBalance(previewDoc.price)}
+                      {Number(previewDoc.price) === 0 ? (
+                        <span className="text-success">Miễn phí</span>
+                      ) : (
+                        formatBalance(previewDoc.price)
+                      )}
                     </p>
                   </div>
                   <div className="bg-muted/40 rounded-xl p-3 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Số trang</p>
-                    <p className="font-bold text-base">{previewDoc.pageCount ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      Số trang
+                    </p>
+                    <p className="font-bold text-base">
+                      {previewDoc.pageCount ?? "—"}
+                    </p>
                   </div>
                 </div>
 
@@ -265,7 +384,9 @@ export default function AdminApprovalsPage() {
                   <div className="flex items-center gap-2">
                     <Info className="w-4 h-4 text-muted-foreground shrink-0" />
                     <span className="text-muted-foreground">Ngày gửi:</span>
-                    <span className="font-semibold">{formatDate(previewDoc.createdAt)}</span>
+                    <span className="font-semibold">
+                      {formatDate(previewDoc.createdAt)}
+                    </span>
                   </div>
                 </div>
 
@@ -276,8 +397,13 @@ export default function AdminApprovalsPage() {
                       <Tag className="w-3.5 h-3.5" /> Tags
                     </p>
                     <div className="flex flex-wrap gap-1.5">
-                      {previewDoc.tags.map(tag => (
-                        <span key={tag} className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">{tag}</span>
+                      {previewDoc.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium"
+                        >
+                          {tag}
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -285,22 +411,32 @@ export default function AdminApprovalsPage() {
 
                 {/* Description */}
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Mô tả</p>
-                  <p className="text-sm text-foreground/80 leading-relaxed max-h-40 overflow-y-auto">{previewDoc.description || 'Không có mô tả.'}</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Mô tả
+                  </p>
+                  <p className="text-sm text-foreground/80 leading-relaxed max-h-40 overflow-y-auto">
+                    {previewDoc.description || "Không có mô tả."}
+                  </p>
                 </div>
 
                 {/* Action buttons */}
                 <div className="pt-2 space-y-2.5">
                   <button
-                    onClick={() => { handleApprove(previewDoc.id); }}
+                    onClick={() => {
+                      handleApprove(previewDoc.id);
+                    }}
                     disabled={processingId === previewDoc.id}
                     className="w-full py-2.5 bg-success text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-success/90 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     <FileCheck className="w-4 h-4" />
-                    {processingId === previewDoc.id ? 'Đang xử lý...' : 'Duyệt tài liệu'}
+                    {processingId === previewDoc.id
+                      ? "Đang xử lý..."
+                      : "Duyệt tài liệu"}
                   </button>
                   <button
-                    onClick={() => { setRejectId(previewDoc.id); }}
+                    onClick={() => {
+                      setRejectId(previewDoc.id);
+                    }}
                     disabled={processingId === previewDoc.id}
                     className="w-full py-2.5 bg-danger/10 text-danger rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-danger/20 transition-colors disabled:opacity-50 cursor-pointer"
                   >
@@ -312,49 +448,60 @@ export default function AdminApprovalsPage() {
 
               {/* Right: file viewer */}
               <div className="md:col-span-2 p-5 flex flex-col">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Xem nội dung tài liệu</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Xem nội dung tài liệu
+                </p>
 
-                {(() => {
-                  const viewUrl = getViewUrl(previewDoc);
-                  if (!viewUrl) {
+                {reviewLoading ? (
+                  <div className="flex-1 min-h-60 flex items-center justify-center text-muted-foreground">
+                    Đang cấp quyền xem file đầy đủ...
+                  </div>
+                ) : (
+                  (() => {
+                    const viewUrl = getViewUrl(previewDoc);
+                    if (!viewUrl) {
+                      return (
+                        <div className="flex-1 bg-muted/30 rounded-xl flex flex-col items-center justify-center gap-3 min-h-60 border border-dashed border-border">
+                          <FileText className="w-12 h-12 text-muted-foreground/50" />
+                          <p className="text-sm text-muted-foreground text-center font-semibold">
+                            Không có bản xem trước PDF
+                          </p>
+                          <p className="text-xs text-muted-foreground/70 text-center max-w-xs">
+                            Tài liệu chưa có preview được tạo (có thể upload
+                            thất bại hoặc đang xử lý). Bạn vẫn có thể duyệt dựa
+                            trên mô tả và thông tin bên cạnh.
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // Preview is always a PDF (generated by pdf-lib with watermark)
                     return (
-                      <div className="flex-1 bg-muted/30 rounded-xl flex flex-col items-center justify-center gap-3 min-h-60 border border-dashed border-border">
-                        <FileText className="w-12 h-12 text-muted-foreground/50" />
-                        <p className="text-sm text-muted-foreground text-center font-semibold">Không có bản xem trước PDF</p>
-                        <p className="text-xs text-muted-foreground/70 text-center max-w-xs">
-                          Tài liệu chưa có preview được tạo (có thể upload thất bại hoặc đang xử lý).
-                          Bạn vẫn có thể duyệt dựa trên mô tả và thông tin bên cạnh.
-                        </p>
+                      <div className="flex-1 flex flex-col gap-2">
+                        <iframe
+                          src={viewUrl}
+                          title={`Preview: ${previewDoc.title}`}
+                          className="w-full flex-1 min-h-[500px] rounded-xl border border-border"
+                        />
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            {previewDoc.reviewSignedUrl
+                              ? "📄 Bản xem duyệt đầy đủ (chỉ dành cho nhân viên, xóa sau khi duyệt/từ chối)."
+                              : "⚠️ Bản xem trước có watermark (30% đầu). Nhân viên xem để tham khảo."}
+                          </p>
+                          <a
+                            href={viewUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors font-medium"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" /> Mở tab mới
+                          </a>
+                        </div>
                       </div>
                     );
-                  }
-
-                  // Preview is always a PDF (generated by pdf-lib with watermark)
-                  return (
-                    <div className="flex-1 flex flex-col gap-2">
-                      <iframe
-                        src={viewUrl}
-                        title={`Preview: ${previewDoc.title}`}
-                        className="w-full flex-1 min-h-[500px] rounded-xl border border-border"
-                      />
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">
-                          {previewDoc.reviewSignedUrl
-                            ? '📄 Bản xem duyệt đầy đủ (chỉ dành cho nhân viên, xóa sau khi duyệt/từ chối).'
-                            : '⚠️ Bản xem trước có watermark (30% đầu). Nhân viên xem để tham khảo.'}
-                        </p>
-                        <a
-                          href={viewUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors font-medium"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" /> Mở tab mới
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })()}
+                  })()
+                )}
               </div>
             </div>
           </div>
@@ -367,25 +514,42 @@ export default function AdminApprovalsPage() {
           <div className="bg-card rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in zoom-in-95">
             <div className="p-5 border-b border-border font-bold text-lg flex justify-between items-center">
               Từ chối Tài liệu
-              <button onClick={() => setRejectId(null)} className="text-muted-foreground hover:text-foreground cursor-pointer">✕</button>
+              <button
+                onClick={() => setRejectId(null)}
+                className="text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
             <form onSubmit={handleReject} className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1.5">Lý do từ chối</label>
+                <label className="block text-sm font-medium mb-1.5">
+                  Lý do từ chối
+                </label>
                 <textarea
                   value={reason}
-                  onChange={e => setReason(e.target.value)}
+                  onChange={(e) => setReason(e.target.value)}
                   className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-danger min-h-[100px]"
                   placeholder="Vd: Tài liệu sai định dạng, vi phạm bản quyền..."
                   required
                 />
               </div>
               <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setRejectId(null)} className="px-4 py-2 hover:bg-muted rounded-xl transition-colors font-medium">
+                <button
+                  type="button"
+                  onClick={() => setRejectId(null)}
+                  className="px-4 py-2 hover:bg-muted rounded-xl transition-colors font-medium"
+                >
                   Hủy
                 </button>
-                <button type="submit" disabled={processingId === rejectId} className="px-6 py-2 bg-danger text-white rounded-xl hover:bg-danger/90 transition-colors font-bold shadow-md disabled:opacity-50">
-                  {processingId === rejectId ? 'Đang xử lý...' : 'Xác nhận Từ chối'}
+                <button
+                  type="submit"
+                  disabled={processingId === rejectId}
+                  className="px-6 py-2 bg-danger text-white rounded-xl hover:bg-danger/90 transition-colors font-bold shadow-md disabled:opacity-50"
+                >
+                  {processingId === rejectId
+                    ? "Đang xử lý..."
+                    : "Xác nhận Từ chối"}
                 </button>
               </div>
             </form>

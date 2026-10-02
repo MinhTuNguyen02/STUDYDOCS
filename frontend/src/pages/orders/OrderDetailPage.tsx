@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ordersApi } from '@/api/orders.api'
 import { libraryApi } from '@/api/library.api'
@@ -10,21 +10,25 @@ export default function OrderDetailPage() {
   const { id } = useParams()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchOrderDetail()
-  }, [id])
-
-  const fetchOrderDetail = async () => {
+  const fetchOrderDetail = useCallback(async () => {
+    if (!id) return
+    setLoading(true)
+    setError(null)
     try {
-      const res = await ordersApi.getOrderStatus(id!)
+      const res = await ordersApi.getOrderStatus(id)
       setOrder(res.data || res)
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Không thể tải chi tiết đơn hàng')
+      const msg = error?.response?.data?.message || 'Không thể tải chi tiết đơn hàng'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => { void fetchOrderDetail() }, [fetchOrderDetail])
 
   const handleDownload = async (documentId: number) => {
     try {
@@ -55,7 +59,20 @@ export default function OrderDetailPage() {
     }
   }
 
-  if (loading) return <div className="py-24 text-center text-muted-foreground">Đang tải chi tiết đơn...</div>
+  if (loading) return <div className="py-24 text-center text-muted-foreground">Đang tải chi tiết đơn hàng...</div>
+
+  if (error) return (
+    <div className="max-w-4xl mx-auto py-24 px-4 text-center">
+      <p className="text-danger mb-4 font-medium">{error}</p>
+      <button
+        onClick={fetchOrderDetail}
+        className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
+      >
+        Thử lại
+      </button>
+    </div>
+  )
+
   if (!order) return <div className="py-24 text-center text-muted-foreground">Không tìm thấy đơn hàng</div>
 
   const orderId = order.orderId || order.order_id || order.id

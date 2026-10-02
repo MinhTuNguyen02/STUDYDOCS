@@ -21,7 +21,7 @@ interface CascadeSelectorProps {
   onChange: (id: string) => void
 }
 
-function CascadeCategorySelector({ allCategories, value, onChange }: CascadeSelectorProps) {
+function CascadeCategorySelector({ allCategories, value: _value, onChange }: CascadeSelectorProps) {
   const [path, setPath] = useState<number[]>([])
 
   const childrenOf = (parentId: number | null) =>

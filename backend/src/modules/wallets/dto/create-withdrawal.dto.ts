@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-﻿import { IsObject, IsString } from 'class-validator';
+import { IsObject, IsString } from 'class-validator';
 
 export class CreateWithdrawalDto {
   @ApiProperty({ example: 'example value' })

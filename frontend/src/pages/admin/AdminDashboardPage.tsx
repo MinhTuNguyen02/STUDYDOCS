@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { adminApi } from '@/api/admin.api';
 import toast from 'react-hot-toast';
 import { FileCheck, Files, ShoppingBag, Banknote, ArrowRight, Download, CalendarDays, Trophy, Package } from 'lucide-react';
@@ -71,11 +71,7 @@ export default function AdminDashboardPage() {
   const [appliedQuery, setAppliedQuery] = useState({ start: defaultWeek.start, end: defaultWeek.end });
   const [appliedLabel, setAppliedLabel] = useState('Tuần hiện tại');
 
-  useEffect(() => {
-    fetchStats(appliedQuery.start, appliedQuery.end);
-  }, [appliedQuery]);
-
-  const fetchStats = async (start: string, end: string) => {
+  const fetchStats = useCallback(async (start: string, end: string) => {
     try {
       setLoading(true);
       const res = await adminApi.getDashboardStats({ startDate: start, endDate: end, groupBy: filterMode === 'YEAR' ? 'month' : 'day' });
@@ -85,7 +81,11 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterMode]);
+
+  useEffect(() => {
+    void fetchStats(appliedQuery.start, appliedQuery.end);
+  }, [appliedQuery, fetchStats]);
 
   const applyFilter = () => {
     let start, end, label;
@@ -119,23 +119,6 @@ export default function AdminDashboardPage() {
   };
 
   const maxMonthForYear = (y: number) => y < currentYear ? 12 : currentMonth;
-
-  const exportCSV = (data: any[], filename: string) => {
-    if (!data || !data.length) { toast.error('Không có dữ liệu để xuất'); return; }
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
 
   const handleExportAll = () => {
     if (!stats) return;

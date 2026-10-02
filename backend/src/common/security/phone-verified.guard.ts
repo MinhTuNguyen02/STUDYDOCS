@@ -1,10 +1,16 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from './auth-user.interface';
 
 @Injectable()
 export class PhoneVerifiedGuard implements CanActivate {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();

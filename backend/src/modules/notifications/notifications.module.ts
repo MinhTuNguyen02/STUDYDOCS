@@ -8,6 +8,6 @@ import { NotificationsController } from './notifications.controller';
   imports: [PrismaModule, GatewayModule],
   controllers: [NotificationsController],
   providers: [NotificationsService],
-  exports: [NotificationsService],
+  exports: [NotificationsService]
 })
 export class NotificationsModule {}

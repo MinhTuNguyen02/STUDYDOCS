@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { usersApi } from '@/api/users.api'
 import { User, Lock, Save, Edit3, X, UserIcon, Mail, Calendar, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDate } from '@/utils/format'
+import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/utils/password'
 
 export default function AdminProfilePage() {
   const { user } = useAuthStore()
@@ -17,11 +18,7 @@ export default function AdminProfilePage() {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true)
       const uRes = await usersApi.getMe().catch(() => null)
@@ -33,7 +30,9 @@ export default function AdminProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => { void fetchData() }, [fetchData])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,6 +56,9 @@ export default function AdminProfilePage() {
     e.preventDefault()
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       return toast.error('Mật khẩu xác nhận không khớp')
+    }
+    if (!isStrongPassword(passwordForm.newPassword)) {
+      return toast.error(PASSWORD_REQUIREMENTS)
     }
     setIsSubmitting(true)
     try {

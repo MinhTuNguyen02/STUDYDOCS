@@ -4,7 +4,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { FirebaseAdminService } from './firebase.service';
-import { TwoFactorAuthService } from './two-factor.service';
 import { GoogleStrategy } from './google.strategy';
 
 @Module({
@@ -13,13 +12,13 @@ import { GoogleStrategy } from './google.strategy';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_ACCESS_SECRET', 'dev_access_secret'),
+        secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: { expiresIn: '2h' }
       })
     })
   ],
   controllers: [AuthController],
-  providers: [AuthService, FirebaseAdminService, TwoFactorAuthService, GoogleStrategy],
-  exports: [AuthService, FirebaseAdminService, TwoFactorAuthService]
+  providers: [AuthService, FirebaseAdminService, GoogleStrategy],
+  exports: [AuthService, FirebaseAdminService]
 })
 export class AuthModule {}

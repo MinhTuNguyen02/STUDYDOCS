@@ -1,24 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
-﻿import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class PaymentWebhookDto {
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ example: 'evt_123' })
   @IsString()
+  @MaxLength(100)
   eventId!: string;
 
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ example: '0' })
   @IsString()
+  @MaxLength(100)
   orderId!: string;
 
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ example: 'provider-transaction-id' })
   @IsString()
+  @MaxLength(100)
   providerTxnId!: string;
 
   @IsString()
-  @IsIn(['SUCCESS', 'FAILED', 'FAILED'])
-  status!: 'SUCCESS' | 'FAILED' | 'FAILED';
+  @IsIn(['SUCCESS', 'FAILED'])
+  status!: 'SUCCESS' | 'FAILED';
 
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ required: false })
   @IsOptional()
+  @IsObject()
   payload?: Record<string, unknown>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { packagesApi } from '@/api/packages.api'
 import { useAuthStore } from '@/store/authStore'
@@ -27,11 +27,7 @@ export default function PackagesPage() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    fetchPackages()
-  }, [])
-
-  const fetchPackages = async () => {
+  const fetchPackages = useCallback(async () => {
     try {
       const [pkgsRes, myRes] = await Promise.all([
         packagesApi.getPackages(),
@@ -44,7 +40,9 @@ export default function PackagesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  useEffect(() => { void fetchPackages() }, [fetchPackages])
 
   const handleBuy = async (pkg: any) => {
     if (!user) {
@@ -60,7 +58,7 @@ export default function PackagesPage() {
     if (window.confirm(`Bạn có chắc chắn muốn mua gói "${pkg.name}" với giá ${formatBalance(pkg.price)}? Tiền sẽ được trừ vào Ví Thanh toán.`)) {
       setBuying(pkg.package_id || pkg.id)
       try {
-        const res = await packagesApi.buyPackage(pkg.package_id || pkg.id)
+        const res = await packagesApi.buyPackage(pkg.package_id || pkg.id, crypto.randomUUID())
         toast.success(res.message || `Mua gói "${pkg.name}" thành công!`)
         // Refresh lại danh sách gói của user
         await fetchPackages()

@@ -1,43 +1,81 @@
-// import { PrismaClient } from '@prisma/client';
-// import { seedFoundation } from './seed-data/01-foundation.seed';
-// import { seedAccounts } from './seed-data/02-accounts.seed';
-// import { seedWallets } from './seed-data/03-wallets.seed';
-// import { seedCatalog } from './seed-data/04-catalog.seed';
-// import { seedDocuments } from './seed-data/05-documents.seed';
-// import { seedOrders } from './seed-data/06-orders.seed';
-// import { seedLedger } from './seed-data/07-ledger.seed';
-// import { seedInteractions } from './seed-data/08-interactions.seed';
-// import { seedModeration } from './seed-data/09-moderation.seed';
-// import { seedNotifications } from './seed-data/10-notifications.seed';
+import { PrismaClient } from '@prisma/client';
 
-// const prisma = new PrismaClient();
+const prisma = new PrismaClient();
 
-// async function main() {
-//   console.log('🌱 ═══════════════════════════════════════');
-//   console.log('   STUDYDOCS — SEED DATA v2');
-//   console.log('═══════════════════════════════════════════');
+const roles = [
+  { name: 'CUSTOMER', description: 'Customer account' },
+  { name: 'MOD', description: 'Content moderator' },
+  { name: 'ACCOUNTANT', description: 'Finance operator' },
+  { name: 'ADMIN', description: 'System administrator' }
+] as const;
 
-//   await seedFoundation(prisma);
-//   await seedAccounts(prisma);
-//   await seedWallets(prisma);
-//   await seedCatalog(prisma);
-//   await seedDocuments(prisma);
-//   await seedOrders(prisma);
-//   await seedLedger(prisma);
-//   await seedInteractions(prisma);
-//   await seedModeration(prisma);
-//   await seedNotifications(prisma);
+const foundationConfigs = [
+  {
+    config_key: 'COMMISSION_RATE',
+    config_value: '0.5',
+    description: 'Marketplace commission rate (0 to 1)'
+  },
+  {
+    config_key: 'MIN_WITHDRAWAL',
+    config_value: '200000',
+    description: 'Minimum withdrawal amount in VND'
+  },
+  {
+    config_key: 'WITHDRAWAL_FEE_RATE',
+    config_value: '0.0',
+    description: 'Withdrawal fee/tax rate (0 to 1)'
+  }
+] as const;
 
-//   console.log('\n✅ ═══════════════════════════════════════');
-//   console.log('   SEEDING COMPLETED SUCCESSFULLY');
-//   console.log('═══════════════════════════════════════════');
-// }
+async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Seeding is disabled in production.');
+  }
+  if (process.env.ALLOW_SEED !== 'true') {
+    throw new Error('Set ALLOW_SEED=true explicitly to run the idempotent foundation seed.');
+  }
 
-// main()
-//   .catch((e) => {
-//     console.error('❌ Seed failed:', e);
-//     process.exit(1);
-//   })
-//   .finally(async () => {
-//     await prisma.$disconnect();
-//   });
+  await prisma.$transaction([
+    ...roles.map((role) =>
+      prisma.roles.upsert({
+        where: { name: role.name },
+        create: role,
+        update: { description: role.description }
+      })
+    ),
+    ...foundationConfigs.map((config) =>
+      prisma.configs.upsert({
+        where: { config_key: config.config_key },
+        create: config,
+        update: { description: config.description }
+      })
+    )
+  ]);
+
+  console.info(`Seeded ${roles.length} roles and ${foundationConfigs.length} foundation configs.`);
+
+  await prisma.$transaction(async (tx) => {
+    // Serialize foundation seeding even if two deploy jobs start concurrently.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(781325194)`;
+
+    const systemWalletTypes = ['GATEWAY_POOL', 'SYSTEM_REVENUE', 'TAX_PAYABLE'] as const;
+    for (const walletType of systemWalletTypes) {
+      const existing = await tx.wallets.findFirst({
+        where: { wallet_type: walletType, customer_id: null }
+      });
+      if (!existing) {
+        await tx.wallets.create({ data: { wallet_type: walletType, balance: 0 } });
+        console.info(`Created system wallet: ${walletType}`);
+      }
+    }
+  });
+
+  console.info('Foundation seed complete.');
+}
+
+main()
+  .catch((error: unknown) => {
+    console.error('Seed failed:', error instanceof Error ? error.message : 'Unknown error');
+    process.exitCode = 1;
+  })
+  .finally(async () => prisma.$disconnect());

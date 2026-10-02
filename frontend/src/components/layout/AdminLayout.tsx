@@ -8,6 +8,7 @@ import {
   FolderTree, Vault
 } from 'lucide-react';
 import NotificationBell from '@/components/common/NotificationBell';
+import { authApi } from '@/api/auth.api';
 
 interface Props {
   children: ReactNode;
@@ -19,7 +20,12 @@ export default function AdminLayout({ children }: Props) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // Local logout must still complete when the session already expired.
+    }
     logout();
     navigate('/login');
   };

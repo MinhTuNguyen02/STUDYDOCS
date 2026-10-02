@@ -1,14 +1,25 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException
+} from '@nestjs/common';
 import { StorageService } from '../storage/storage.service';
+import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { PDFDocument, rgb, degrees, StandardFonts } from 'pdf-lib';
-import * as sharp from 'sharp';
 import axios from 'axios';
 import * as FormData from 'form-data';
 
 @Injectable()
 export class DocumentUploadService {
-  constructor(private readonly storageService: StorageService) { }
+  private readonly logger = new Logger(DocumentUploadService.name);
+  private readonly maxPageCount = 1_000;
+
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly configService: ConfigService
+  ) {}
 
   async processAndUploadDocument(
     file: Express.Multer.File,
@@ -22,7 +33,10 @@ export class DocumentUploadService {
 
     // Parsing and checking extensions
     const extMatch = file.originalname.match(/\.[0-9a-z]+$/i);
-    let extension = extMatch ? extMatch[0].replace('.', '').toLowerCase() : providedExtension.toLowerCase();
+    const extension = extMatch
+      ? extMatch[0].replace('.', '').toLowerCase()
+      : providedExtension.toLowerCase();
+    this.assertSupportedFile(file, extension, providedExtension);
 
     let pageCount = 0;
     let previewBuffer: Buffer | null = null;
@@ -33,33 +47,35 @@ export class DocumentUploadService {
     if (extension === 'pdf') {
       pdfBufferToParse = file.buffer;
     } else {
-      try {
-        const formData = new FormData();
-        const safeFilename = file.originalname.includes('.') ? file.originalname : `${file.originalname}.${extension}`;
-        formData.append('files', file.buffer, { filename: safeFilename });
+      const safeFilename = file.originalname.includes('.')
+        ? file.originalname
+        : `${file.originalname}.${extension}`;
+      const gotenbergUrl = this.configService
+        .getOrThrow<string>('GOTENBERG_URL')
+        .replace(/\/$/, '');
 
-        const gotenbergUrl = process.env.GOTENBERG_URL || 'http://localhost:3000';
-
-        let response: any = null;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            response = await axios.post(`${gotenbergUrl}/forms/libreoffice/convert`, formData, {
-              headers: formData.getHeaders(),
-              responseType: 'arraybuffer',
-              timeout: 60000, // 60s timeout per attempt
-            });
-            break; // success — exit retry loop
-          } catch (retryErr: any) {
-            console.warn(`Gotenberg attempt ${attempt}/3 failed: ${retryErr.message}`);
-            if (attempt < 3) await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
-          }
-        }
-
-        if (response) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const formData = new FormData();
+          formData.append('files', file.buffer, { filename: safeFilename });
+          const response = await axios.post(`${gotenbergUrl}/forms/libreoffice/convert`, formData, {
+            headers: formData.getHeaders(),
+            responseType: 'arraybuffer',
+            timeout: 45_000,
+            maxBodyLength: 100 * 1024 * 1024,
+            maxContentLength: 150 * 1024 * 1024
+          });
           pdfBufferToParse = Buffer.from(response.data);
+          break;
+        } catch {
+          this.logger.warn(`Gotenberg conversion attempt ${attempt}/2 failed.`);
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1_000));
         }
-      } catch (e) {
-        console.error('Gotenberg conversion error (fallback to placeholder):', e);
+      }
+      if (!pdfBufferToParse) {
+        throw new ServiceUnavailableException(
+          'Không thể chuyển đổi tài liệu lúc này. Vui lòng thử lại sau.'
+        );
       }
     }
 
@@ -70,32 +86,36 @@ export class DocumentUploadService {
         pageCount = processed.pageCount;
         previewBuffer = processed.previewBuffer;
         reviewBuffer = processed.reviewBuffer;
-      } catch (e) {
+      } catch {
         if (extension === 'pdf') {
           throw new BadRequestException('Khong the doc file PDF nay.');
-        } else {
-          console.error('Pdf parse error on converted file:', e);
         }
+        throw new ServiceUnavailableException(
+          'File sau chuyển đổi không hợp lệ. Vui lòng thử lại.'
+        );
       }
+    }
+
+    if (!previewBuffer || !reviewBuffer || pageCount < 1) {
+      throw new BadRequestException('Không thể tạo bản xem trước cho tài liệu.');
     }
 
     // Upload main document
     const ts = Date.now();
     const fileKey = `docs/${slug}-${ts}.${extension}`;
-    await this.storageService.uploadFile(fileKey, file.buffer, file.mimetype);
-
-    // Upload preview (30% + watermark — for buyers to sample)
-    let previewKey = `previews/placeholder.png`;
-    if (previewBuffer) {
-      previewKey = `previews/${slug}-${ts}.pdf`;
+    const previewKey = `previews/${slug}-${ts}.pdf`;
+    const reviewKey = `reviews/${slug}-${ts}.pdf`;
+    const uploadedKeys: string[] = [];
+    try {
+      await this.storageService.uploadFile(fileKey, file.buffer, file.mimetype);
+      uploadedKeys.push(fileKey);
       await this.storageService.uploadFile(previewKey, previewBuffer, 'application/pdf');
-    }
-
-    // Upload review (100% + light watermark — for staff moderation only, deleted after decision)
-    let reviewKey: string | null = null;
-    if (reviewBuffer) {
-      reviewKey = `reviews/${slug}-${ts}.pdf`;
+      uploadedKeys.push(previewKey);
       await this.storageService.uploadFile(reviewKey, reviewBuffer, 'application/pdf');
+      uploadedKeys.push(reviewKey);
+    } catch (error) {
+      await Promise.all(uploadedKeys.map((key) => this.storageService.deleteFile(key)));
+      throw error;
     }
 
     return {
@@ -109,10 +129,72 @@ export class DocumentUploadService {
     };
   }
 
-  private async processPdfBuffer(buffer: Buffer): Promise<{ pageCount: number, previewBuffer: Buffer, reviewBuffer: Buffer }> {
+  async cleanupUpload(upload: { fileKey: string; previewKey: string; reviewKey: string | null }) {
+    const keys = [upload.fileKey, upload.previewKey, upload.reviewKey].filter(
+      (key): key is string => Boolean(key) && key !== 'previews/placeholder.png'
+    );
+    await Promise.all(keys.map((key) => this.storageService.deleteFile(key)));
+  }
+
+  private assertSupportedFile(
+    file: Express.Multer.File,
+    extension: string,
+    providedExtension: string
+  ) {
+    const allowed = new Set(['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx']);
+    if (!allowed.has(extension) || extension !== providedExtension.toLowerCase()) {
+      throw new BadRequestException('Phần mở rộng của file không hợp lệ hoặc không khớp biểu mẫu.');
+    }
+
+    const header = file.buffer.subarray(0, 8);
+    const isPdf = header.subarray(0, 5).toString('ascii') === '%PDF-';
+    const isZip =
+      header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
+    const isLegacyOffice = header.equals(
+      Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])
+    );
+
+    if (extension === 'pdf' && !isPdf) {
+      throw new BadRequestException('Nội dung file không phải PDF hợp lệ.');
+    }
+    if (['docx', 'pptx', 'xlsx'].includes(extension) && !isZip) {
+      throw new BadRequestException('File Office Open XML không hợp lệ.');
+    }
+    if (['doc', 'ppt', 'xls'].includes(extension) && !isLegacyOffice) {
+      throw new BadRequestException('File Office legacy không hợp lệ.');
+    }
+
+    const allowedMimeTypes: Record<string, string[]> = {
+      pdf: ['application/pdf'],
+      doc: ['application/msword', 'application/octet-stream'],
+      docx: [
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/octet-stream'
+      ],
+      ppt: ['application/vnd.ms-powerpoint', 'application/octet-stream'],
+      pptx: [
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/octet-stream'
+      ],
+      xls: ['application/vnd.ms-excel', 'application/octet-stream'],
+      xlsx: [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/octet-stream'
+      ]
+    };
+    if (!allowedMimeTypes[extension]?.includes(file.mimetype)) {
+      throw new BadRequestException('MIME type của file không phù hợp với định dạng đã chọn.');
+    }
+  }
+
+  private async processPdfBuffer(
+    buffer: Buffer
+  ): Promise<{ pageCount: number; previewBuffer: Buffer; reviewBuffer: Buffer }> {
     const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
     const totalPages = pdfDoc.getPageCount();
-    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    if (totalPages < 1 || totalPages > this.maxPageCount) {
+      throw new BadRequestException(`Tài liệu phải có từ 1 đến ${this.maxPageCount} trang.`);
+    }
 
     // ── 1. REVIEW PDF — Full pages, light diagonal watermark ──
     const reviewPdf = await PDFDocument.create();
@@ -134,11 +216,13 @@ export class DocumentUploadService {
       const y = cy - (textWidth / 2) * Math.sin(angleRad) - (textHeight / 2) * Math.cos(angleRad);
 
       page.drawText(text, {
-        x, y, size,
+        x,
+        y,
+        size,
         font: reviewFont,
         color: rgb(0.1, 0.4, 0.9),
         rotate: degrees(angle),
-        opacity: 0.15   // Very light — readable but doesn't obstruct content
+        opacity: 0.15 // Very light — readable but doesn't obstruct content
       });
       reviewPdf.addPage(page);
     }
@@ -150,7 +234,10 @@ export class DocumentUploadService {
     const previewText = 'STUDYDOCS';
     const previewSize = 70;
 
-    const previewCopied = await previewPdf.copyPages(pdfDoc, Array.from({ length: previewCount }, (_, i) => i));
+    const previewCopied = await previewPdf.copyPages(
+      pdfDoc,
+      Array.from({ length: previewCount }, (_, i) => i)
+    );
 
     for (const page of previewCopied) {
       const { width, height } = page.getSize();
@@ -164,7 +251,8 @@ export class DocumentUploadService {
       const y = cy - (textWidth / 2) * Math.sin(angleRad) - (textHeight / 2) * Math.cos(angleRad);
 
       page.drawText(previewText, {
-        x, y,
+        x,
+        y,
         size: previewSize,
         font: previewFont,
         color: rgb(0.95, 0.1, 0.1),

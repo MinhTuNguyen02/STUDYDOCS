@@ -17,7 +17,7 @@ Students can **buy, sell, download, and review** academic documents through a tr
 - **Payment Integration** — VNPay gateway with HMAC-SHA512 signing, IPN webhook, and idempotent transaction processing
 - **Document Processing Pipeline** — Upload → SHA256 dedup → DOCX/PPTX/XLSX-to-PDF conversion (Gotenberg) → watermarked preview generation (pdf-lib)
 - **Real-Time Notifications** — Socket.IO WebSocket gateway with JWT auth and role-based broadcasting (multiple event types)
-- **Anti-Fraud System** — File hash duplicate detection, progressive penalties (fine → ban), and comprehensive audit logging
+- **Anti-Abuse System** — File hash duplicate detection, progressive non-financial warnings/account sanctions, and comprehensive audit logging
 - **Seller Dashboard** — Revenue analytics, daily/monthly trends, top documents, sales management
 - **Admin Dashboard** — 18 management pages covering content moderation, financial oversight, user management, and system configuration
 - **Download Packages** — Subscription-like download bundles with expiration and auto-activation queue
@@ -128,7 +128,7 @@ Seller uploads file
        │
        ▼
   SHA256 hash ──── Duplicate? ──→ Reject + Record violation
-       │                          (auto-fine at 3rd, ban at 5th)
+       │                          (warning at 3rd, ban at 5th)
        │ unique
        ▼
   Is PDF? ─── No ──→ Gotenberg (LibreOffice) ──→ Convert to PDF
@@ -183,7 +183,7 @@ Customer clicks "Top Up"
 | **File Storage** | Supabase Storage (S3-compatible) |
 | **Payment** | VNPay (HMAC-SHA512) |
 | **File Conversion** | Gotenberg 8 (LibreOffice engine — DOCX/PPTX/XLSX → PDF) |
-| **Auth** | JWT (access + refresh), Google OAuth 2.0, Firebase Phone OTP, 2FA |
+| **Auth** | JWT (access + refresh), Google OAuth 2.0, Firebase Phone OTP |
 | **Email** | Nodemailer (Gmail SMTP) |
 | **Security** | Helmet, Throttler (rate limiting), bcryptjs |
 | **Testing** | Jest, Supertest (4 E2E suites) |
@@ -207,8 +207,8 @@ Customer clicks "Top Up"
 
 ### Prerequisites
 
-- **Node.js** ≥ 18 (recommended ≥ 20)
-- **npm** ≥ 9
+- **Node.js** 22 LTS
+- **npm** ≥ 10
 - **Docker Desktop** (running — required for Gotenberg)
 - **Git**
 - A [Supabase](https://supabase.com) project with:
@@ -231,10 +231,10 @@ Required variables:
 ```env
 PORT=4000
 FRONTEND_URL="http://localhost:5173"
-DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres"
+DATABASE_URL="postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres"
 
-JWT_ACCESS_SECRET="your-access-secret"
-JWT_REFRESH_SECRET="your-refresh-secret"
+JWT_ACCESS_SECRET="replace-with-a-long-random-secret-at-least-32-characters"
 
 # Supabase (Settings → API in your Supabase Dashboard)
 SUPABASE_URL="https://[project-ref].supabase.co"
@@ -263,10 +263,10 @@ VITE_STORAGE_URL="https://[project-ref].supabase.co/storage/v1/object/public/stu
 From the project root directory:
 
 ```bash
-docker compose up -d
+docker compose up -d gotenberg
 ```
 
-This starts Gotenberg on port `3000` for DOCX/PPTX/XLSX → PDF conversion.
+This starts Gotenberg on port `3000` for DOCX/PPTX/XLSX → PDF conversion. The `postgres` service is optional and must not be started when the project uses Supabase.
 
 > **Note:** Database and Storage run on Supabase Cloud — no local Docker needed for those.
 
@@ -276,11 +276,11 @@ This starts Gotenberg on port `3000` for DOCX/PPTX/XLSX → PDF conversion.
 cd backend
 npm install
 npx prisma generate
-npx prisma db push        # Sync schema to database (see warning below)
+npx prisma migrate deploy # Apply reviewed migrations
 npm run start:dev
 ```
 
-> ⚠️ **Warning:** `prisma db push` directly modifies the database schema without migration history. Use it **only for local/development databases**. For shared or production databases, use `prisma migrate dev` instead to avoid accidental data loss.
+> Never use `prisma db push` against shared/staging/production data. Create migrations against a disposable local database with `npm run prisma:migrate:dev`, review the SQL, back up the target, then apply with `npm run prisma:migrate:deploy`.
 
 ✅ Backend runs at: **http://localhost:4000**
 
@@ -314,7 +314,7 @@ A Postman collection is also available at `backend/studydocs-be.postman_collecti
 
 ## 🧪 Testing
 
-The project includes 4 end-to-end test suites:
+The project includes 4 end-to-end test suites. E2E is blocked unless the dedicated `TEST_*` database and storage variables described in `backend/.env.test.example` are exported; it never silently uses `backend/.env`.
 
 ```bash
 cd backend
@@ -337,7 +337,7 @@ npm run test:e2e:part4    # 04-interaction — Reviews, reports, admin operation
 
 ```
 src/modules/
-├── auth/           # Login, register, JWT, Google OAuth, OTP, 2FA, password reset
+├── auth/           # Login, register, JWT, Google OAuth, OTP, password reset
 ├── users/          # User profile management
 ├── seller/         # Seller document management, upload pipeline, dashboard analytics
 ├── documents/      # Public document search, detail, view counting
@@ -353,7 +353,7 @@ src/modules/
 ├── reviews/        # Ratings, comments, seller replies
 ├── reports/        # Content violation reports
 ├── packages/       # Download packages (subscription bundles)
-├── moderation/     # Content moderation + penalty/auto-ban system
+├── moderation/     # Non-financial violation warnings and account sanctions
 ├── admin/          # System admin (dashboard, users, configs, staff management)
 ├── configs/        # Dynamic system configuration (commission rate, fees)
 ├── policies/       # Terms & policies CMS (rich text)
@@ -392,7 +392,8 @@ npm run build             # Production build
 npm run seed              # Seed sample data
 npx prisma studio         # Visual database browser
 npx prisma generate       # Regenerate Prisma Client
-npx prisma db push        # Sync schema → DB (dev only!)
+npm run prisma:migrate:dev    # Create migration on disposable local DB
+npm run prisma:migrate:deploy # Apply reviewed migrations
 npm run test              # Run E2E test suites
 ```
 
@@ -408,7 +409,7 @@ npm run lint              # Code style check
 ### Docker
 
 ```bash
-docker compose up -d      # Start Gotenberg
+docker compose up -d gotenberg # Start Gotenberg only (Supabase provides DB)
 docker compose down       # Stop services
 docker compose logs -f    # Stream logs
 ```
@@ -432,11 +433,11 @@ docker compose logs -f    # Stream logs
 
 1. **Docker Desktop must be running** before `docker compose up -d` (for Gotenberg).
 2. **Startup order:** Docker → Backend → Frontend.
-3. **Schema changes** — after editing `prisma/schema.prisma`:
+3. **Schema changes** — after editing `prisma/schema.prisma`, use a disposable local database:
    ```bash
-   npx prisma generate && npx prisma db push
+   npx prisma generate && npm run prisma:migrate:dev
    ```
-   > ⚠️ Use `prisma db push` only for **local/dev** databases. For production or shared databases, use `prisma migrate dev` to create proper migration files.
+   Review generated SQL and back up the target before running `npm run prisma:migrate:deploy` on staging/production.
 4. **VNPay testing** — configure `VNPAY_TMN_CODE` and `VNPAY_HASH_SECRET` in `.env` from [VNPay Sandbox](https://sandbox.vnpayment.vn).
 5. **VNPay IPN webhook** — to receive automatic payment confirmations, expose the backend via **ngrok**:
    ```bash

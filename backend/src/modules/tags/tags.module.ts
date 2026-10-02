@@ -6,6 +6,6 @@ import { PrismaModule } from '../../database/prisma.module';
 @Module({
   imports: [PrismaModule],
   controllers: [TagsController],
-  providers: [TagsService],
+  providers: [TagsService]
 })
 export class TagsModule {}

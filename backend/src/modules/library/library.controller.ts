@@ -1,5 +1,6 @@
 import { ApiTags } from '@nestjs/swagger';
-import { Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, Req, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
@@ -10,7 +11,7 @@ import { LibraryService } from './library.service';
 @Controller('library')
 @UseGuards(JwtAuthGuard)
 export class LibraryController {
-  constructor(private readonly libraryService: LibraryService) { }
+  constructor(private readonly libraryService: LibraryService) {}
 
   @Get('documents')
   listMyDocuments(@CurrentUser() user: AuthUser) {
@@ -19,13 +20,13 @@ export class LibraryController {
 
   @Post('documents/:id/download-link')
   @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   createDownloadLink(
     @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Req() req: { ip?: string; socket?: { remoteAddress?: string } }
   ) {
     const ipAddress = req.ip ?? req.socket?.remoteAddress ?? null;
     return this.libraryService.createDownloadLink(user, id, ipAddress ?? undefined);
   }
 }
-
