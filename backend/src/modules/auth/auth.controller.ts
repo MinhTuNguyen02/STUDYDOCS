@@ -20,6 +20,7 @@ import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SkipResponseEnvelope } from '../../common/http/response-envelope.decorator';
 import { ConfigService } from '@nestjs/config';
 import { CookieOptions, Request, Response } from 'express';
 import { randomBytes, timingSafeEqual } from 'crypto';
@@ -154,12 +155,14 @@ export class AuthController {
   }
 
   @Get('google')
+  @SkipResponseEnvelope()
   @UseGuards(AuthGuard('google'))
   async googleAuth(@Req() _req: Request) {
     // Initiate Google OAuth
   }
 
   @Get('google/callback')
+  @SkipResponseEnvelope()
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
     const tokens = await this.authService.googleLogin(req);

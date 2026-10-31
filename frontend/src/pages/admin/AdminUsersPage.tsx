@@ -17,6 +17,7 @@ import { formatDate } from "@/utils/format";
 import { useAuthStore } from "@/store/authStore";
 import Pagination from "@/components/common/Pagination";
 import { useSearchParams } from "react-router-dom";
+import { isCanceledRequest } from "@/api/request";
 
 type TabType = "customers" | "staff";
 
@@ -120,34 +121,43 @@ export default function AdminUsersPage() {
     role: "MOD" as "MOD" | "ACCOUNTANT",
   });
 
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await adminApi.getUsers({
-        search: searchTerm || undefined,
-        status: statusFilter,
-        sort: sortBy,
-        role: activeTab === "staff" ? "STAFF" : "CUSTOMER",
-        page,
-        limit,
-      });
-      setAllUsers(res.data || res);
-      setTotal(res.meta?.total ?? (res.data || res).length);
-      setCustomerCount(res.summary?.customers ?? 0);
-      setStaffCount(res.summary?.staff ?? 0);
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || "Lỗi tải danh sách người dùng";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, page, searchTerm, sortBy, statusFilter]);
+  const fetchUsers = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await adminApi.getUsers(
+          {
+            search: searchTerm || undefined,
+            status: statusFilter,
+            sort: sortBy,
+            role: activeTab === "staff" ? "STAFF" : "CUSTOMER",
+            page,
+            limit,
+          },
+          signal,
+        );
+        setAllUsers(res.data || res);
+        setTotal(res.meta?.total ?? (res.data || res).length);
+        setCustomerCount(res.summary?.customers ?? 0);
+        setStaffCount(res.summary?.staff ?? 0);
+      } catch (err: any) {
+        if (isCanceledRequest(err)) return;
+        const msg =
+          err?.response?.data?.message || "Lỗi tải danh sách người dùng";
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [activeTab, page, searchTerm, sortBy, statusFilter],
+  );
 
   useEffect(() => {
-    void fetchUsers();
+    const controller = new AbortController();
+    void fetchUsers(controller.signal);
+    return () => controller.abort();
   }, [fetchUsers]);
   useEffect(() => {
     setSearchInput(searchTerm);
@@ -355,7 +365,7 @@ export default function AdminUsersPage() {
           <div className="p-12 text-center">
             <p className="text-danger mb-4 font-medium">{error}</p>
             <button
-              onClick={fetchUsers}
+              onClick={() => void fetchUsers()}
               className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
             >
               Thử lại

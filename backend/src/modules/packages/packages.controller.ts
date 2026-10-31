@@ -8,6 +8,7 @@ import { AuthUser } from '../../common/security/auth-user.interface';
 import { Roles } from '../../common/security/roles.decorator';
 import { PhoneVerifiedGuard } from '../../common/security/phone-verified.guard';
 import { BuyPackageDto, CreatePackageDto, UpdatePackageDto } from './dto/package.dto';
+import { PublicCache } from '../../common/http/response-envelope.decorator';
 
 @ApiTags('Financial & Packages')
 @Controller('packages')
@@ -15,6 +16,7 @@ export class PackagesController {
   constructor(private readonly packagesService: PackagesService) {}
 
   @Get()
+  @PublicCache(120)
   getActivePackages() {
     return this.packagesService.getActivePackages();
   }

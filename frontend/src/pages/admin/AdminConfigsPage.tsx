@@ -3,6 +3,7 @@ import { adminApi } from '@/api/admin.api'
 import { Settings, Save, Edit2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDateTime } from '@/utils/format'
+import { asCollection } from '@/api/request'
 
 interface Config {
   config_key: string
@@ -32,7 +33,7 @@ export default function AdminConfigsPage() {
     setLoading(true)
     try {
       const res = await adminApi.getConfigs()
-      setConfigs(res.data || [])
+      setConfigs(asCollection<Config>(res))
     } catch (error) {
       toast.error('Lỗi khi tải cấu hình hệ thống')
     } finally {

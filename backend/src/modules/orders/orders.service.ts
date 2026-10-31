@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { createPaginationMeta } from '../../common/dto/pagination-response.dto';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { AuthUser } from '../../common/security/auth-user.interface';
 
@@ -52,7 +53,7 @@ export class OrdersService {
     ]);
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       data: toJsonSafe(
         orders.map((order) => ({
           id: order.order_id,

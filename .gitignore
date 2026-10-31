@@ -17,6 +17,8 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+frontend/test-results/
+frontend/playwright-report/
 
 # Gemini / AI agent
 .gemini/

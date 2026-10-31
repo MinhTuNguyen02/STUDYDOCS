@@ -4,6 +4,7 @@ import MainLayout from '@/components/layout/MainLayout'
 import AdminLayout from '@/components/layout/AdminLayout'
 import AdminRoute from '@/components/guards/AdminRoute'
 import RequireRole from '@/components/guards/RequireRole'
+import GuestRoute from '@/components/guards/GuestRoute'
 
 // ── Auth Pages ──
 import { lazy, Suspense, useEffect, useState } from 'react'
@@ -72,18 +73,22 @@ function App() {
   const [authReady, setAuthReady] = useState(!user || Boolean(accessToken))
 
   useEffect(() => {
-    if (!user || accessToken) return
+    if (!user || accessToken) {
+      setAuthReady(true)
+      return
+    }
 
     let active = true
     authApi.refresh()
       .then((session) => {
+        login({ accessToken: session.accessToken, user: session.user || user })
         if (active) {
-          login({ accessToken: session.accessToken, user: session.user })
           setAuthReady(true)
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (active) {
+          console.warn('Khôi phục phiên đăng nhập thất bại:', err)
           logout()
           setAuthReady(true)
         }
@@ -92,11 +97,11 @@ function App() {
   }, [accessToken, login, logout, user])
 
   useEffect(() => {
-    if (user) {
+    if (user && accessToken) {
       useWishlistStore.getState().fetchWishlist()
       useNotificationStore.getState().fetchInitial()
     }
-  }, [user])
+  }, [user, accessToken])
 
   useEffect(() => {
     if (user && accessToken) useNotificationStore.getState().connect()
@@ -112,9 +117,9 @@ function App() {
     <Suspense fallback={<div className="min-h-[40vh] grid place-items-center text-muted-foreground" role="status">Đang tải trang...</div>}>
     <Routes>
       {/* ── Public Auth ── */}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+      <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+      <Route path="/reset-password" element={<GuestRoute><ResetPasswordPage /></GuestRoute>} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
 
       {/* ── Protected Auth ── */}

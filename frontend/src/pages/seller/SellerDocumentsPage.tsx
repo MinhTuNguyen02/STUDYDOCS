@@ -5,6 +5,7 @@ import { FileText, Plus, Search, Filter, EyeOff, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { formatBalance, formatDate } from "@/utils/format";
 import SellerLayout from "@/components/layout/SellerLayout";
+import { isCanceledRequest } from "@/api/request";
 
 export default function SellerDocumentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,30 +18,39 @@ export default function SellerDocumentsPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [meta, setMeta] = useState({ page: 1, limit: 10, total: 0 });
 
-  const fetchDocs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await sellerApi.getMyDocuments({
-        status: filter === "ALL" ? undefined : filter,
-        search,
-        page,
-        limit: 10,
-      });
-      setDocuments(res.data || res);
-      if (res.meta) setMeta(res.meta);
-    } catch (err) {
-      const msg =
-        (err as any)?.response?.data?.message ||
-        "Không thể tải danh sách tài liệu";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, page, search]);
+  const fetchDocs = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await sellerApi.getMyDocuments(
+          {
+            status: filter === "ALL" ? undefined : filter,
+            search,
+            page,
+            limit: 10,
+          },
+          signal,
+        );
+        setDocuments(res.data || res);
+        if (res.meta) setMeta(res.meta);
+      } catch (err) {
+        if (isCanceledRequest(err)) return;
+        const msg =
+          (err as any)?.response?.data?.message ||
+          "Không thể tải danh sách tài liệu";
+        setError(msg);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [filter, page, search],
+  );
 
   useEffect(() => {
-    void fetchDocs();
+    const controller = new AbortController();
+    void fetchDocs(controller.signal);
+    return () => controller.abort();
   }, [fetchDocs]);
   useEffect(() => {
     setSearchInput(search);
@@ -189,7 +199,7 @@ export default function SellerDocumentsPage() {
                   <td colSpan={7} className="p-12 text-center">
                     <p className="text-danger mb-4 font-medium">{error}</p>
                     <button
-                      onClick={fetchDocs}
+                      onClick={() => void fetchDocs()}
                       className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       Thử lại

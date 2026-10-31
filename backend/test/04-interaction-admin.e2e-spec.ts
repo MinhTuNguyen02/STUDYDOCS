@@ -66,7 +66,8 @@ describe('PHẦN 4: Reviews, Reports & Admin (e2e)', () => {
     it('✅ Xem reviews của tài liệu (public, có thể trống)', async () => {
       const res = await authGet('/reviews/documents/1', customer.accessToken).expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('❌ Đánh giá tài liệu chưa mua', async () => {
@@ -296,6 +297,58 @@ describe('PHẦN 4: Reviews, Reports & Admin (e2e)', () => {
       await authGet('/admin/approvals/documents?limit=101', adminUser.accessToken).expect(400);
     });
 
+    it('enforces one-way document approval state transitions', async () => {
+      if (!adminUser || !customer.customerId) throw new Error('Missing approval fixture');
+      const prisma = getApp().get(PrismaService);
+      const suffix = Date.now();
+      const category = await prisma.categories.create({
+        data: { name: `State category ${suffix}`, slug: `state-category-${suffix}` }
+      });
+      const createPending = (label: string) =>
+        prisma.documents.create({
+          data: {
+            seller_id: customer.customerId!,
+            category_id: category.category_id,
+            title: `${label} ${suffix}`,
+            slug: `${label.toLowerCase()}-${suffix}`,
+            price: 0,
+            page_count: 1,
+            status: 'PENDING',
+            file_url: `private/${label}-${suffix}.pdf`,
+            file_extension: 'pdf',
+            file_hash: `${label}-${suffix}`.padEnd(64, '0').slice(0, 64)
+          }
+        });
+
+      const approved = await createPending('Approved');
+      await authPatch(
+        `/admin/approvals/documents/${approved.document_id}/approve`,
+        adminUser.accessToken
+      ).expect(200);
+      await authPatch(
+        `/admin/approvals/documents/${approved.document_id}/approve`,
+        adminUser.accessToken
+      ).expect(409);
+      await authPatch(
+        `/admin/approvals/documents/${approved.document_id}/reject`,
+        adminUser.accessToken
+      )
+        .send({ reason: 'Cannot reject an approved document' })
+        .expect(409);
+
+      const rejected = await createPending('Rejected');
+      await authPatch(
+        `/admin/approvals/documents/${rejected.document_id}/reject`,
+        adminUser.accessToken
+      )
+        .send({ reason: 'Rejected by state machine test' })
+        .expect(200);
+      await authPatch(
+        `/admin/approvals/documents/${rejected.document_id}/approve`,
+        adminUser.accessToken
+      ).expect(409);
+    });
+
     it('❌ Approve document không tồn tại', async () => {
       if (!adminUser) return;
       await authPatch('/admin/approvals/documents/999999/approve', adminUser.accessToken).expect(
@@ -425,7 +478,16 @@ describe('PHẦN 4: Reviews, Reports & Admin (e2e)', () => {
         adminUser.accessToken
       ).expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.meta).toEqual(expect.objectContaining({ page: 1, limit: 20 }));
+      expect(typeof res.body.meta.total).toBe('number');
+      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(res.body.summary).toEqual(
+        expect.objectContaining({
+          totalCredit: expect.any(Number),
+          totalDebit: expect.any(Number),
+          netRevenue: expect.any(Number)
+        })
+      );
     });
 
     it('❌ Revenue report thiếu ngày', async () => {
@@ -454,6 +516,30 @@ describe('PHẦN 4: Reviews, Reports & Admin (e2e)', () => {
   });
 
   // ─── ADMIN: RECONCILIATION ────────────────────────────────
+
+  describe('Admin ledger pagination contracts', () => {
+    it('returns the same paginated shape for gateway and tax ledgers', async () => {
+      if (!adminUser) return;
+      for (const endpoint of ['gateway', 'tax']) {
+        const res = await authGet(
+          `/admin/wallets/${endpoint}?startDate=2026-01-01&endDate=2026-12-31&page=1&limit=5`,
+          adminUser.accessToken
+        ).expect(200);
+        expect(res.body.meta).toEqual(expect.objectContaining({ page: 1, limit: 5 }));
+        expect(typeof res.body.meta.total).toBe('number');
+        expect(Array.isArray(res.body.data)).toBe(true);
+        expect(res.body.data.length).toBeLessThanOrEqual(5);
+      }
+    });
+
+    it('rejects an excessive ledger page size', async () => {
+      if (!adminUser) return;
+      await authGet(
+        '/admin/wallets/gateway?startDate=2026-01-01&endDate=2026-12-31&limit=101',
+        adminUser.accessToken
+      ).expect(400);
+    });
+  });
 
   describe('Admin Reconciliation', () => {
     it('✅ Admin xem đối soát', async () => {

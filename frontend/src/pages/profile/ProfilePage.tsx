@@ -10,6 +10,7 @@ import { formatBalance, formatDate } from '@/utils/format'
 import { Link, useSearchParams } from 'react-router-dom'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { isStrongPassword, PASSWORD_REQUIREMENTS } from '@/utils/password'
+import { asCollection } from '@/api/request'
 
 export default function ProfilePage() {
   const { user } = useAuthStore()
@@ -67,8 +68,8 @@ export default function ProfilePage() {
     if (socket) {
       socket.on('wallet_updated', () => {
         // Just refresh wallet and transactions
-        walletsApi.getMyWallets().then(res => setWallets(res?.data || [])).catch(() => { });
-        walletsApi.getTransactions().then(res => setTransactions(res?.data || res || [])).catch(() => { });
+        walletsApi.getMyWallets().then(res => setWallets(asCollection(res))).catch(() => { });
+        walletsApi.getTransactions().then(res => setTransactions(asCollection(res))).catch(() => { });
       })
       return () => {
         socket.off('wallet_updated')
@@ -91,10 +92,10 @@ export default function ProfilePage() {
       setProfile(data || user)
       setFullName(data?.full_name || data?.fullName || user?.fullName || '')
 
-      setWallets(wRes?.data || [])
-      setTransactions(tRes?.data || tRes || [])
-      setWithdrawals(wdRes?.data || wdRes || [])
-      setMyPackages(pkgRes?.data || [])
+      setWallets(asCollection(wRes))
+      setTransactions(asCollection(tRes))
+      setWithdrawals(asCollection(wdRes))
+      setMyPackages(asCollection(pkgRes))
     } catch (err) {
       toast.error('Lỗi tải thông tin cá nhân')
     } finally {

@@ -3,8 +3,10 @@ import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
+import { SkipResponseEnvelope } from '../../common/http/response-envelope.decorator';
 
 @Controller('health')
+@SkipResponseEnvelope()
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,

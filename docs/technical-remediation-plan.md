@@ -89,16 +89,16 @@
 
 - [x] Xóa workflow report trùng trong `ModerationModule`; `ReportsModule` là API duy nhất, moderation chỉ giữ sanction.
 - [x] Body/param/query quan trọng có DTO, enum/độ dài/range và `ParseIntPipe`; pagination bị chặn ở 1..100, date range kiểm tra định dạng lẫn thứ tự. VNPay IPN giữ raw query có chủ đích để xác minh chữ ký.
-- [ ] Chuẩn hóa success/error/pagination response contract.
-- [-] Server-side pagination/filter/search/sort cho list endpoint chính. Documents, orders, seller documents/sales và admin documents/users/audit/approvals/reports/withdrawals đã chạy tại DB; metadata và các ledger report còn cần chiến lược phân trang/cache phù hợp.
-- [-] Payment, package activation/download entitlement và withdrawal đã có atomic claim/transaction/advisory lock; còn lập state-machine test đầy đủ cho document/report/order.
+- [x] Chuẩn hóa success/error/pagination response contract. Global interceptor trả `{ success: true, data, meta? }`, global filter trả `{ success: false, ... }`; Swagger tự bọc schema 2xx và các callback/redirect/health ngoại lệ được đánh dấu bỏ envelope.
+- [x] Server-side pagination/filter/search/sort cho list endpoint chính. Documents, orders, seller documents/sales, admin documents/users/audit/approvals/reports/withdrawals và revenue/gateway/tax ledger đều chạy tại DB; metadata công khai nhỏ dùng cache/ETag.
+- [x] Payment, package activation/download entitlement, withdrawal và document moderation có atomic claim/transaction/conditional transition; E2E bao phủ repeated/reverse transition và concurrent/replay chính.
 - [x] Payment webhook/callback có signature validation, claim trạng thái atomically, idempotency và replay protection.
 - [x] Checkout/package/download có idempotency/transaction/conditional update; migration bảo đảm một package ACTIVE. Concurrent/replay test xác nhận package chỉ trừ tiền một lần và hai download đồng thời cùng tài liệu chỉ tiêu thụ một lượt/cộng counter một lần.
 - [-] Download counter cập nhật atomically cùng entitlement; view counter có throttle và local dedupe nhưng còn cần chiến lược dedupe server-side theo account/IP/time-window.
 - [x] Report mở, wishlist và review có unique rule; download history ghi đúng một record cho mỗi entitlement consumption hợp lệ.
 - [-] Notification trực tiếp có retry và không làm hỏng request nghiệp vụ; còn thiếu outbox/queue để bảo đảm giao hàng bền vững khi process chết.
 - [ ] Xóa business logic duplicate và logic nằm sai controller/UI.
-- [ ] Chuẩn hóa HTTP status code và mapping exception.
+- [-] Chuẩn hóa HTTP status code và mapping exception. Global filter đã map Prisma unique/FK/not-found/deadlock sang 409/404 với message an toàn; còn rà soát semantic status cho từng endpoint nghiệp vụ.
 
 ## 6. Database — P1
 
@@ -110,8 +110,8 @@
 - [x] Index cho order item `document_id/status`, `seller_id/status/created_at`.
 - [x] Index cho user package `customer_id/status/expires_at`.
 - [x] Index cho report `status/created_at`, `customer_id/document_id`.
-- [ ] `onDelete` được chọn có chủ đích: transaction/audit RESTRICT; relation phụ có thể CASCADE.
-- [ ] Nullable/default/timestamp được chuẩn hóa và `updated_at` cập nhật đúng.
+- [-] `onDelete` được chọn có chủ đích: session/notification/junction/cart/wishlist dùng CASCADE, liên kết staff tùy chọn dùng SET NULL, transaction/audit/history bắt buộc giữ RESTRICT/NO ACTION. Migration và drift check đã pass trên PostgreSQL 16 cô lập; còn smoke test trên staging có bản sao dữ liệu thật.
+- [-] Nullable/default/timestamp được chuẩn hóa và `updated_at` cập nhật đúng. Migration có backfill timestamp null trước khi đặt NOT NULL và đã pass DB rỗng; còn audit dữ liệu legacy trên staging có bản sao dữ liệu thật.
 - [x] Có job cleanup session, notification, OTP và reset token hết hạn.
 
 ## 7. Frontend/UX/accessibility — P1/P2
@@ -121,14 +121,14 @@
 - [x] Mỗi page có loading/skeleton, empty, error+retry và success state. AdminReportsPage, DocumentsListPage, SellerSalesPage, SellerDocumentsPage, WishlistPage, OrdersPage, OrderDetailPage, LibraryPage, DocumentDetailPage, AdminDocumentsPage, AdminWithdrawalsPage, AdminUsersPage, AdminApprovalsPage, PolicyPage đã hoàn thiện.
 - [x] Không còn silent catch làm lỗi trông giống empty state. Tất cả các trang đã có state `error` rõ ràng, hiển thị thông báo lỗi và nút "Thử lại".
 - [x] Filter/search/sort/page được lưu vào URL cho refresh/back/deep-link ở documents, orders, seller documents/sales, admin documents/users/audit/approvals/reports/withdrawals và các báo cáo tài chính revenue/gateway/tax.
-- [ ] Form validation hiển thị lỗi theo field và khớp backend.
-- [ ] Double-submit bị chặn; action nguy hiểm có confirmation dialog thống nhất.
-- [ ] Toast/notification có feedback success/failure rõ ràng.
-- [-] Modal có focus trap, Escape, restore focus và accessible label. Phone verification đã hoàn thiện; các modal khác còn phải chuẩn hóa.
+- [-] Form validation hiển thị lỗi theo field và khớp backend. Backend trả `details[{field,messages}]`; login/register/forgot/reset đã ánh xạ field error + `aria-invalid`; còn chuẩn hóa các form profile/admin/seller.
+- [-] Double-submit bị chặn; action nguy hiểm có confirmation dialog thống nhất. Shared accessible confirm đã thay toàn bộ `window.confirm` ở cart/document/package; còn rà soát modal confirm nội bộ và trạng thái submit của mọi form.
+- [-] Toast/notification có feedback success/failure rõ ràng. Các flow chính đã có toast; còn lập ma trận và kiểm tra mọi success/failure action.
+- [-] Modal có focus trap, Escape, restore focus và accessible label. Phone verification, forgot-password, top-up và report đã hoàn thiện; modal page/admin còn phải chuẩn hóa.
 - [ ] Icon button có accessible name; keyboard navigation và `aria-live` hoạt động.
 - [ ] Kiểm tra contrast, heading hierarchy, table và form labels.
-- [ ] Responsive được xác minh ở 360/390/768/1024/1440px.
-- [-] Menu chỉ hiển thị action role có quyền; forbidden không redirect mơ hồ. Guard đã chuẩn hóa; cần browser regression theo từng role.
+- [-] Responsive được tự động kiểm tra ở 360/390/768/1024/1440px. 45 Playwright cases đã pass cho public/auth/role routes/dialog/overflow; còn visual/manual matrix cho toàn bộ page dữ liệu lớn và table phức tạp.
+- [x] Menu chỉ hiển thị action role có quyền; forbidden không redirect mơ hồ. Browser regression xác nhận permission matrix của customer/mod/accountant/admin.
 - [x] Loại bỏ placeholder page/import/dead UI đã xác định trong audit.
 
 ## 8. Performance & reliability — P2
@@ -140,17 +140,17 @@
 - [ ] Chuyển convert PDF/Office sang BullMQ + Redis background job.
 - [ ] Upload trả job ID/progress/retry; Gotenberg có timeout/circuit breaker.
 - [x] Duyệt category không dùng recursive N+1.
-- [ ] Public categories/tags/policies/configs có cache/ETag hợp lý.
+- [x] Public categories/tags/policies/packages có `Cache-Control`, ETag SHA-256 và conditional GET 304; private/admin config không bị public-cache.
 - [x] Chưa thêm search engine ngoài khi chưa có số liệu chứng minh nhu cầu.
-- [-] Search documents/seller/admin users/audit đã debounce và đồng bộ URL; còn bổ sung AbortController/cancel stale request và rà các màn hình admin khác.
+- [x] Search/list documents, seller documents/sales, admin users/audit/approvals/documents và revenue/gateway/tax đã debounce khi cần, đồng bộ URL và hủy request cũ bằng AbortController để tránh stale response.
 - [x] Có liveness và readiness cho DB, Supabase Storage và Gotenberg; Redis chưa tham gia runtime hiện tại.
 
 ## 9. Architecture & maintainability — P1/P2
 
 - [ ] Tách `AdminService` theo dashboard/users/documents/finance/audit.
 - [ ] Tách `CheckoutService`, `AuthService`, `SellerService` theo use case.
-- [ ] Tách các React component/page quá lớn, đặc biệt Profile/MainLayout/SellerUpload/AdminDashboard.
-- [ ] Có shared typed API contracts; giảm `any` ở API/store/page.
+- [-] Tách các React component/page quá lớn, đặc biệt Profile/MainLayout/SellerUpload/AdminDashboard. Đã tách hook query báo cáo tài chính, request/envelope helper, accessible-dialog hook và metadata/cart/wallet orchestration khỏi MainLayout; Profile/SellerUpload/AdminDashboard còn cần tách tiếp.
+- [-] Có shared typed API contracts; giảm `any` ở API/store/page. Đã có contract pagination/financial, typed collection/envelope helper và loại `any` khỏi MainLayout; các API/store/page legacy còn cần tiếp tục chuẩn hóa.
 - [ ] Chuẩn hóa naming/casing DTO và response field.
 - [ ] Loại hard-coded timeout, fee, threshold, URL và status string.
 - [x] Xóa dependency không dùng/duplicate: 2FA, MinIO, Facebook Passport, `uuid`, `sharp`.
@@ -181,11 +181,11 @@
 - [x] ESLint frontend hiểu TypeScript/TSX và chạy không parsing error (còn warning debt được theo dõi).
 - [x] Backend có lint config/script hoạt động.
 - [x] Có script `typecheck` riêng cho FE và BE.
-- [-] Unit test cho auth, entitlement, status transition, moderation và storage pipeline. Đã có unit test env validation (src/config/env.validation.spec.ts) và moderation sanction evaluation (src/modules/moderation/penalty.service.spec.ts) pass 100%.
+- [x] Unit test cô lập cho auth, entitlement, status transition, moderation, storage upload/rollback, response envelope/cache và Swagger; đạt 19/19.
 - [-] Prisma được kiểm thử qua E2E trên PostgreSQL test cô lập bắt buộc; còn tách suite integration cấp repository/service riêng.
-- [x] API E2E cho customer/mod/accountant/admin và negative authorization; toàn bộ 4 suite đạt 121/121.
-- [ ] Playwright E2E cho route public/private, form/modal và responsive.
-- [ ] Test đủ loading/empty/error/success/401/403/404/409/422/429.
+- [x] API E2E cho customer/mod/accountant/admin, negative authorization, financial pagination và document state-machine; toàn bộ 4 suite đạt 124/124.
+- [-] Playwright E2E cho route public/private, form/modal, permission matrix và responsive. 45/45 case pass ở 360/390/768/1024/1440 cho customer/mod/accountant/admin; còn bổ sung nghiệp vụ có backend thật như moderation, checkout và download.
+- [-] Test đủ loading/empty/error/success/401/403/404/409/422/429. API đã bao phủ phần lớn status và browser đã có redirect/404/modal; còn browser state matrix và các case 422/429 chuyên biệt.
 - [-] Migration smoke test trên DB rỗng và DB có dữ liệu mẫu. DB rỗng PostgreSQL 16 + drift check đã pass; DB có dữ liệu mẫu chưa chạy.
 - [x] CI chạy install, Prisma validate/generate, migration deploy/seed trên PostgreSQL service, lint, typecheck, unit test, toàn bộ API E2E, build và bundle budget.
 - [x] Dependency/security scan mức Critical chạy trong CI; upgrade major vẫn tách nhánh và chỉ merge sau compatibility test.
@@ -193,18 +193,22 @@
 
 ## 12. Production release gate
 
-- [x] Frontend/backend build, lint sạch (0 error, 0 warning), typecheck, 7/7 unit test và 121/121 API E2E đều pass.
+- [x] Frontend/backend build, lint sạch (0 error, 0 warning), typecheck, 19/19 unit test, 124/124 API E2E, 45/45 Playwright và bundle budget đều pass.
 - [x] Không còn mock/placeholder security behavior trong production; mock phone OTP bị cấm bởi env validation.
 - [x] Không còn reference 2FA/fine/hold/dispute/refund ngoài migration archival có chú thích.
 - [ ] Migration staging pass, có backup và rollback/runbook.
-- [ ] Browser regression pass trên desktop/mobile cho mọi role.
+- [-] Browser regression pass 45/45 trên 5 viewport cho mọi role; còn các flow nghiệp vụ kết nối backend thật trước production.
 - [-] Security negative/authorization test và upload giả MIME/magic-byte đã pass; còn file quá lớn, decompression bomb/malware và conversion-timeout test trong môi trường staging.
 - [-] Performance budget pass; health/readiness đã triển khai nhưng cần probe trong môi trường staging đầy đủ.
-- [-] README, `.env.example` và runbook đã cập nhật; Swagger/response contract còn cần rà soát đồng bộ cuối.
+- [x] README, `.env.example`, runbook và Swagger/success-error response contract đã được đồng bộ ở tầng global.
 - [-] GitNexus index gần nhất có 2.590 nodes/6.431 edges và cycle check pass; re-index hiện tại bị Windows Application Control chặn LadybugDB nên chưa thể xác nhận lại sau commit cuối.
 
 ## Nhật ký triển khai
 
+- 2026-10-03: Chuẩn hóa global response envelope + Swagger, structured field validation, ETag/cache metadata công khai; audit/migrate quan hệ và timestamp trên PostgreSQL 16 cô lập; thêm accessible confirm, sửa frontend unwrap collection và tách MainLayout data hook.
+- 2026-10-03: Mở rộng unit lên 19/19, API E2E 124/124 và Playwright 45/45 ở 360/390/768/1024/1440 cho customer/mod/accountant/admin; lint/typecheck/build/bundle budget pass.
+- 2026-10-02: Chuẩn hóa pagination meta, phân trang ledger revenue/gateway/tax tại DB, mapping Prisma exception, `@updatedAt`, AbortController cho list/report chính, shared typed contracts/hooks và accessible dialog cho forgot-password/top-up/report.
+- 2026-10-02: Bổ sung document state-machine/API pagination E2E và Playwright desktop/mobile baseline; regression đạt 7/7 unit, 124/124 API E2E, 10/10 browser E2E, lint/typecheck/build/bundle budget pass.
 - 2026-09-30: Tạo kế hoạch từ audit; GitNexus index bao phủ 226 file, không phát hiện circular import.
 - 2026-09-30: Loại bỏ 2FA, tiền phạt, hold/dispute/refund; thêm forward migration và hardening auth/upload/checkout.
 - 2026-10-01: Migration smoke trên PostgreSQL 16 pass; `prisma migrate diff` xác nhận không còn schema drift.

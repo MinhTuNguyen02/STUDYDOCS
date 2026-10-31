@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../../common/security/jwt-auth.guard';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
+import { PublicCache } from '../../common/http/response-envelope.decorator';
 
 @ApiTags('Metadata')
 @Controller('categories')
@@ -24,11 +25,13 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
+  @PublicCache(300)
   findAll() {
     return this.categoriesService.findAll();
   }
 
   @Get('hierarchy')
+  @PublicCache(300)
   getHierarchy() {
     return this.categoriesService.getHierarchy();
   }

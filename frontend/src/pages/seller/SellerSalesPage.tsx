@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import SellerLayout from "@/components/layout/SellerLayout";
 import { useSearchParams } from "react-router-dom";
+import { isCanceledRequest } from "@/api/request";
 
 export default function SellerSalesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -25,32 +26,42 @@ export default function SellerSalesPage() {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
 
-  const fetchSales = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await sellerApi.getSalesHistory({
-        status: filter === "ALL" ? undefined : filter,
-        search,
-        page,
-        limit: 10,
-      });
-      setSales(res.data || res);
-      if (res.meta) setMeta(res.meta);
-      if (res.totalEarnings !== undefined) setTotalEarnings(res.totalEarnings);
-      if (res.totalOrders !== undefined) setTotalOrders(res.totalOrders);
-    } catch (err) {
-      const msg =
-        (err as any)?.response?.data?.message ||
-        "Không thể tải lịch sử bán hàng";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, page, search]);
+  const fetchSales = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await sellerApi.getSalesHistory(
+          {
+            status: filter === "ALL" ? undefined : filter,
+            search,
+            page,
+            limit: 10,
+          },
+          signal,
+        );
+        setSales(res.data || res);
+        if (res.meta) setMeta(res.meta);
+        if (res.totalEarnings !== undefined)
+          setTotalEarnings(res.totalEarnings);
+        if (res.totalOrders !== undefined) setTotalOrders(res.totalOrders);
+      } catch (err) {
+        if (isCanceledRequest(err)) return;
+        const msg =
+          (err as any)?.response?.data?.message ||
+          "Không thể tải lịch sử bán hàng";
+        setError(msg);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [filter, page, search],
+  );
 
   useEffect(() => {
-    void fetchSales();
+    const controller = new AbortController();
+    void fetchSales(controller.signal);
+    return () => controller.abort();
   }, [fetchSales]);
   useEffect(() => {
     setSearchInput(search);
@@ -172,7 +183,7 @@ export default function SellerSalesPage() {
                   <td colSpan={7} className="p-12 text-center">
                     <p className="text-danger mb-4 font-medium">{error}</p>
                     <button
-                      onClick={fetchSales}
+                      onClick={() => void fetchSales()}
                       className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       Thử lại

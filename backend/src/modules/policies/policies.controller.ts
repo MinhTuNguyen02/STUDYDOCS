@@ -17,6 +17,7 @@ import { Roles } from '../../common/security/roles.decorator';
 import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { IsBoolean, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { PublicCache } from '../../common/http/response-envelope.decorator';
 
 export class CreatePolicyDto {
   @IsString()
@@ -46,6 +47,7 @@ export class PoliciesController {
   constructor(private readonly policiesService: PoliciesService) {}
 
   @Get()
+  @PublicCache(300)
   getListPublic() {
     return this.policiesService.findAll(true);
   }
@@ -58,6 +60,7 @@ export class PoliciesController {
   }
 
   @Get(':slug')
+  @PublicCache(300)
   getDetail(@Param('slug') slug: string) {
     return this.policiesService.findBySlug(slug);
   }

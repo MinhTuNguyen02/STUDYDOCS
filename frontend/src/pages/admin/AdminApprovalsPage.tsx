@@ -15,6 +15,7 @@ import {
 import { formatBalance, formatDate } from "@/utils/format";
 import Pagination from "@/components/common/Pagination";
 import { useSearchParams } from "react-router-dom";
+import { isCanceledRequest } from "@/api/request";
 
 interface PendingDoc {
   id: number;
@@ -51,30 +52,39 @@ export default function AdminApprovalsPage() {
   const [previewDoc, setPreviewDoc] = useState<PendingDoc | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
 
-  const fetchPendingDocuments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await adminApi.getApprovals({
-        search: search || undefined,
-        page,
-        limit,
-      });
-      const data = res.data || res;
-      setDocuments(data);
-      setTotal(res.meta?.total ?? data.length);
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.message || "Lỗi khi tải danh sách kiểm duyệt";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, search]);
+  const fetchPendingDocuments = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await adminApi.getApprovals(
+          {
+            search: search || undefined,
+            page,
+            limit,
+          },
+          signal,
+        );
+        const data = res.data || res;
+        setDocuments(data);
+        setTotal(res.meta?.total ?? data.length);
+      } catch (err: any) {
+        if (isCanceledRequest(err)) return;
+        const msg =
+          err?.response?.data?.message || "Lỗi khi tải danh sách kiểm duyệt";
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [page, search],
+  );
 
   useEffect(() => {
-    void fetchPendingDocuments();
+    const controller = new AbortController();
+    void fetchPendingDocuments(controller.signal);
+    return () => controller.abort();
   }, [fetchPendingDocuments]);
   useEffect(() => {
     setSearchInput(search);
@@ -220,7 +230,7 @@ export default function AdminApprovalsPage() {
             <div className="p-12 text-center">
               <p className="text-danger mb-4 font-medium">{error}</p>
               <button
-                onClick={fetchPendingDocuments}
+                onClick={() => void fetchPendingDocuments()}
                 className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Thử lại

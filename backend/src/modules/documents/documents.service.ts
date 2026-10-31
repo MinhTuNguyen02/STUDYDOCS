@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { createPaginationMeta } from '../../common/dto/pagination-response.dto';
 import { DocumentSearchDto } from './dto/document-search.dto';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { Prisma } from '@prisma/client';
@@ -65,7 +66,7 @@ export class DocumentsService {
     ]);
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       data: toJsonSafe(
         documents.map((doc) => ({
           id: doc.document_id,

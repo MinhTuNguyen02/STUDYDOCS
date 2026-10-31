@@ -10,6 +10,7 @@ import { CheckoutService } from './checkout.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { PaymentWebhookDto } from './dto/payment-webhook.dto';
 import { CreateTopupDto } from './dto/create-topup.dto';
+import { SkipResponseEnvelope } from '../../common/http/response-envelope.decorator';
 
 @ApiTags('Shop & Order')
 @Controller('checkout')
@@ -48,6 +49,7 @@ export class CheckoutController {
   }
 
   @Get('vnpay-ipn')
+  @SkipResponseEnvelope()
   vnpayIpn(@Query() query: Record<string, string>) {
     return this.checkoutService.vnpayIpn(query);
   }

@@ -10,6 +10,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { LedgerService } from '../wallets/ledger.service';
 import { StorageService } from '../storage/storage.service';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
+import { createPaginationMeta } from '../../common/dto/pagination-response.dto';
 import { RejectDocumentDto } from './dto/reject-document.dto';
 import { CreateStaffAccountDto } from './dto/admin-actions.dto';
 import { Prisma } from '@prisma/client';
@@ -21,6 +22,8 @@ import {
   AdminUserQueryDto,
   AuditLogQueryDto,
   PendingDocumentQueryDto,
+  LedgerReportQueryDto,
+  RequiredLedgerReportQueryDto,
   WithdrawalListQueryDto
 } from './dto/admin-query.dto';
 
@@ -32,7 +35,7 @@ export class AdminService {
     private readonly storageService: StorageService,
     private readonly ledger: LedgerService,
     private readonly notifications: NotificationsService
-  ) {}
+  ) { }
 
   private formatFileSize(bytes: number) {
     return `${(Number(bytes) / (1024 * 1024)).toFixed(1)} MB`;
@@ -392,14 +395,14 @@ export class AdminService {
       status: 'PENDING',
       OR: query.search
         ? [
-            { title: { contains: query.search, mode: 'insensitive' } },
-            {
-              customer_profiles: {
-                full_name: { contains: query.search, mode: 'insensitive' }
-              }
-            },
-            { categories: { name: { contains: query.search, mode: 'insensitive' } } }
-          ]
+          { title: { contains: query.search, mode: 'insensitive' } },
+          {
+            customer_profiles: {
+              full_name: { contains: query.search, mode: 'insensitive' }
+            }
+          },
+          { categories: { name: { contains: query.search, mode: 'insensitive' } } }
+        ]
         : undefined
     };
     const [total, docs] = await Promise.all([
@@ -452,7 +455,7 @@ export class AdminService {
       })
     );
 
-    return { meta: { page, limit, total }, data: toJsonSafe(mapped) };
+    return { meta: createPaginationMeta(page, limit, total), data: toJsonSafe(mapped) };
   }
 
   /**
@@ -465,7 +468,11 @@ export class AdminService {
     if (!doc) throw new NotFoundException('Không tìm thấy tài liệu.');
     if (!doc.file_url) throw new NotFoundException('Tài liệu chưa có file được lưu.');
 
-    const reviewUrl = await this.storageService.getPresignedUrl(doc.file_url, 600);
+    const targetKey = doc.review_url || doc.file_url;
+    if (!targetKey) throw new NotFoundException('Tài liệu chưa có file được lưu.');
+
+    const reviewUrl = await this.storageService.getPresignedUrl(targetKey, 600);
+
 
     // Audit log
     await this.prisma.audit_logs.create({
@@ -649,14 +656,14 @@ export class AdminService {
       category_id: categoryIds ? { in: categoryIds } : undefined,
       OR: filters.search
         ? [
-            { title: { contains: filters.search, mode: 'insensitive' } },
-            { slug: { contains: filters.search, mode: 'insensitive' } },
-            {
-              customer_profiles: {
-                full_name: { contains: filters.search, mode: 'insensitive' }
-              }
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { slug: { contains: filters.search, mode: 'insensitive' } },
+          {
+            customer_profiles: {
+              full_name: { contains: filters.search, mode: 'insensitive' }
             }
-          ]
+          }
+        ]
         : undefined
     };
 
@@ -678,7 +685,7 @@ export class AdminService {
     ]);
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       data: toJsonSafe(
         docs.map((doc) => ({
           id: doc.document_id,
@@ -787,7 +794,7 @@ export class AdminService {
         orderBy: [{ created_at: 'desc' }, { request_id: 'desc' }]
       })
     ]);
-    return { meta: { page, limit, total }, data: toJsonSafe(reqs) };
+    return { meta: createPaginationMeta(page, limit, total), data: toJsonSafe(reqs) };
   }
 
   async getUsers(query: AdminUserQueryDto, actor: AuthUser) {
@@ -802,18 +809,18 @@ export class AdminService {
       status: query.status && query.status !== 'ALL' ? query.status : undefined,
       OR: query.search
         ? [
-            { email: { contains: query.search, mode: 'insensitive' } },
-            {
-              customer_profiles: {
-                is: { full_name: { contains: query.search, mode: 'insensitive' } }
-              }
-            },
-            {
-              staff_profiles: {
-                is: { full_name: { contains: query.search, mode: 'insensitive' } }
-              }
+          { email: { contains: query.search, mode: 'insensitive' } },
+          {
+            customer_profiles: {
+              is: { full_name: { contains: query.search, mode: 'insensitive' } }
             }
-          ]
+          },
+          {
+            staff_profiles: {
+              is: { full_name: { contains: query.search, mode: 'insensitive' } }
+            }
+          }
+        ]
         : undefined
     };
     const where: Prisma.accountsWhereInput = {
@@ -872,7 +879,7 @@ export class AdminService {
     );
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       summary: { customers: customerCount, staff: isAdmin ? staffCount : 0 },
       data: toJsonSafe(
         users.map((user) => {
@@ -1102,88 +1109,152 @@ export class AdminService {
         }
       })
     ]);
-    return { meta: { page, limit, total }, data: logs };
+    return { meta: createPaginationMeta(page, limit, total), data: logs };
   }
 
-  async exportRevenueReport(startDate: string, endDate: string) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+  async exportRevenueReport(query: RequiredLedgerReportQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const start = new Date(`${query.startDate}T00:00:00+07:00`);
+    const end = new Date(`${query.endDate}T23:59:59.999+07:00`);
 
     const systemRevenueWallet = await this.prisma.wallets.findFirst({
       where: { wallet_type: 'SYSTEM_REVENUE' }
     });
 
-    if (!systemRevenueWallet) return [];
+    if (!systemRevenueWallet) {
+      return {
+        meta: createPaginationMeta(page, limit, 0),
+        summary: { totalCredit: 0, totalDebit: 0, netRevenue: 0 },
+        data: []
+      };
+    }
 
-    return this.prisma.ledger_entries.findMany({
-      where: {
-        wallet_id: systemRevenueWallet.wallet_id,
-        created_at: { gte: start, lte: end }
-      },
-      include: { ledger_transactions: true },
-      orderBy: { created_at: 'asc' }
+    const where: Prisma.ledger_entriesWhereInput = {
+      wallet_id: systemRevenueWallet.wallet_id,
+      created_at: { gte: start, lte: end }
+    };
+    const [total, amounts, entries] = await Promise.all([
+      this.prisma.ledger_entries.count({ where }),
+      this.prisma.ledger_entries.aggregate({
+        where,
+        _sum: { credit_amount: true, debit_amount: true }
+      }),
+      this.prisma.ledger_entries.findMany({
+        where,
+        include: { ledger_transactions: true },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit
+      })
+    ]);
+    const totalCredit = Number(amounts._sum.credit_amount ?? 0);
+    const totalDebit = Number(amounts._sum.debit_amount ?? 0);
+    return toJsonSafe({
+      meta: createPaginationMeta(page, limit, total),
+      summary: { totalCredit, totalDebit, netRevenue: totalCredit - totalDebit },
+      data: entries
     });
   }
 
-  async getGatewayWalletReport(startDate: string, endDate: string) {
-    const start = new Date(new Date(startDate + 'T00:00:00+07:00').getTime());
-    const end = new Date(new Date(endDate + 'T23:59:59+07:00').getTime());
+  async getGatewayWalletReport(
+    query: LedgerReportQueryDto & { startDate: string; endDate: string }
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const start = new Date(`${query.startDate}T00:00:00+07:00`);
+    const end = new Date(`${query.endDate}T23:59:59.999+07:00`);
 
     const gatewayWallet = await this.prisma.wallets.findFirst({
       where: { wallet_type: 'GATEWAY_POOL' }
     });
 
-    if (!gatewayWallet) return { wallet: null, entries: [], summary: null };
+    if (!gatewayWallet) {
+      return {
+        wallet: null,
+        meta: createPaginationMeta(page, limit, 0),
+        data: [],
+        summary: null
+      };
+    }
 
-    const entries = await this.prisma.ledger_entries.findMany({
-      where: {
-        wallet_id: gatewayWallet.wallet_id,
-        created_at: { gte: start, lte: end }
-      },
-      include: { ledger_transactions: true },
-      orderBy: { created_at: 'desc' }
-    });
+    const where: Prisma.ledger_entriesWhereInput = {
+      wallet_id: gatewayWallet.wallet_id,
+      created_at: { gte: start, lte: end }
+    };
+    const [total, amounts, entries] = await Promise.all([
+      this.prisma.ledger_entries.count({ where }),
+      this.prisma.ledger_entries.aggregate({
+        where,
+        _sum: { debit_amount: true, credit_amount: true }
+      }),
+      this.prisma.ledger_entries.findMany({
+        where,
+        include: { ledger_transactions: true },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit
+      })
+    ]);
 
-    // GATEWAY_POOL is an Asset account: DEBIT = increase (In), CREDIT = decrease (Out)
-    const totalIn = entries.reduce((sum, e) => sum + Number(e.debit_amount), 0);
-    const totalOut = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
+    const totalIn = Number(amounts._sum.debit_amount ?? 0);
+    const totalOut = Number(amounts._sum.credit_amount ?? 0);
 
     return toJsonSafe({
       wallet: {
         wallet_id: gatewayWallet.wallet_id,
         balance: gatewayWallet.balance
       },
-      summary: { totalIn, totalOut, netFlow: totalIn - totalOut, entryCount: entries.length },
-      entries
+      meta: createPaginationMeta(page, limit, total),
+      summary: { totalIn, totalOut, netFlow: totalIn - totalOut, entryCount: total },
+      data: entries
     });
   }
 
-  async getTaxWalletReport(startDate: string, endDate: string) {
-    const start = new Date(new Date(startDate + 'T00:00:00+07:00').getTime());
-    const end = new Date(new Date(endDate + 'T23:59:59+07:00').getTime());
+  async getTaxWalletReport(query: LedgerReportQueryDto & { startDate: string; endDate: string }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const start = new Date(`${query.startDate}T00:00:00+07:00`);
+    const end = new Date(`${query.endDate}T23:59:59.999+07:00`);
 
     const taxWallet = await this.prisma.wallets.findFirst({
       where: { wallet_type: 'TAX_PAYABLE' }
     });
 
-    if (!taxWallet) return { wallet: null, entries: [], summary: null };
+    if (!taxWallet) {
+      return {
+        wallet: null,
+        meta: createPaginationMeta(page, limit, 0),
+        data: [],
+        summary: null
+      };
+    }
 
-    const entries = await this.prisma.ledger_entries.findMany({
-      where: {
-        wallet_id: taxWallet.wallet_id,
-        created_at: { gte: start, lte: end }
-      },
-      include: { ledger_transactions: true },
-      orderBy: { created_at: 'desc' }
-    });
+    const where: Prisma.ledger_entriesWhereInput = {
+      wallet_id: taxWallet.wallet_id,
+      created_at: { gte: start, lte: end }
+    };
+    const [total, collected, paid, entries] = await Promise.all([
+      this.prisma.ledger_entries.count({ where }),
+      this.prisma.ledger_entries.aggregate({ where, _sum: { credit_amount: true } }),
+      this.prisma.ledger_entries.aggregate({
+        where: {
+          ...where,
+          ledger_transactions: { reference_type: 'TAX_PAYMENT' }
+        },
+        _sum: { debit_amount: true }
+      }),
+      this.prisma.ledger_entries.findMany({
+        where,
+        include: { ledger_transactions: true },
+        orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit
+      })
+    ]);
 
-    // TAX_PAYABLE is a liability account: CREDIT increases tax payable; DEBIT records tax payment.
-    const totalCollected = entries.reduce((sum, e) => sum + Number(e.credit_amount), 0);
-
-    const totalPaid = entries
-      .filter((e) => e.ledger_transactions.reference_type === 'TAX_PAYMENT')
-      .reduce((sum, e) => sum + Number(e.debit_amount), 0);
+    const totalCollected = Number(collected._sum.credit_amount ?? 0);
+    const totalPaid = Number(paid._sum.debit_amount ?? 0);
 
     // Tính tổng tiền thuế từ các giao dịch rút tiền đã thành công (PAID) từ trước tới nay
     const paidTaxAggregate = await this.prisma.withdrawal_requests.aggregate({
@@ -1193,13 +1264,14 @@ export class AdminService {
     const totalTaxFromPaid = Number(paidTaxAggregate._sum.tax_amount || 0);
 
     // Tính tổng tiền thuế đã thực tế nộp cho Nhà nước (TAX_PAYMENT) từ trước tới nay
-    const paidEntries = await this.prisma.ledger_entries.findMany({
+    const paidEntries = await this.prisma.ledger_entries.aggregate({
       where: {
         wallet_id: taxWallet.wallet_id,
         ledger_transactions: { reference_type: 'TAX_PAYMENT' }
-      }
+      },
+      _sum: { debit_amount: true }
     });
-    const totalTaxAlreadyPaid = paidEntries.reduce((sum, e) => sum + Number(e.debit_amount), 0);
+    const totalTaxAlreadyPaid = Number(paidEntries._sum.debit_amount ?? 0);
 
     const availableTaxToPay = Math.max(0, totalTaxFromPaid - totalTaxAlreadyPaid);
 
@@ -1212,10 +1284,11 @@ export class AdminService {
         totalCollected,
         totalPaid,
         netFlow: totalCollected - totalPaid,
-        entryCount: entries.length,
+        entryCount: total,
         availableTaxToPay
       },
-      entries
+      meta: createPaginationMeta(page, limit, total),
+      data: entries
     });
   }
 

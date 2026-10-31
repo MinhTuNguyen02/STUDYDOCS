@@ -7,10 +7,14 @@ ALTER TABLE "accounts"
   DROP COLUMN IF EXISTS "is_two_factor_enabled";
 
 DO $$
+DECLARE
+  has_data boolean;
 BEGIN
-  IF to_regclass('public.disputes') IS NOT NULL
-     AND EXISTS (SELECT 1 FROM "disputes" LIMIT 1) THEN
-    RAISE EXCEPTION 'disputes contains legacy data; archive it before running this migration';
+  IF to_regclass('public.disputes') IS NOT NULL THEN
+    EXECUTE 'SELECT EXISTS (SELECT 1 FROM "disputes" LIMIT 1)' INTO has_data;
+    IF has_data THEN
+      RAISE EXCEPTION 'disputes contains legacy data; archive it before running this migration';
+    END IF;
   END IF;
 END $$;
 

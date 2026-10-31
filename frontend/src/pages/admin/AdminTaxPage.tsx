@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminApi } from "@/api/admin.api";
-import { formatBalance, formatDateTime, toVNDateString } from "@/utils/format";
+import { formatBalance, formatDateTime } from "@/utils/format";
 import {
   ShieldCheck,
   Download,
@@ -11,84 +11,47 @@ import {
   Calendar,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/common/Pagination";
-import { useSearchParams } from "react-router-dom";
-
-interface LedgerEntry {
-  id: number;
-  wallet_id: number;
-  transaction_id: number;
-  debit_amount: string;
-  credit_amount: string;
-  created_at: string;
-  ledger_transactions: {
-    type: string;
-    reference_type?: string;
-    description?: string;
-    status: string;
-  };
-}
-
-interface TaxReport {
-  wallet: { wallet_id: number; balance: string } | null;
-  summary: {
-    totalCollected: number;
-    totalPaid: number;
-    netFlow: number;
-    entryCount: number;
-    availableTaxToPay: number;
-  } | null;
-  entries: LedgerEntry[];
-}
+import type { LedgerEntry, TaxReport } from "@/api/contracts";
+import { fetchAllPages, isCanceledRequest } from "@/api/request";
+import { useFinancialReportQuery } from "@/hooks/useFinancialReportQuery";
 
 export default function AdminTaxPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { startDate, endDate, requestedPage, updateQuery } =
+    useFinancialReportQuery();
   const [data, setData] = useState<TaxReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const defaultStartDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return toVNDateString(d);
-  })();
-  const startDate = searchParams.get("startDate") || defaultStartDate;
-  const endDate = searchParams.get("endDate") || toVNDateString();
-  const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
-
-  const updateQuery = useCallback(
-    (updates: Record<string, string | number>) => {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        Object.entries(updates).forEach(([key, value]) =>
-          next.set(key, String(value)),
-        );
-        return next;
-      });
-    },
-    [setSearchParams],
-  );
 
   // Pay Tax Modal State
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getTaxWallet({ startDate, endDate });
-      setData(res);
-    } catch {
-      toast.error("Lỗi khi tải dữ liệu tiền Thuế Thu Hộ");
-    } finally {
-      setLoading(false);
-    }
-  }, [endDate, startDate]);
+  const fetchData = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await adminApi.getTaxWallet(
+          { startDate, endDate, page: requestedPage, limit: 20 },
+          signal,
+        );
+        setData(res);
+      } catch (error) {
+        if (!isCanceledRequest(error))
+          toast.error("Lỗi khi tải dữ liệu tiền Thuế Thu Hộ");
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [endDate, requestedPage, startDate],
+  );
 
   useEffect(() => {
-    void fetchData();
+    const controller = new AbortController();
+    void fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
   const handlePayTax = async (e: React.FormEvent) => {
@@ -116,50 +79,60 @@ export default function AdminTaxPage() {
     }
   };
 
-  const { page, totalPages, total, limit, paginatedItems, setPage } =
-    usePagination(data?.entries ?? [], 20, {
-      page: requestedPage,
-      onPageChange: (nextPage) => updateQuery({ page: nextPage }),
-    });
+  const page = data?.meta.page ?? requestedPage;
+  const limit = data?.meta.limit ?? 20;
+  const total = data?.meta.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const setPage = (nextPage: number) => updateQuery({ page: nextPage });
 
-  const handleExportCSV = () => {
-    const entries = data?.entries ?? [];
-    if (!entries.length) {
-      toast.error("Không có dữ liệu để xuất");
-      return;
+  const handleExportCSV = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const entries = await fetchAllPages<LedgerEntry>((page, limit) =>
+        adminApi.getTaxWallet({ startDate, endDate, page, limit }),
+      );
+      if (!entries.length) {
+        toast.error("Không có dữ liệu để xuất");
+        return;
+      }
+
+      const headers = [
+        "Mã Giao Dịch",
+        "Thời Gian",
+        "Loại",
+        "Mô Tả",
+        "Nộp Thuế (Debit)",
+        "Thu Hộ (Credit)",
+      ];
+      const csvContent = [
+        headers.join(","),
+        ...entries.map((e) =>
+          [
+            `TXN-${e.transaction_id}`,
+            formatDateTime(e.created_at),
+            e.ledger_transactions.type,
+            `"${(e.ledger_transactions.description ?? "").replace(/"/g, '""')}"`,
+            Number(e.debit_amount),
+            Number(e.credit_amount),
+          ].join(","),
+        ),
+      ].join("\n");
+
+      const blob = new Blob(["\uFEFF" + csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", `tax_payable_${startDate}_${endDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      toast.error("Không thể xuất CSV, vui lòng thử lại");
+    } finally {
+      setExporting(false);
     }
-
-    const headers = [
-      "Mã Giao Dịch",
-      "Thời Gian",
-      "Loại",
-      "Mô Tả",
-      "Nộp Thuế (Debit)",
-      "Thu Hộ (Credit)",
-    ];
-    const csvContent = [
-      headers.join(","),
-      ...entries.map((e) =>
-        [
-          `TXN-${e.transaction_id}`,
-          formatDateTime(e.created_at),
-          e.ledger_transactions.type,
-          `"${(e.ledger_transactions.description ?? "").replace(/"/g, '""')}"`,
-          Number(e.debit_amount),
-          Number(e.credit_amount),
-        ].join(","),
-      ),
-    ].join("\n");
-
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `tax_payable_${startDate}_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -184,9 +157,12 @@ export default function AdminTaxPage() {
           </button>
           <button
             onClick={handleExportCSV}
-            className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors"
+            disabled={exporting}
+            aria-busy={exporting}
+            className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-60"
           >
-            <Download className="w-4 h-4" /> Xuất CSV
+            <Download className="w-4 h-4" />{" "}
+            {exporting ? "Đang xuất..." : "Xuất CSV"}
           </button>
         </div>
       </div>
@@ -229,7 +205,7 @@ export default function AdminTaxPage() {
           </div>
         </div>
         <button
-          onClick={fetchData}
+          onClick={() => void fetchData()}
           className="btn bg-primary text-white hover:bg-primary-hover px-5 py-2 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm"
         >
           Lọc dữ liệu
@@ -400,7 +376,7 @@ export default function AdminTaxPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {paginatedItems.map((e, idx) => {
+                  {data.data.map((e, idx) => {
                     const de = Number(e.debit_amount);
                     const cr = Number(e.credit_amount);
                     const isCollected = cr > 0;
@@ -436,7 +412,7 @@ export default function AdminTaxPage() {
                         </td>
                         <td
                           className="p-4 text-sm font-medium max-w-[200px] truncate"
-                          title={e.ledger_transactions.description}
+                          title={e.ledger_transactions.description ?? undefined}
                         >
                           {e.ledger_transactions.description || "-"}
                         </td>
@@ -468,7 +444,7 @@ export default function AdminTaxPage() {
                       </tr>
                     );
                   })}
-                  {paginatedItems.length === 0 && (
+                  {data.data.length === 0 && (
                     <tr>
                       <td
                         colSpan={6}

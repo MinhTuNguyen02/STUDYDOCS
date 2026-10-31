@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsIn,
@@ -29,7 +29,11 @@ export class AdminDocumentQueryDto extends PaginationQueryDto {
   status?: string;
 
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === 'ALL' || value === null || value === undefined
+      ? undefined
+      : Number(value)
+  )
   @IsInt()
   @Min(1)
   categoryId?: number;
@@ -106,4 +110,26 @@ export class RequiredDateRangeQueryDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   @IsDateString({ strict: true })
   endDate!: string;
+}
+
+export class RequiredLedgerReportQueryDto extends PaginationQueryDto {
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  startDate!: string;
+
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  endDate!: string;
+}
+
+export class LedgerReportQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  startDate?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
+  endDate?: string;
 }

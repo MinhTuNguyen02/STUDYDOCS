@@ -9,135 +9,116 @@ import {
   TrendingUp,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/common/Pagination";
-import { useSearchParams } from "react-router-dom";
+import type { LedgerEntry, RevenueReport } from "@/api/contracts";
+import { fetchAllPages, isCanceledRequest } from "@/api/request";
+import { useFinancialReportQuery } from "@/hooks/useFinancialReportQuery";
 
 // Chống lỗi missing moment do import
-interface RevenueEntry {
-  entry_id: number;
-  wallet_id: number;
-  transaction_id: number;
-  debit_amount: string;
-  credit_amount: string;
-  created_at: string;
-  ledger_transactions: {
-    transaction_type: string;
-    reference_type: string;
-    description: string;
-  };
-}
-
 export default function AdminRevenuePage() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [data, setData] = useState<RevenueEntry[]>([]);
+  const { startDate, endDate, requestedPage, updateQuery } =
+    useFinancialReportQuery();
+  const [report, setReport] = useState<RevenueReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const defaultStartDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return toVNDateString(d);
-  })();
-  const startDate = searchParams.get("startDate") || defaultStartDate;
-  const endDate = searchParams.get("endDate") || toVNDateString();
-  const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
-
-  const updateQuery = useCallback(
-    (updates: Record<string, string | number>) => {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        Object.entries(updates).forEach(([key, value]) =>
-          next.set(key, String(value)),
+  const fetchRevenue = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await adminApi.getRevenueReport(
+          { startDate, endDate, page: requestedPage, limit: 20 },
+          signal,
         );
-        return next;
-      });
+        setReport(res);
+      } catch (error) {
+        if (!isCanceledRequest(error))
+          toast.error("Lỗi khi tải báo cáo doanh thu");
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
     },
-    [setSearchParams],
+    [endDate, requestedPage, startDate],
   );
-
-  const fetchRevenue = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getRevenueReport({ startDate, endDate });
-      setData(res.data || res);
-    } catch (error) {
-      toast.error("Lỗi khi tải báo cáo doanh thu");
-    } finally {
-      setLoading(false);
-    }
-  }, [endDate, startDate]);
 
   useEffect(() => {
-    void fetchRevenue();
+    const controller = new AbortController();
+    void fetchRevenue(controller.signal);
+    return () => controller.abort();
   }, [fetchRevenue]);
 
-  const handleExportCSV = () => {
-    if (data.length === 0) {
-      toast.error("Không có dữ liệu để xuất");
-      return;
+  const handleExportCSV = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const data = await fetchAllPages<LedgerEntry>((page, limit) =>
+        adminApi.getRevenueReport({ startDate, endDate, page, limit }),
+      );
+      if (data.length === 0) {
+        toast.error("Không có dữ liệu để xuất");
+        return;
+      }
+
+      const headers = [
+        "Mã Giao Dịch",
+        "Thời Gian",
+        "Loại",
+        "Mô Tả",
+        "Thu Nhập (Credit)",
+        "Khấu Trừ (Debit)",
+      ];
+
+      const csvContent = [
+        headers.join(","),
+        ...data.map((item) => {
+          // Xử lý escape dấu ngoặc kép an toàn cho chuẩn CSV
+          const safeDescription = item.ledger_transactions.description
+            ? item.ledger_transactions.description.replace(/"/g, '""')
+            : "";
+
+          return [
+            `TXN-${item.transaction_id}`,
+            new Date(item.created_at)
+              .toISOString()
+              .replace("T", " ")
+              .substring(0, 19),
+            item.ledger_transactions.type,
+            `"${safeDescription}"`, // Bọc chuỗi đã được escape an toàn
+            Number(item.credit_amount),
+            Number(item.debit_amount),
+          ].join(",");
+        }),
+      ].join("\n");
+
+      // Download CSV
+      const blob = new Blob(["\uFEFF" + csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute(
+        "download",
+        `bao_cao_doanh_thu_${toVNDateString().replace(/-/g, "")}.csv`,
+      );
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      toast.error("Không thể xuất CSV, vui lòng thử lại");
+    } finally {
+      setExporting(false);
     }
-
-    const headers = [
-      "Mã Giao Dịch",
-      "Thời Gian",
-      "Loại",
-      "Mô Tả",
-      "Thu Nhập (Credit)",
-      "Khấu Trừ (Debit)",
-    ];
-
-    const csvContent = [
-      headers.join(","),
-      ...data.map((item) => {
-        // Xử lý escape dấu ngoặc kép an toàn cho chuẩn CSV
-        const safeDescription = item.ledger_transactions.description
-          ? item.ledger_transactions.description.replace(/"/g, '""')
-          : "";
-
-        return [
-          `TXN-${item.transaction_id}`,
-          new Date(item.created_at)
-            .toISOString()
-            .replace("T", " ")
-            .substring(0, 19),
-          item.ledger_transactions.transaction_type,
-          `"${safeDescription}"`, // Bọc chuỗi đã được escape an toàn
-          Number(item.credit_amount),
-          Number(item.debit_amount),
-        ].join(",");
-      }),
-    ].join("\n");
-
-    // Download CSV
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute(
-      "download",
-      `bao_cao_doanh_thu_${toVNDateString().replace(/-/g, "")}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
-  const totalCredit = data.reduce(
-    (acc, cur) => acc + Number(cur.credit_amount),
-    0,
-  );
-  const totalDebit = data.reduce(
-    (acc, cur) => acc + Number(cur.debit_amount),
-    0,
-  );
-  const netRevenue = totalCredit - totalDebit;
-
-  const { page, setPage, totalPages, total, limit, paginatedItems } =
-    usePagination(data, 20, {
-      page: requestedPage,
-      onPageChange: (nextPage) => updateQuery({ page: nextPage }),
-    });
+  const data = report?.data ?? [];
+  const totalCredit = report?.summary.totalCredit ?? 0;
+  const totalDebit = report?.summary.totalDebit ?? 0;
+  const netRevenue = report?.summary.netRevenue ?? 0;
+  const page = report?.meta.page ?? requestedPage;
+  const limit = report?.meta.limit ?? 20;
+  const total = report?.meta.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const setPage = (nextPage: number) => updateQuery({ page: nextPage });
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
@@ -150,9 +131,12 @@ export default function AdminRevenuePage() {
         </div>
         <button
           onClick={handleExportCSV}
-          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors"
+          disabled={exporting}
+          aria-busy={exporting}
+          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-60"
         >
-          <Download className="w-4 h-4" /> Xuất CSV
+          <Download className="w-4 h-4" />{" "}
+          {exporting ? "Đang xuất..." : "Xuất CSV"}
         </button>
       </div>
 
@@ -192,7 +176,7 @@ export default function AdminRevenuePage() {
           </div>
         </div>
         <button
-          onClick={fetchRevenue}
+          onClick={() => void fetchRevenue()}
           className="btn bg-primary text-white hover:bg-primary-hover px-5 py-2 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm"
         >
           Lọc dữ liệu
@@ -273,12 +257,12 @@ export default function AdminRevenuePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {paginatedItems.map((item) => {
+                  {data.map((item) => {
                     const cr = Number(item.credit_amount);
                     const de = Number(item.debit_amount);
                     return (
                       <tr
-                        key={item.entry_id}
+                        key={item.id}
                         className="hover:bg-muted/30 transition-colors"
                       >
                         <td className="p-4 text-muted-foreground text-sm whitespace-nowrap">
@@ -290,7 +274,7 @@ export default function AdminRevenuePage() {
                         <td className="p-4">
                           <div className="flex flex-col">
                             <span className="font-semibold text-sm">
-                              {item.ledger_transactions.transaction_type}
+                              {item.ledger_transactions.type}
                             </span>
                             <span className="text-xs text-muted-foreground mt-0.5">
                               {item.ledger_transactions.description}

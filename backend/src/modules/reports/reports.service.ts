@@ -5,6 +5,7 @@ import {
   BadRequestException
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { createPaginationMeta } from '../../common/dto/pagination-response.dto';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { report_status } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -164,6 +165,6 @@ export class ReportsService {
         }
       })
     ]);
-    return { meta: { page, limit, total }, data: reports };
+    return { meta: createPaginationMeta(page, limit, total), data: reports };
   }
 }

@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.2.2",
     "@types/canvas-confetti": "^1.9.0",
     "@types/google.accounts": "^0.0.18",

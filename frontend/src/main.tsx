@@ -5,12 +5,15 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './styles/index.css'
 import AppErrorBoundary from './components/common/AppErrorBoundary'
+import { ConfirmDialogProvider } from './components/common/ConfirmDialogProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AppErrorBoundary>
-        <App />
+        <ConfirmDialogProvider>
+          <App />
+        </ConfirmDialogProvider>
       </AppErrorBoundary>
       <Toaster
         position="top-right"

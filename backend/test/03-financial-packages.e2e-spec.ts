@@ -79,7 +79,8 @@ describe('PHẦN 3: Financial, Packages & Downloads (e2e)', () => {
     it('✅ Xem lịch sử giao dịch (có thể trống)', async () => {
       const res = await authGet('/wallets/transactions/me', customer.accessToken).expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.success).toBe(true);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
   });
 

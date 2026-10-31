@@ -8,6 +8,8 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { ConfiguredIoAdapter } from './common/websocket/configured-io.adapter';
 import { randomUUID } from 'crypto';
 import { NextFunction, Request, Response } from 'express';
+import { applySwaggerResponseEnvelopes } from './common/http/swagger-envelope.util';
+import { validationExceptionFactory } from './common/validation/validation-error.util';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -52,7 +54,8 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true
+      forbidNonWhitelisted: true,
+      exceptionFactory: validationExceptionFactory
     })
   );
 
@@ -64,6 +67,7 @@ async function bootstrap() {
       .addBearerAuth()
       .build();
     const document = SwaggerModule.createDocument(app, swaggerConfig);
+    applySwaggerResponseEnvelopes(document);
     SwaggerModule.setup('api/docs', app, document);
   }
 

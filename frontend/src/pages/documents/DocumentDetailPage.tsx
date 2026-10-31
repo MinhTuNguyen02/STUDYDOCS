@@ -1,203 +1,264 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { documentsApi } from '@/api/documents.api'
-import { reviewsApi } from '@/api/reviews.api'
-import { wishlistApi } from '@/api/cart.api'
-import { useAuthStore } from '@/store/authStore'
-import { useCartStore } from '@/store/cartStore'
-import { useWishlistStore } from '@/store/wishlistStore'
-import { libraryApi } from '@/api/library.api'
-import ReviewForm from '@/components/reviews/ReviewForm'
-import SellerReplyForm from '@/components/reviews/SellerReplyForm'
-import ReportModal from '@/components/common/ReportModal'
-import { formatPrice, formatFileSize, formatDate } from '@/utils/format'
-import { Star, ShoppingCart, Download, ShieldCheck, FileText, CheckCircle2, ChevronRight, CornerDownRight, Tag, AlertTriangle, Heart, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useCallback, useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { documentsApi } from "@/api/documents.api";
+import { reviewsApi } from "@/api/reviews.api";
+import { wishlistApi } from "@/api/cart.api";
+import { useAuthStore } from "@/store/authStore";
+import { useCartStore } from "@/store/cartStore";
+import { useWishlistStore } from "@/store/wishlistStore";
+import { libraryApi } from "@/api/library.api";
+import ReviewForm from "@/components/reviews/ReviewForm";
+import SellerReplyForm from "@/components/reviews/SellerReplyForm";
+import ReportModal from "@/components/common/ReportModal";
+import { formatPrice, formatFileSize, formatDate } from "@/utils/format";
+import {
+  Star,
+  ShoppingCart,
+  Download,
+  ShieldCheck,
+  FileText,
+  CheckCircle2,
+  ChevronRight,
+  CornerDownRight,
+  Tag,
+  AlertTriangle,
+  Heart,
+  Trash2,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { useConfirmDialog } from "@/components/common/confirm-dialog.context";
 
 export default function DocumentDetailPage() {
-  const { id } = useParams()
-  const { user } = useAuthStore()
-  const { addToCart } = useCartStore()
-  const { wishlistIds } = useWishlistStore()
-  const navigate = useNavigate()
+  const { id } = useParams();
+  const { user } = useAuthStore();
+  const { addToCart } = useCartStore();
+  const { wishlistIds } = useWishlistStore();
+  const navigate = useNavigate();
+  const confirm = useConfirmDialog();
 
-  const [doc, setDoc] = useState<any>(null)
-  const [reviews, setReviews] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [addingToCart, setAddingToCart] = useState(false)
-  const [addingToWishlist, setAddingToWishlist] = useState(false)
-  const [isPurchased, setIsPurchased] = useState(false)
-  const [showReportModal, setShowReportModal] = useState(false)
+  const [doc, setDoc] = useState<any>(null);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [addingToWishlist, setAddingToWishlist] = useState(false);
+  const [isPurchased, setIsPurchased] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
-  const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
+  const isStaff = ["admin", "mod", "accountant"].includes(
+    user?.roleNames?.[0]?.toLowerCase() || "",
+  );
 
   const handleDeleteReview = async (reviewId: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này? Dữ liệu không thể khôi phục.')) return;
+    const accepted = await confirm({
+      title: "Xóa đánh giá",
+      message: "Đánh giá sẽ bị xóa và không thể khôi phục.",
+      confirmLabel: "Xóa đánh giá",
+      tone: "danger",
+    });
+    if (!accepted) return;
     try {
       await reviewsApi.deleteReview(reviewId);
-      toast.success('Đã xóa đánh giá');
+      toast.success("Đã xóa đánh giá");
       fetchDocAndReviews();
     } catch (err: any) {
-      toast.error('Lỗi: ' + (err?.response?.data?.message || err.message));
+      toast.error("Lỗi: " + (err?.response?.data?.message || err.message));
     }
-  }
+  };
 
   const handleDeleteReply = async (reviewId: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa phản hồi này?')) return;
+    const accepted = await confirm({
+      title: "Xóa phản hồi",
+      message: "Bạn có chắc chắn muốn xóa phản hồi này?",
+      confirmLabel: "Xóa phản hồi",
+      tone: "danger",
+    });
+    if (!accepted) return;
     try {
       await reviewsApi.deleteReply(reviewId);
-      toast.success('Đã xóa phản hồi');
+      toast.success("Đã xóa phản hồi");
       fetchDocAndReviews();
     } catch (err: any) {
-      toast.error('Lỗi: ' + (err?.response?.data?.message || err.message));
+      toast.error("Lỗi: " + (err?.response?.data?.message || err.message));
     }
-  }
+  };
 
   const fetchDocAndReviews = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
-    setError(null)
+    if (!id) return;
+    setLoading(true);
+    setError(null);
     try {
       const [docRes, revRes] = await Promise.all([
         documentsApi.getDocumentById(id),
-        documentsApi.getReviews(id).catch(() => ({ data: [] }))
-      ])
+        documentsApi.getReviews(id).catch(() => ({ data: [] })),
+      ]);
       const docData = docRes.data || docRes;
-      setDoc(docData)
-      setReviews(revRes.data || revRes || [])
+      setDoc(docData);
+      setReviews(revRes.data || revRes || []);
 
       // Check if purchased uses the backend provided flag
-      setIsPurchased(!!docData.hasPurchased)
+      setIsPurchased(!!docData.hasPurchased);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Lỗi khi tải tài liệu'
-      setError(msg)
-      toast.error(msg)
+      const msg = err?.response?.data?.message || "Lỗi khi tải tài liệu";
+      setError(msg);
+      toast.error(msg);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [id])
+  }, [id]);
 
   useEffect(() => {
-    if (id) void fetchDocAndReviews()
-  }, [fetchDocAndReviews, id, user])
+    if (id) void fetchDocAndReviews();
+  }, [fetchDocAndReviews, id, user]);
 
   useEffect(() => {
     if (id) {
-      const viewedDocs = JSON.parse(localStorage.getItem('viewedDocs') || '[]')
+      const viewedDocs = JSON.parse(localStorage.getItem("viewedDocs") || "[]");
       if (!viewedDocs.includes(id)) {
-        documentsApi.incrementView(id).catch(() => undefined)
-        viewedDocs.push(id)
-        localStorage.setItem('viewedDocs', JSON.stringify(viewedDocs))
+        documentsApi.incrementView(id).catch(() => undefined);
+        viewedDocs.push(id);
+        localStorage.setItem("viewedDocs", JSON.stringify(viewedDocs));
       }
     }
-  }, [id])
+  }, [id]);
 
   const handleDownloadFree = async () => {
-    if (!user) return navigate('/login')
-    const role = user.roleNames?.[0]?.toLowerCase() || '';
-    if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không tải tài liệu');
-    if (isOwner) return toast.error('Bạn là chủ sở hữu, hãy xem file tại mục quản lý')
+    if (!user) return navigate("/login");
+    const role = user.roleNames?.[0]?.toLowerCase() || "";
+    if (["admin", "mod", "accountant"].includes(role))
+      return toast.error("Quản trị viên không tải tài liệu");
+    if (isOwner)
+      return toast.error("Bạn là chủ sở hữu, hãy xem file tại mục quản lý");
 
-    setAddingToCart(true) // Dành riêng cho FE3, FE4 không có thì bỏ dòng này
+    setAddingToCart(true); // Dành riêng cho FE3, FE4 không có thì bỏ dòng này
     try {
-      const res = await libraryApi.requestDownload(Number(id || doc.id))
+      const res = await libraryApi.requestDownload(Number(id || doc.id));
 
       // Chỉ cần check res.downloadUrl, không cần rawUrl hay startsWith('http') nữa
       if (res.downloadUrl) {
-        window.open(res.downloadUrl, '_blank')
-        toast.success(res.message || 'Bắt đầu tải tài liệu')
+        window.open(res.downloadUrl, "_blank");
+        toast.success(res.message || "Bắt đầu tải tài liệu");
       } else {
-        toast.error('Đã xảy ra lỗi, không sinh được link.')
+        toast.error("Đã xảy ra lỗi, không sinh được link.");
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Không thể tải tài liệu này')
+      toast.error(err?.response?.data?.message || "Không thể tải tài liệu này");
     } finally {
-      setAddingToCart?.(false) // Dành riêng cho FE3
+      setAddingToCart?.(false); // Dành riêng cho FE3
     }
-  }
+  };
 
   const handleAddToCart = async () => {
-    if (!user) return navigate('/login')
-    const role = user.roleNames?.[0]?.toLowerCase() || '';
-    if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không mua tài liệu');
-    if (isOwner) return toast.error('Không thể mua tài liệu của chính mình')
+    if (!user) return navigate("/login");
+    const role = user.roleNames?.[0]?.toLowerCase() || "";
+    if (["admin", "mod", "accountant"].includes(role))
+      return toast.error("Quản trị viên không mua tài liệu");
+    if (isOwner) return toast.error("Không thể mua tài liệu của chính mình");
 
-    setAddingToCart(true)
+    setAddingToCart(true);
     try {
-      await addToCart(Number(id))
-      toast.success('Đã thêm vào giỏ hàng')
+      await addToCart(Number(id));
+      toast.success("Đã thêm vào giỏ hàng");
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Không thể thêm vào giỏ')
+      toast.error(err?.response?.data?.message || "Không thể thêm vào giỏ");
     } finally {
-      setAddingToCart(false)
+      setAddingToCart(false);
     }
-  }
+  };
 
   const handleToggleWishlist = async () => {
-    if (!user) return navigate('/login')
-    const role = user.roleNames?.[0]?.toLowerCase() || '';
-    if (['admin', 'mod', 'accountant'].includes(role)) return toast.error('Quản trị viên không dùng chức năng này');
-    setAddingToWishlist(true)
+    if (!user) return navigate("/login");
+    const role = user.roleNames?.[0]?.toLowerCase() || "";
+    if (["admin", "mod", "accountant"].includes(role))
+      return toast.error("Quản trị viên không dùng chức năng này");
+    setAddingToWishlist(true);
     try {
-      await wishlistApi.toggleWishlist(Number(id))
-      toast.success(isWishlisted ? 'Đã bỏ khỏi danh sách yêu thích' : 'Đã cập nhật danh sách yêu thích')
+      await wishlistApi.toggleWishlist(Number(id));
+      toast.success(
+        isWishlisted
+          ? "Đã bỏ khỏi danh sách yêu thích"
+          : "Đã cập nhật danh sách yêu thích",
+      );
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Lỗi khi cập nhật yêu thích')
+      toast.error(err?.response?.data?.message || "Lỗi khi cập nhật yêu thích");
     } finally {
-      setAddingToWishlist(false)
+      setAddingToWishlist(false);
     }
-  }
+  };
 
-  if (loading) return <div className="text-center py-24 text-muted-foreground">Đang tải tài liệu...</div>
+  if (loading)
+    return (
+      <div className="text-center py-24 text-muted-foreground">
+        Đang tải tài liệu...
+      </div>
+    );
 
-  if (error) return (
-    <div className="max-w-4xl mx-auto py-24 px-4 text-center">
-      <p className="text-danger mb-4 font-medium">{error}</p>
-      <button
-        onClick={fetchDocAndReviews}
-        className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
-      >
-        Thử lại
-      </button>
-    </div>
-  )
+  if (error)
+    return (
+      <div className="max-w-4xl mx-auto py-24 px-4 text-center">
+        <p className="text-danger mb-4 font-medium">{error}</p>
+        <button
+          onClick={fetchDocAndReviews}
+          className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg font-medium transition-colors shadow-sm"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
 
-  if (!doc) return <div className="text-center py-24 text-muted-foreground">Không tìm thấy tài liệu</div>
+  if (!doc)
+    return (
+      <div className="text-center py-24 text-muted-foreground">
+        Không tìm thấy tài liệu
+      </div>
+    );
 
-  const isFree = !doc.price || Number(doc.price) === 0
-  const isOwner = user?.customerId && Number(doc.sellerId || doc.seller_id || 0) === Number(user.customerId)
-  const isWishlisted = doc.isWishlisted || wishlistIds.includes(Number(id))
+  const isFree = !doc.price || Number(doc.price) === 0;
+  const isOwner =
+    user?.customerId &&
+    Number(doc.sellerId || doc.seller_id || 0) === Number(user.customerId);
+  const isWishlisted = doc.isWishlisted || wishlistIds.includes(Number(id));
 
-  const ext = doc.file_extension || doc.fileExtension || 'N/A'
-  const rating = doc.rating || 0
-  const reviewCount = reviews.length || doc.reviewCount || doc.reviews?.length || 0
+  const ext = doc.file_extension || doc.fileExtension || "N/A";
+  const rating = doc.rating || 0;
+  const reviewCount =
+    reviews.length || doc.reviewCount || doc.reviews?.length || 0;
 
-  const hasReviewed = !!doc.hasReviewed || reviews.some((r: any) => r.buyer && Number(r.buyer.id) === Number(user?.customerId))
+  const hasReviewed =
+    !!doc.hasReviewed ||
+    reviews.some(
+      (r: any) => r.buyer && Number(r.buyer.id) === Number(user?.customerId),
+    );
 
   return (
     <div className="bg-background text-foreground">
       <div className="max-w-7xl mx-auto py-2">
-
         {/* Breadcrumb */}
         <nav className="flex items-center text-sm text-muted-foreground mb-6 font-medium">
-          <Link to="/" className="hover:text-primary transition-colors">Trang chủ</Link>
+          <Link to="/" className="hover:text-primary transition-colors">
+            Trang chủ
+          </Link>
           <ChevronRight className="w-4 h-4 mx-2" />
-          <Link to="/documents" className="hover:text-primary transition-colors">Tài liệu</Link>
+          <Link
+            to="/documents"
+            className="hover:text-primary transition-colors"
+          >
+            Tài liệu
+          </Link>
           <ChevronRight className="w-4 h-4 mx-2" />
-          <span className="text-foreground line-clamp-1">{doc.categoryName || doc.categories?.name || 'Chuyên mục'}</span>
+          <span className="text-foreground line-clamp-1">
+            {doc.categoryName || doc.categories?.name || "Chuyên mục"}
+          </span>
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
           {/* Main Content (Left) */}
           <div className="lg:col-span-2 space-y-8">
-
             {/* Header info */}
             <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <span className="bg-primary/10 text-primary px-3 py-1 text-sm font-semibold rounded-full uppercase tracking-wide">
-                  {doc.categoryName || doc.categories?.name || 'Tài liệu'}
+                  {doc.categoryName || doc.categories?.name || "Tài liệu"}
                 </span>
                 <span className="bg-orange-100 text-orange-700 px-3 py-1 text-sm font-semibold rounded-full uppercase tracking-wide flex items-center gap-1">
                   <FileText className="w-4 h-4" />
@@ -212,19 +273,32 @@ export default function DocumentDetailPage() {
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className={`w-4 h-4 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${i < Math.floor(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                      />
                     ))}
                   </div>
-                  <span className="font-semibold text-foreground">{rating}</span>
+                  <span className="font-semibold text-foreground">
+                    {rating}
+                  </span>
                   <span>({reviewCount} đánh giá)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-foreground">Người bán:</span>
-                  <span className="text-primary font-semibold">{doc.sellerName || doc.customer_profiles?.full_name || 'Người dùng'}</span>
+                  <span className="font-semibold text-foreground">
+                    Người bán:
+                  </span>
+                  <span className="text-primary font-semibold">
+                    {doc.sellerName ||
+                      doc.customer_profiles?.full_name ||
+                      "Người dùng"}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-success" />
-                  <span className="text-success font-medium">Đã kiểm duyệt</span>
+                  <span className="text-success font-medium">
+                    Đã kiểm duyệt
+                  </span>
                 </div>
                 <div>{doc.downloadCount || 0} lượt tải</div>
                 <div>{doc.viewCount || 0} lượt xem</div>
@@ -232,38 +306,54 @@ export default function DocumentDetailPage() {
 
               {/* Preview Document */}
               <div className="w-full h-[800px] bg-card border border-border rounded-xl flex items-center justify-center mb-8 overflow-hidden shadow-sm">
-                {doc.previewUrl && doc.previewUrl !== 'previews/placeholder.png' ? (
+                {doc.previewUrl &&
+                doc.previewUrl !== "previews/placeholder.png" ? (
                   <object
-                    data={`${import.meta.env.VITE_STORAGE_URL || '/api/storage'}/${doc.previewUrl}#toolbar=0&navpanes=0&view=FitH`}
+                    data={`${import.meta.env.VITE_STORAGE_URL || "/api/storage"}/${doc.previewUrl}#toolbar=0&navpanes=0&view=FitH`}
                     type="application/pdf"
                     className="w-full h-full bg-muted"
                   >
-                    <p className="text-muted-foreground p-4">Trình duyệt không hỗ trợ xem trực tiếp PDF.</p>
+                    <p className="text-muted-foreground p-4">
+                      Trình duyệt không hỗ trợ xem trực tiếp PDF.
+                    </p>
                   </object>
                 ) : (
                   <div className="w-full h-full bg-linear-to-br from-blue-400 to-indigo-600 flex items-center justify-center relative group">
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
                     <FileText className="w-24 h-24 text-white/90 group-hover:scale-110 transition-transform duration-300 relative z-10" />
-                    <div className="absolute font-heading font-black text-white/20 text-9xl z-0 tracking-widest">{ext}</div>
+                    <div className="absolute font-heading font-black text-white/20 text-9xl z-0 tracking-widest">
+                      {ext}
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Description */}
               <div>
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">Mô tả tài liệu</h2>
+                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                  Mô tả tài liệu
+                </h2>
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-line wrap-break-word w-full text-lg">
-                  {doc.description || 'Chưa có mô tả chi tiết cho tài liệu này.'}
+                  {doc.description ||
+                    "Chưa có mô tả chi tiết cho tài liệu này."}
                 </p>
 
                 {(doc.tags || doc.document_tags) && (
                   <div className="mt-8 flex flex-wrap gap-2">
-                    {(doc.tags || doc.document_tags || []).map((t: any, i: number) => (
-                      <Link key={i} to={`/documents?tagId=${t.tag_id || t.id}`} className="bg-primary/10 text-primary-hover px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 hover:bg-primary/20 transition-colors">
-                        <Tag className="w-3.5 h-3.5" />
-                        {typeof t === 'string' ? t : (t.tags?.tag_name || t.tag_name || 'tag')}
-                      </Link>
-                    ))}
+                    {(doc.tags || doc.document_tags || []).map(
+                      (t: any, i: number) => (
+                        <Link
+                          key={i}
+                          to={`/documents?tagId=${t.tag_id || t.id}`}
+                          className="bg-primary/10 text-primary-hover px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                        >
+                          <Tag className="w-3.5 h-3.5" />
+                          {typeof t === "string"
+                            ? t
+                            : t.tags?.tag_name || t.tag_name || "tag"}
+                        </Link>
+                      ),
+                    )}
                   </div>
                 )}
               </div>
@@ -274,14 +364,18 @@ export default function DocumentDetailPage() {
               <h2 className="text-xl font-bold mb-6">Đánh giá từ người mua</h2>
 
               {isPurchased && !isOwner && !hasReviewed && (
-                <ReviewForm documentId={Number(id)} onSuccess={fetchDocAndReviews} />
+                <ReviewForm
+                  documentId={Number(id)}
+                  onSuccess={fetchDocAndReviews}
+                />
               )}
 
               {isPurchased && !isOwner && hasReviewed && (
                 <div className="mb-8 p-4 bg-primary/5 border border-primary/20 rounded-xl">
                   <p className="text-primary font-medium text-sm flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5" />
-                    Đánh giá của bạn đã được ghi nhận. Mỗi người dùng chỉ được đánh giá 1 lần cho mỗi tài liệu.
+                    Đánh giá của bạn đã được ghi nhận. Mỗi người dùng chỉ được
+                    đánh giá 1 lần cho mỗi tài liệu.
                   </p>
                 </div>
               )}
@@ -289,24 +383,34 @@ export default function DocumentDetailPage() {
               {reviews.length > 0 ? (
                 <div className="space-y-6">
                   {reviews.map((rev: any) => {
-                    const isMyReview = Number(rev.buyer?.id || rev.buyer_id) === Number(user?.customerId);
+                    const isMyReview =
+                      Number(rev.buyer?.id || rev.buyer_id) ===
+                      Number(user?.customerId);
                     const canDeleteReview = isStaff || isMyReview;
                     const canDeleteReply = isStaff || isOwner;
 
                     return (
-                      <div key={rev.review_id || rev.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
+                      <div
+                        key={rev.review_id || rev.id}
+                        className="border-b border-border pb-6 last:border-0 last:pb-0"
+                      >
                         <div className="flex items-center justify-between mb-2">
                           <div className="font-semibold flex items-center gap-2">
                             <div className="w-8 h-8 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold text-sm">
-                              {rev.buyer?.name?.charAt(0)?.toUpperCase() || 'U'}
+                              {rev.buyer?.name?.charAt(0)?.toUpperCase() || "U"}
                             </div>
-                            {rev.buyer?.name || `Ẩn danh ${rev.buyer?.id || ''}`}
+                            {rev.buyer?.name ||
+                              `Ẩn danh ${rev.buyer?.id || ""}`}
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm text-muted-foreground">{formatDate(rev.created_at || rev.createdAt)}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {formatDate(rev.created_at || rev.createdAt)}
+                            </span>
                             {canDeleteReview && (
                               <button
-                                onClick={() => handleDeleteReview(rev.review_id || rev.id)}
+                                onClick={() =>
+                                  handleDeleteReview(rev.review_id || rev.id)
+                                }
                                 className="text-danger flex items-center gap-1 text-xs hover:bg-danger/10 px-2 py-1 rounded"
                                 title="Xóa đánh giá"
                               >
@@ -317,56 +421,80 @@ export default function DocumentDetailPage() {
                         </div>
                         <div className="flex text-yellow-400 mb-3">
                           {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`w-4 h-4 ${i < rev.rating ? 'fill-current' : 'text-gray-300 fill-transparent'}`} />
+                            <Star
+                              key={i}
+                              className={`w-4 h-4 ${i < rev.rating ? "fill-current" : "text-gray-300 fill-transparent"}`}
+                            />
                           ))}
                         </div>
                         <p className="text-foreground">{rev.comment}</p>
 
                         {/* Hiển thị phản hồi của người bán */}
-                        {(rev.sellerReply || rev.seller_reply) ? (
+                        {rev.sellerReply || rev.seller_reply ? (
                           <div className="mt-4 p-4 bg-muted/30 border border-border rounded-xl ml-4 relative">
                             <CornerDownRight className="absolute -left-5 top-4 w-4 h-4 text-muted-foreground" />
                             <div className="flex items-center justify-between mb-2">
                               <span className="font-semibold text-sm text-foreground flex items-center gap-1">
                                 Phản hồi của người bán
-                                {isOwner && <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">Bạn</span>}
+                                {isOwner && (
+                                  <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                                    Bạn
+                                  </span>
+                                )}
                               </span>
                               <div className="flex items-center gap-3">
-                                <span className="text-xs text-muted-foreground">{formatDate(rev.repliedAt || rev.replied_at)}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDate(rev.repliedAt || rev.replied_at)}
+                                </span>
                                 {canDeleteReply && (
                                   <button
-                                    onClick={() => handleDeleteReply(rev.review_id || rev.id)}
+                                    onClick={() =>
+                                      handleDeleteReply(rev.review_id || rev.id)
+                                    }
                                     className="text-danger flex items-center gap-1 text-xs hover:bg-danger/10 px-2 py-1 rounded"
                                     title="Xóa phản hồi"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" /> Xóa phản hồi
+                                    <Trash2 className="w-3.5 h-3.5" /> Xóa phản
+                                    hồi
                                   </button>
                                 )}
                               </div>
                             </div>
-                            <p className="text-sm text-foreground/90 whitespace-pre-line">{rev.sellerReply || rev.seller_reply}</p>
+                            <p className="text-sm text-foreground/90 whitespace-pre-line">
+                              {rev.sellerReply || rev.seller_reply}
+                            </p>
                           </div>
                         ) : (
-                          isOwner && <SellerReplyForm reviewId={rev.review_id || rev.id} onSuccess={fetchDocAndReviews} />
+                          isOwner && (
+                            <SellerReplyForm
+                              reviewId={rev.review_id || rev.id}
+                              onSuccess={fetchDocAndReviews}
+                            />
+                          )
                         )}
                       </div>
-                    )
+                    );
                   })}
                 </div>
               ) : (
-                <p className="text-muted-foreground">Chưa có đánh giá nào. {isPurchased ? 'Hãy là người đầu tiên đánh giá!' : 'Bạn cần mua tài liệu để đánh giá.'}</p>
+                <p className="text-muted-foreground">
+                  Chưa có đánh giá nào.{" "}
+                  {isPurchased
+                    ? "Hãy là người đầu tiên đánh giá!"
+                    : "Bạn cần mua tài liệu để đánh giá."}
+                </p>
               )}
             </div>
-
           </div>
 
           {/* Sticky Sidebar (Right) */}
           <div className="lg:col-span-1 border-border">
             <div className="sticky top-24 bg-card border border-border rounded-2xl p-6 shadow-xl">
-
               <div className="mb-6">
                 <div className="flex items-end gap-3 mb-2">
-                  <span className="text-3xl font-bold font-heading text-primary">{isFree ? 'Miễn phí' : formatPrice(doc.price)}</span>
+                  <span className="text-3xl font-bold font-heading text-primary">
+                    {isFree ? "Miễn phí" : formatPrice(doc.price)}
+                  </span>
                 </div>
               </div>
 
@@ -384,7 +512,7 @@ export default function DocumentDetailPage() {
                         className="w-full flex items-center justify-center gap-2 py-4 bg-success hover:bg-success/90 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-lg disabled:opacity-50"
                       >
                         <Download className="w-6 h-6" />
-                        {addingToCart ? 'Đang tải...' : 'Tải Xuống (Đã sở hữu)'}
+                        {addingToCart ? "Đang tải..." : "Tải Xuống (Đã sở hữu)"}
                       </button>
                     ) : (
                       <button
@@ -392,39 +520,77 @@ export default function DocumentDetailPage() {
                         disabled={addingToCart}
                         className="w-full flex items-center justify-center gap-2 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-lg disabled:opacity-50"
                       >
-                        {isFree ? <Download className="w-6 h-6" /> : <ShoppingCart className="w-6 h-6" />}
-                        {addingToCart ? (isFree ? 'Đang xử lý...' : 'Đang thêm...') : isFree ? 'Tải Xuống' : 'Thêm Giỏ Hàng'}
+                        {isFree ? (
+                          <Download className="w-6 h-6" />
+                        ) : (
+                          <ShoppingCart className="w-6 h-6" />
+                        )}
+                        {addingToCart
+                          ? isFree
+                            ? "Đang xử lý..."
+                            : "Đang thêm..."
+                          : isFree
+                            ? "Tải Xuống"
+                            : "Thêm Giỏ Hàng"}
                       </button>
                     )}
                     <button
                       onClick={handleToggleWishlist}
                       disabled={addingToWishlist}
-                      className={`w-full py-4 border-2 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-lg disabled:opacity-50 ${isWishlisted ? 'bg-red-50 border-red-500 text-red-500 hover:bg-red-100' : 'bg-white border-primary text-primary hover:bg-primary/5'}`}
+                      className={`w-full py-4 border-2 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-lg disabled:opacity-50 ${isWishlisted ? "bg-red-50 border-red-500 text-red-500 hover:bg-red-100" : "bg-white border-primary text-primary hover:bg-primary/5"}`}
                     >
-                      <Heart className={`w-5 h-5 ${isWishlisted ? 'fill-current' : ''}`} /> {addingToWishlist ? 'Đang xử lý...' : isWishlisted ? 'Đã Yêu Thích' : 'Yêu Thích'}
+                      <Heart
+                        className={`w-5 h-5 ${isWishlisted ? "fill-current" : ""}`}
+                      />{" "}
+                      {addingToWishlist
+                        ? "Đang xử lý..."
+                        : isWishlisted
+                          ? "Đã Yêu Thích"
+                          : "Yêu Thích"}
                     </button>
                   </>
                 )}
               </div>
 
               <div className="border-t border-border pt-6">
-                <h3 className="font-bold mb-4 text-foreground">Thông tin chi tiết</h3>
+                <h3 className="font-bold mb-4 text-foreground">
+                  Thông tin chi tiết
+                </h3>
                 <ul className="space-y-4 text-sm">
                   <li className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-2"><FileText className="w-4 h-4" /> Định dạng</span>
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <FileText className="w-4 h-4" /> Định dạng
+                    </span>
                     <span className="font-semibold uppercase">{ext}</span>
                   </li>
                   <li className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-2"><FileText className="w-4 h-4" /> Số trang</span>
-                    <span className="font-semibold">{doc.page_count || doc.pageCount || '?'} trang</span>
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <FileText className="w-4 h-4" /> Số trang
+                    </span>
+                    <span className="font-semibold">
+                      {doc.page_count || doc.pageCount || "?"} trang
+                    </span>
                   </li>
                   <li className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-2"><Download className="w-4 h-4" /> Dung lượng</span>
-                    <span className="font-semibold">{formatFileSize(doc.file_size || doc.fileSize)}</span>
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <Download className="w-4 h-4" /> Dung lượng
+                    </span>
+                    <span className="font-semibold">
+                      {formatFileSize(doc.file_size || doc.fileSize)}
+                    </span>
                   </li>
                   <li className="flex justify-between">
-                    <span className="text-muted-foreground flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Đăng ngày</span>
-                    <span className="font-semibold">{formatDate(doc.published_at || doc.publishedAt || doc.created_at || doc.createdAt)}</span>
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> Đăng ngày
+                    </span>
+                    <span className="font-semibold">
+                      {formatDate(
+                        doc.published_at ||
+                          doc.publishedAt ||
+                          doc.created_at ||
+                          doc.createdAt,
+                      )}
+                    </span>
                   </li>
                 </ul>
               </div>
@@ -432,19 +598,24 @@ export default function DocumentDetailPage() {
               <div className="mt-8 bg-primary/5 border border-primary/10 rounded-xl p-4 flex gap-4 items-start">
                 <ShieldCheck className="w-6 h-6 text-primary shrink-0" />
                 <div>
-                  <h4 className="font-bold text-primary-hover text-sm mb-1">Cam kết từ StudyDocs</h4>
-                  <p className="text-xs text-foreground/80 leading-relaxed mb-3">Nội dung đã được kiểm duyệt. Nhận lại toàn bộ tiền trực tiếp vào số dư nếu tài liệu có vấn đề hay sai mô tả.</p>
+                  <h4 className="font-bold text-primary-hover text-sm mb-1">
+                    Cam kết từ StudyDocs
+                  </h4>
+                  <p className="text-xs text-foreground/80 leading-relaxed mb-3">
+                    Nội dung đã được kiểm duyệt. Nhận lại toàn bộ tiền trực tiếp
+                    vào số dư nếu tài liệu có vấn đề hay sai mô tả.
+                  </p>
                   {!isOwner && user && (
                     <button
                       onClick={() => setShowReportModal(true)}
                       className="text-xs text-danger font-semibold flex items-center gap-1 hover:underline cursor-pointer"
                     >
-                      <AlertTriangle className="w-3.5 h-3.5" /> Báo cáo tài liệu này
+                      <AlertTriangle className="w-3.5 h-3.5" /> Báo cáo tài liệu
+                      này
                     </button>
                   )}
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -457,5 +628,5 @@ export default function DocumentDetailPage() {
         />
       )}
     </div>
-  )
+  );
 }

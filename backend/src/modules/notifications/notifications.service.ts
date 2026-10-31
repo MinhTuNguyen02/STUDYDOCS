@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { notification_type } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { createPaginationMeta } from '../../common/dto/pagination-response.dto';
 import { EventsGateway } from '../gateway/events.gateway';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -164,7 +165,7 @@ export class NotificationsService {
     ]);
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       data: toJsonSafe(
         notifications.map((n) => ({
           id: n.id,

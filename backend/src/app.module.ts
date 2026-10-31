@@ -24,7 +24,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { TagsModule } from './modules/tags/tags.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppThrottlerGuard } from './common/security/app-throttler.guard';
 import { DownloadsModule } from './modules/downloads/downloads.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -33,6 +33,7 @@ import { GatewayModule } from './modules/gateway/gateway.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { validateEnvironment } from './config/env.validation';
 import { HealthModule } from './modules/health/health.module';
+import { ResponseEnvelopeInterceptor } from './common/http/response-envelope.interceptor';
 
 @Module({
   imports: [
@@ -89,6 +90,10 @@ import { HealthModule } from './modules/health/health.module';
     })
   ],
   providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseEnvelopeInterceptor
+    },
     {
       provide: APP_GUARD,
       useClass: AppThrottlerGuard

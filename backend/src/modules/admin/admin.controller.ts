@@ -23,12 +23,16 @@ import {
   AdminUserQueryDto,
   AuditLogQueryDto,
   DashboardQueryDto,
+  LedgerReportQueryDto,
   PendingDocumentQueryDto,
-  RequiredDateRangeQueryDto,
+  RequiredLedgerReportQueryDto,
   WithdrawalListQueryDto
 } from './dto/admin-query.dto';
-import { DateRangeQueryDto, SearchQueryDto } from '../../common/dto/query.dto';
-import { assertChronologicalDateRange } from '../../common/utils/date-range.util';
+import { SearchQueryDto } from '../../common/dto/query.dto';
+import {
+  assertChronologicalDateRange,
+  currentDateInTimeZone
+} from '../../common/utils/date-range.util';
 
 @ApiTags('System & Admin')
 @Controller('admin')
@@ -151,28 +155,33 @@ export class AdminController {
 
   @Get('reports/revenue')
   @Roles('admin', 'accountant')
-  exportRevenueReport(@Query() query: RequiredDateRangeQueryDto) {
+  exportRevenueReport(@Query() query: RequiredLedgerReportQueryDto) {
     assertChronologicalDateRange(query.startDate, query.endDate);
-    return this.adminService.exportRevenueReport(query.startDate, query.endDate);
+    return this.adminService.exportRevenueReport(query);
   }
 
   @Get('wallets/gateway')
   @Roles('admin', 'accountant')
-  getGatewayWallet(@Query() query: DateRangeQueryDto) {
+  getGatewayWallet(@Query() query: LedgerReportQueryDto) {
     assertChronologicalDateRange(query.startDate, query.endDate);
-    const today = new Date().toISOString().slice(0, 10);
-    return this.adminService.getGatewayWalletReport(
-      query.startDate || today,
-      query.endDate || today
-    );
+    const today = currentDateInTimeZone();
+    return this.adminService.getGatewayWalletReport({
+      ...query,
+      startDate: query.startDate || today,
+      endDate: query.endDate || today
+    });
   }
 
   @Get('wallets/tax')
   @Roles('admin', 'accountant')
-  getTaxWallet(@Query() query: DateRangeQueryDto) {
+  getTaxWallet(@Query() query: LedgerReportQueryDto) {
     assertChronologicalDateRange(query.startDate, query.endDate);
-    const today = new Date().toISOString().slice(0, 10);
-    return this.adminService.getTaxWalletReport(query.startDate || today, query.endDate || today);
+    const today = currentDateInTimeZone();
+    return this.adminService.getTaxWalletReport({
+      ...query,
+      startDate: query.startDate || today,
+      endDate: query.endDate || today
+    });
   }
 
   @Post('wallets/tax/pay')

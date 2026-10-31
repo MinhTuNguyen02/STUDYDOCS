@@ -1,0 +1,5 @@
+[mcp_servers.gitnexus]
+command = 'C:\Windows\System32\cmd.exe'
+args = ['/d', '/c', 'D:\STUDYDOCS\STUDYDOCS\.codex\gitnexus-mcp.cmd']
+cwd = 'D:\STUDYDOCS\STUDYDOCS'
+startup_timeout_sec = 30

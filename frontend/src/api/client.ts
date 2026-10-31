@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
+import { unwrapApiEnvelope } from './request'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -15,6 +16,46 @@ api.interceptors.request.use((config) => {
   }
   return config
 })
+
+// ── Single-flight session refresh để tránh race condition & token reuse detection ──
+let refreshPromise: Promise<{ accessToken: string; user?: any }> | null = null
+
+export async function refreshAuthSession(): Promise<{ accessToken: string; user?: any }> {
+  if (refreshPromise) {
+    return refreshPromise
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_URL || '/api'
+      const csrf = await axios.get(`${baseUrl}/auth/csrf`, { withCredentials: true })
+      const csrfPayload = unwrapApiEnvelope(csrf.data) as { csrfToken: string }
+      const csrfToken = csrfPayload?.csrfToken || (csrf.data as any)?.csrfToken
+
+      const res = await axios.post(
+        `${baseUrl}/auth/refresh`,
+        {},
+        {
+          withCredentials: true,
+          headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+        },
+      )
+      const refreshPayload = unwrapApiEnvelope(res.data) as { accessToken: string; user?: any }
+      const newAccessToken = refreshPayload.accessToken
+
+      useAuthStore.getState().setAccessToken(newAccessToken)
+      if (refreshPayload.user) {
+        useAuthStore.getState().updateUser(refreshPayload.user)
+      }
+
+      return refreshPayload
+    } finally {
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
 
 // ── Response: auto-refresh khi 401 ──
 let isRefreshing = false
@@ -32,7 +73,10 @@ const processQueue = (error: unknown, token: string | null = null) => {
 }
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    res.data = unwrapApiEnvelope(res.data)
+    return res
+  },
   async (error) => {
     const originalRequest = error.config
     const authPath = String(originalRequest?.url ?? '')
@@ -62,22 +106,10 @@ api.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || '/api'
-        const csrf = await axios.get(`${baseUrl}/auth/csrf`, { withCredentials: true })
-        const res = await axios.post(
-          `${baseUrl}/auth/refresh`,
-          {},
-          {
-            withCredentials: true,
-            headers: { 'X-CSRF-Token': csrf.data.csrfToken },
-          },
-        )
-        const newAccessToken = res.data.accessToken
+        const { accessToken } = await refreshAuthSession()
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`
 
-        useAuthStore.getState().setAccessToken(newAccessToken)
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
-
-        processQueue(null, newAccessToken)
+        processQueue(null, accessToken)
         return api(originalRequest)
       } catch (refreshError) {
         processQueue(refreshError, null)

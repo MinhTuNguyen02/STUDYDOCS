@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { PrismaService } from '../../database/prisma.service';
+import { createPaginationMeta } from '../../common/dto/pagination-response.dto';
 import { toJsonSafe } from '../../common/utils/to-json-safe.util';
 import { CreateSellerDocumentDto } from './dto/create-seller-document.dto';
 import { UpdateSellerDocumentDto } from './dto/update-seller-document.dto';
@@ -275,7 +276,7 @@ export class SellerService {
     ]);
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       data: toJsonSafe(
         docs.map((doc) => ({
           id: doc.document_id,
@@ -504,7 +505,7 @@ export class SellerService {
     ]);
 
     return {
-      meta: { page, limit, total },
+      meta: createPaginationMeta(page, limit, total),
       totalEarnings,
       totalOrders,
       data: toJsonSafe(

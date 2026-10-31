@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthUser } from '../../common/security/auth-user.interface';
-import sanitizeHtml from 'sanitize-html';
+import * as sanitizeHtml from 'sanitize-html';
 
 interface PolicyInput {
   title: string;
@@ -15,7 +15,8 @@ export class PoliciesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private sanitizePolicyContent(content: string) {
-    return sanitizeHtml(content, {
+    const sanitize = (sanitizeHtml as any).default || sanitizeHtml;
+    return sanitize(content, {
       allowedTags: [
         'p',
         'br',
@@ -46,7 +47,7 @@ export class PoliciesService {
       allowedSchemes: ['http', 'https', 'mailto'],
       allowedSchemesByTag: { img: ['http', 'https'] },
       transformTags: {
-        a: (tagName, attribs) => ({
+        a: (tagName: string, attribs: Record<string, string>) => ({
           tagName,
           attribs: { ...attribs, rel: 'noopener noreferrer' }
         })

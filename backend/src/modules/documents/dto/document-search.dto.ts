@@ -1,53 +1,56 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
+
+const toOptionalNumber = ({ value }: { value: unknown }) =>
+  value === '' || value === null || value === undefined ? undefined : Number(value);
 
 export class DocumentSearchDto {
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ example: 1, required: false })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(toOptionalNumber)
   @IsInt()
   @Min(1)
   page?: number;
 
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ example: 10, required: false })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(toOptionalNumber)
   @IsInt()
   @Min(1)
   @Max(100)
   limit?: number;
 
-  @ApiProperty({ example: 'example value' })
+  @ApiProperty({ example: 'toán học', required: false })
   @IsOptional()
   @IsString()
   @MaxLength(200)
   keyword?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @ApiProperty({ example: 1 })
+  @Transform(toOptionalNumber)
+  @ApiProperty({ example: 1, required: false })
   @IsInt()
   @Min(1)
   categoryId?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @ApiProperty({ example: 1 })
+  @Transform(toOptionalNumber)
+  @ApiProperty({ example: 1, required: false })
   @IsInt()
   @Min(1)
   tagId?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @ApiProperty({ example: 1 })
+  @Transform(toOptionalNumber)
+  @ApiProperty({ example: 0, required: false })
   @IsNumber()
   @Min(0)
   minPrice?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @ApiProperty({ example: 1 })
+  @Transform(toOptionalNumber)
+  @ApiProperty({ example: 100000, required: false })
   @IsNumber()
   @Min(0)
   maxPrice?: number;

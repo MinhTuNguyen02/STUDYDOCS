@@ -13,6 +13,7 @@ import { formatBalance, formatDate } from "@/utils/format";
 import { documentsApi } from "@/api/documents.api";
 import { Link, useSearchParams } from "react-router-dom";
 import Pagination from "@/components/common/Pagination";
+import { isCanceledRequest } from "@/api/request";
 
 export default function AdminDocumentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,33 +60,45 @@ export default function AdminDocumentsPage() {
     }
   };
 
-  const fetchDocuments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await adminApi.getAllDocuments({
-        search: searchTerm,
-        status: statusFilter,
-        categoryId:
-          subCategoryFilter !== "ALL" ? subCategoryFilter : categoryFilter,
-        page,
-        limit,
-      });
-      setDocuments(res.data || res);
-      setTotal(res.meta?.total ?? (res.data || res).length);
-    } catch (err) {
-      const msg =
-        (err as any)?.response?.data?.message ||
-        "Không thể tải danh sách tài liệu";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [categoryFilter, page, searchTerm, statusFilter, subCategoryFilter]);
+  const fetchDocuments = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const selectedCat = subCategoryFilter !== "ALL" ? subCategoryFilter : categoryFilter;
+        const queryParams: Record<string, any> = {
+          search: searchTerm,
+          status: statusFilter,
+          page,
+          limit,
+        };
+        if (selectedCat && selectedCat !== "ALL") {
+          queryParams.categoryId = Number(selectedCat);
+        }
+        const res = await adminApi.getAllDocuments(
+          queryParams,
+          signal,
+        );
+        setDocuments(res.data || res);
+        setTotal(res.meta?.total ?? (res.data || res).length);
+      } catch (err) {
+        if (isCanceledRequest(err)) return;
+        const msg =
+          (err as any)?.response?.data?.message ||
+          "Không thể tải danh sách tài liệu";
+        setError(msg);
+        toast.error(msg);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [categoryFilter, page, searchTerm, statusFilter, subCategoryFilter],
+  );
 
   useEffect(() => {
-    void fetchDocuments();
+    const controller = new AbortController();
+    void fetchDocuments(controller.signal);
+    return () => controller.abort();
   }, [fetchDocuments]);
   useEffect(() => {
     setSearchInput(searchTerm);
@@ -246,7 +259,7 @@ export default function AdminDocumentsPage() {
                   <td colSpan={5} className="p-12 text-center">
                     <p className="text-danger mb-4 font-medium">{error}</p>
                     <button
-                      onClick={fetchDocuments}
+                      onClick={() => void fetchDocuments()}
                       className="px-4 py-2 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
                     >
                       Thử lại

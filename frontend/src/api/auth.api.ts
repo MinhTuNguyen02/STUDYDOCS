@@ -1,4 +1,4 @@
-import api from './client'
+import api, { refreshAuthSession } from './client'
 
 export const authApi = {
   login: async (data: { email: string; password: string }) => {
@@ -22,18 +22,19 @@ export const authApi = {
   },
 
   refresh: async () => {
-    const csrf = await api.get('/auth/csrf')
-    const res = await api.post('/auth/refresh', {}, {
-      headers: { 'X-CSRF-Token': csrf.data.csrfToken },
-    })
-    return res.data
+    return refreshAuthSession()
   },
 
   logout: async () => {
     const csrf = await api.get('/auth/csrf')
-    const res = await api.post('/auth/logout', {}, {
-      headers: { 'X-CSRF-Token': csrf.data.csrfToken },
-    })
+    const csrfToken = csrf.data?.csrfToken || (csrf.data as any)?.data?.csrfToken
+    const res = await api.post(
+      '/auth/logout',
+      {},
+      {
+        headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+      }
+    )
     return res.data
   },
 
@@ -46,5 +47,4 @@ export const authApi = {
     const res = await api.post('/auth/verify-otp', data)
     return res.data
   },
-
 }

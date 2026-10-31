@@ -24,6 +24,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm run check:bundle
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
   backend:
     runs-on: ubuntu-latest

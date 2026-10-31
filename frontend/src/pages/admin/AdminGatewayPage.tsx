@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminApi } from "@/api/admin.api";
-import { formatBalance, formatDateTime, toVNDateString } from "@/utils/format";
+import { formatBalance, formatDateTime } from "@/utils/format";
 import {
   Vault,
   TrendingUp,
@@ -12,123 +12,96 @@ import {
   Calendar,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/common/Pagination";
-import { useSearchParams } from "react-router-dom";
-
-interface LedgerEntry {
-  id: number;
-  wallet_id: number;
-  transaction_id: number;
-  debit_amount: string;
-  credit_amount: string;
-  created_at: string;
-  ledger_transactions: {
-    type: string;
-    reference_type?: string;
-    description?: string;
-    status: string;
-  };
-}
-
-interface GatewayReport {
-  wallet: { wallet_id: number; balance: string } | null;
-  summary: {
-    totalIn: number;
-    totalOut: number;
-    netFlow: number;
-    entryCount: number;
-  } | null;
-  entries: LedgerEntry[];
-}
+import type { GatewayReport, LedgerEntry } from "@/api/contracts";
+import { fetchAllPages, isCanceledRequest } from "@/api/request";
+import { useFinancialReportQuery } from "@/hooks/useFinancialReportQuery";
 
 export default function AdminGatewayPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { startDate, endDate, requestedPage, updateQuery } =
+    useFinancialReportQuery();
   const [data, setData] = useState<GatewayReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  const defaultStartDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return toVNDateString(d);
-  })();
-  const startDate = searchParams.get("startDate") || defaultStartDate;
-  const endDate = searchParams.get("endDate") || toVNDateString();
-  const requestedPage = Math.max(1, Number(searchParams.get("page")) || 1);
-
-  const updateQuery = useCallback(
-    (updates: Record<string, string | number>) => {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        Object.entries(updates).forEach(([key, value]) =>
-          next.set(key, String(value)),
+  const fetchData = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await adminApi.getGatewayWalletReport(
+          { startDate, endDate, page: requestedPage, limit: 20 },
+          signal,
         );
-        return next;
-      });
+        setData(res);
+      } catch (error) {
+        if (!isCanceledRequest(error)) toast.error("Lỗi khi tải dữ liệu ví");
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
     },
-    [setSearchParams],
+    [endDate, requestedPage, startDate],
   );
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getGatewayWalletReport({ startDate, endDate });
-      setData(res);
-    } catch {
-      toast.error("Lỗi khi tải dữ liệu ví");
-    } finally {
-      setLoading(false);
-    }
-  }, [endDate, startDate]);
-
   useEffect(() => {
-    void fetchData();
+    const controller = new AbortController();
+    void fetchData(controller.signal);
+    return () => controller.abort();
   }, [fetchData]);
 
-  const { page, totalPages, total, limit, paginatedItems, setPage } =
-    usePagination(data?.entries ?? [], 20, {
-      page: requestedPage,
-      onPageChange: (nextPage) => updateQuery({ page: nextPage }),
-    });
+  const page = data?.meta.page ?? requestedPage;
+  const limit = data?.meta.limit ?? 20;
+  const total = data?.meta.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const setPage = (nextPage: number) => updateQuery({ page: nextPage });
 
-  const handleExportCSV = () => {
-    const entries = data?.entries ?? [];
-    if (!entries.length) {
-      toast.error("Không có dữ liệu để xuất");
-      return;
+  const handleExportCSV = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const entries = await fetchAllPages<LedgerEntry>((page, limit) =>
+        adminApi.getGatewayWalletReport({ startDate, endDate, page, limit }),
+      );
+      if (!entries.length) {
+        toast.error("Không có dữ liệu để xuất");
+        return;
+      }
+
+      const headers = [
+        "Mã Giao Dịch",
+        "Thời Gian",
+        "Loại",
+        "Mô Tả",
+        "Tiền Vào (Debit)",
+        "Tiền Ra (Credit)",
+      ];
+      const csvContent = [
+        headers.join(","),
+        ...entries.map((e) =>
+          [
+            `TXN-${e.transaction_id}`,
+            formatDateTime(e.created_at),
+            e.ledger_transactions.type,
+            `"${(e.ledger_transactions.description ?? "").replace(/"/g, '""')}"`,
+            Number(e.debit_amount),
+            Number(e.credit_amount),
+          ].join(","),
+        ),
+      ].join("\n");
+
+      const blob = new Blob(["\uFEFF" + csvContent], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute("download", `gateway_pool_${startDate}_${endDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      toast.error("Không thể xuất CSV, vui lòng thử lại");
+    } finally {
+      setExporting(false);
     }
-
-    const headers = [
-      "Mã Giao Dịch",
-      "Thời Gian",
-      "Loại",
-      "Mô Tả",
-      "Tiền Vào (Debit)",
-      "Tiền Ra (Credit)",
-    ];
-    const csvContent = [
-      headers.join(","),
-      ...entries.map((e) =>
-        [
-          `TXN-${e.transaction_id}`,
-          formatDateTime(e.created_at),
-          e.ledger_transactions.type,
-          `"${(e.ledger_transactions.description ?? "").replace(/"/g, '""')}"`,
-          Number(e.debit_amount),
-          Number(e.credit_amount),
-        ].join(","),
-      ),
-    ].join("\n");
-
-    const blob = new Blob(["\uFEFF" + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `gateway_pool_${startDate}_${endDate}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const txTypeLabel: Record<string, string> = {
@@ -146,9 +119,12 @@ export default function AdminGatewayPage() {
         </div>
         <button
           onClick={handleExportCSV}
-          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors"
+          disabled={exporting}
+          aria-busy={exporting}
+          className="btn bg-success text-white hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-colors disabled:opacity-60"
         >
-          <Download className="w-4 h-4" /> Xuất CSV
+          <Download className="w-4 h-4" />{" "}
+          {exporting ? "Đang xuất..." : "Xuất CSV"}
         </button>
       </div>
 
@@ -190,7 +166,7 @@ export default function AdminGatewayPage() {
           </div>
         </div>
         <button
-          onClick={fetchData}
+          onClick={() => void fetchData()}
           className="btn bg-primary text-white hover:bg-primary-hover px-5 py-2 rounded-xl text-sm font-bold cursor-pointer transition-colors shadow-sm"
         >
           Lọc dữ liệu
@@ -275,11 +251,11 @@ export default function AdminGatewayPage() {
             <div className="px-6 py-4 border-b border-border flex items-center justify-between">
               <h2 className="font-bold text-base">Lịch Sử Giao Dịch</h2>
               <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-lg">
-                {data.entries.length} bản ghi
+                {data.meta.total} bản ghi
               </span>
             </div>
 
-            {data.entries.length === 0 ? (
+            {data.data.length === 0 ? (
               <p className="text-center text-muted-foreground py-12 text-sm">
                 Không có giao dịch trong kỳ đã chọn.
               </p>
@@ -310,7 +286,7 @@ export default function AdminGatewayPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedItems.map((entry) => {
+                      {data.data.map((entry) => {
                         const isIn = Number(entry.debit_amount) > 0;
                         return (
                           <tr
@@ -345,7 +321,10 @@ export default function AdminGatewayPage() {
                             </td>
                             <td
                               className="py-3 px-4 text-xs text-muted-foreground max-w-[200px] truncate"
-                              title={entry.ledger_transactions.description}
+                              title={
+                                entry.ledger_transactions.description ??
+                                undefined
+                              }
                             >
                               {entry.ledger_transactions.description || "—"}
                             </td>

@@ -19,6 +19,7 @@ import { CurrentUser } from '../../common/security/current-user.decorator';
 import { AuthUser } from '../../common/security/auth-user.interface';
 import { TagDto } from './dto/tag.dto';
 import { SearchQueryDto } from '../../common/dto/query.dto';
+import { PublicCache } from '../../common/http/response-envelope.decorator';
 
 @ApiTags('Metadata')
 @Controller('tags')
@@ -26,6 +27,7 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Get()
+  @PublicCache(300)
   findAll(@Query() query: SearchQueryDto) {
     return this.tagsService.findAll(query.search);
   }

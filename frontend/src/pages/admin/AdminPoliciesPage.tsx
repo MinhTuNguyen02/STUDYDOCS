@@ -4,6 +4,7 @@ import { FileText, Plus, Edit2, Trash2, CheckCircle2, XCircle } from 'lucide-rea
 import toast from 'react-hot-toast'
 import RichTextEditor from '@/components/ui/RichTextEditor'
 import { formatDate } from '@/utils/format'
+import { asCollection } from '@/api/request'
 
 interface Policy {
   policy_id: number
@@ -41,7 +42,7 @@ export default function AdminPoliciesPage() {
     setLoading(true)
     try {
       const res = await adminApi.getPolicies()
-      setPolicies(res.data)
+      setPolicies(asCollection<Policy>(res))
     } catch (error) {
       toast.error('Lỗi khi tải danh sách chính sách')
     } finally {

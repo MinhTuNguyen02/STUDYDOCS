@@ -22,7 +22,7 @@ model accounts {
   reset_password_token   String?        @db.VarChar(255)
   reset_password_expires DateTime?      @db.Timestamptz(6)
   created_at             DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
   delete_at              DateTime?      @db.Timestamptz(6)
   banned_until           DateTime?      @db.Timestamptz(6)
 
@@ -43,7 +43,7 @@ model staff_profiles {
   is_phone_verified Boolean   @default(false)
   avatar_url        String?   @db.VarChar(255)
   created_at        DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   dob               DateTime? @db.Date
   cccd              String?   @unique @db.VarChar(20)
 
@@ -63,7 +63,7 @@ model customer_profiles {
   is_phone_verified        Boolean   @default(false)
   avatar_url               String?   @db.VarChar(255)
   created_at               DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   free_downloads_remaining Int       @default(4)
   free_downloads_reset_at  DateTime? @db.Timestamptz(6)
 
@@ -101,7 +101,7 @@ model user_sessions {
   expires_at    DateTime @db.Timestamptz(6)
   created_at    DateTime @default(now()) @db.Timestamptz(6)
 
-  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([account_id, is_revoked, expires_at], map: "idx_user_sessions_account_active_expiry")
 }
@@ -128,13 +128,13 @@ model documents {
   slug             String?         @unique @db.VarChar(255)
   published_at     DateTime?       @db.Timestamptz(6)
   staff_id         Int?
-  updated_at       DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime        @default(now()) @updatedAt @db.Timestamptz(6)
   view_count       Int             @default(0)
   download_count   Int             @default(0)
   is_user_hidden   Boolean         @default(false)
   delete_at        DateTime?       @db.Timestamptz(6)
 
-  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: SetNull, onUpdate: NoAction)
   categories        categories        @relation(fields: [category_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
   customer_profiles customer_profiles @relation(fields: [seller_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -160,7 +160,7 @@ model orders {
   total_amount    Decimal      @db.Decimal(10, 2)
   status          order_status
   created_at      DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
 
   customer_profiles customer_profiles @relation(fields: [buyer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   order_items       order_items[]
@@ -182,7 +182,7 @@ model order_items {
   status         order_item_status
   created_at     DateTime          @default(now()) @db.Timestamptz(6)
   unit_price     Decimal           @db.Decimal(10, 2)
-  updated_at     DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
 
   documents         documents          @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
   orders            orders             @relation(fields: [order_id], references: [order_id], onDelete: NoAction, onUpdate: NoAction)
@@ -223,8 +223,8 @@ model document_tags {
   document_id Int
   tag_id      Int
 
-  documents documents @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
-  tags      tags      @relation(fields: [tag_id], references: [tag_id], onDelete: NoAction, onUpdate: NoAction)
+  documents documents @relation(fields: [document_id], references: [document_id], onDelete: Cascade, onUpdate: NoAction)
+  tags      tags      @relation(fields: [tag_id], references: [tag_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([document_id, tag_id])
 }
@@ -242,8 +242,8 @@ model download_history {
 
   customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
   documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
-  order_items       order_items?      @relation(fields: [order_item_id], references: [order_item_id], onDelete: NoAction, onUpdate: NoAction)
-  user_packages     user_packages?    @relation(fields: [user_package_id], references: [user_package_id], onDelete: NoAction, onUpdate: NoAction)
+  order_items       order_items?      @relation(fields: [order_item_id], references: [order_item_id], onDelete: SetNull, onUpdate: NoAction)
+  user_packages     user_packages?    @relation(fields: [user_package_id], references: [user_package_id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([customer_id], map: "idx_download_history_customer_id")
   @@index([document_id], map: "idx_download_history_document_id")
@@ -259,8 +259,8 @@ model reviews {
   seller_reply  String?
   replied_at    DateTime? @db.Timestamptz(6)
   is_deleted    Boolean   @default(false)
-  created_at    DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at    DateTime? @default(now()) @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   document_id   Int
 
   customer_profiles customer_profiles @relation(fields: [buyer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
@@ -274,24 +274,24 @@ model reviews {
 
 // ─── Bảng Carts ─────────────────────────────────────────────────
 model carts {
-  cart_id     Int       @id @default(autoincrement())
-  customer_id Int       @unique
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime? @default(now()) @db.Timestamptz(6)
+  cart_id     Int      @id @default(autoincrement())
+  customer_id Int      @unique
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
-  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade, onUpdate: NoAction)
   cart_items        cart_items[]
 }
 
 // ─── Bảng Cart_Items ────────────────────────────────────────────
 model cart_items {
-  cart_item_id Int       @id @default(autoincrement())
+  cart_item_id Int      @id @default(autoincrement())
   cart_id      Int
   document_id  Int
-  add_at       DateTime? @default(now()) @db.Timestamptz(6)
+  add_at       DateTime @default(now()) @db.Timestamptz(6)
 
-  carts     carts     @relation(fields: [cart_id], references: [cart_id], onDelete: NoAction, onUpdate: NoAction)
-  documents documents @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  carts     carts     @relation(fields: [cart_id], references: [cart_id], onDelete: Cascade, onUpdate: NoAction)
+  documents documents @relation(fields: [document_id], references: [document_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([cart_id, document_id])
 }
@@ -300,10 +300,10 @@ model cart_items {
 model wishlists {
   customer_id Int
   document_id Int
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
 
-  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
-  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
+  customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade, onUpdate: NoAction)
+  documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([customer_id, document_id])
 }
@@ -362,8 +362,8 @@ model payments {
   provider_txn_id  String?          @unique @db.VarChar(100)
   request_payload  Json?
   callback_payload Json?
-  created_at       DateTime?        @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
 
   orders  orders?  @relation(fields: [order_id], references: [order_id], onDelete: NoAction, onUpdate: NoAction)
   wallets wallets? @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction)
@@ -382,9 +382,9 @@ model withdrawal_requests {
   bank_info     Json
   created_at    DateTime          @default(now()) @db.Timestamptz(6)
   accountant_id Int?
-  updated_at    DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
 
-  staff_profiles    staff_profiles?   @relation(fields: [accountant_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  staff_profiles    staff_profiles?   @relation(fields: [accountant_id], references: [staff_id], onDelete: SetNull, onUpdate: NoAction)
   customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([customer_id], map: "idx_withdrawal_requests_customer_id")
@@ -400,11 +400,11 @@ model reports {
   reason      String?
   status      report_status @default(PENDING)
   staff_id    Int?
-  created_at  DateTime?     @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime?     @default(now()) @db.Timestamptz(6)
+  created_at  DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
 
   documents         documents         @relation(fields: [document_id], references: [document_id], onDelete: NoAction, onUpdate: NoAction)
-  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  staff_profiles    staff_profiles?   @relation(fields: [staff_id], references: [staff_id], onDelete: SetNull, onUpdate: NoAction)
   customer_profiles customer_profiles @relation(fields: [customer_id], references: [customer_id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([document_id], map: "idx_reports_document_id")
@@ -464,11 +464,11 @@ model audit_logs {
 
 // ─── Bảng Configs ───────────────────────────────────────────────
 model configs {
-  config_id    Int       @id @default(autoincrement())
-  config_key   String    @unique @db.VarChar(50)
-  config_value String    @db.VarChar(255)
-  created_at   DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  config_id    Int      @id @default(autoincrement())
+  config_key   String   @unique @db.VarChar(50)
+  config_value String   @db.VarChar(255)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
   description  String?
 }
 
@@ -478,11 +478,11 @@ model policies {
   title      String   @db.VarChar(255)
   slug       String   @unique @db.VarChar(255)
   content    String
-  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
   is_active  Boolean  @default(true)
   updated_by Int?
 
-  staff_profiles staff_profiles? @relation(fields: [updated_by], references: [staff_id], onDelete: NoAction, onUpdate: NoAction)
+  staff_profiles staff_profiles? @relation(fields: [updated_by], references: [staff_id], onDelete: SetNull, onUpdate: NoAction)
 }
 
 // ─── Bảng Notifications ─────────────────────────────────────────
@@ -497,7 +497,7 @@ model notifications {
   is_read        Boolean           @default(false)
   created_at     DateTime          @default(now()) @db.Timestamptz(6)
 
-  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: NoAction, onUpdate: NoAction)
+  accounts accounts @relation(fields: [account_id], references: [account_id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([account_id, is_read], map: "idx_notifications_account_read")
   @@index([created_at], map: "idx_notifications_created_at")

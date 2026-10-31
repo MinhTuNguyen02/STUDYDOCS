@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { formatDateTime, formatDateTimeSec } from "@/utils/format";
 import Pagination from "@/components/common/Pagination";
 import { useSearchParams } from "react-router-dom";
+import { isCanceledRequest } from "@/api/request";
 
 interface AuditLog {
   log_id: number;
@@ -68,31 +69,40 @@ export default function AdminAuditLogsPage() {
   const [total, setTotal] = useState(0);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await adminApi.getAuditLogs({
-        action: actionFilter || undefined,
-        search: searchEmail || undefined,
-        page,
-        limit,
-      });
-      setLogs(res.data || res);
-      setTotal(res.meta?.total ?? (res.data || res).length);
-    } catch (caughtError) {
-      const message =
-        (caughtError as any)?.response?.data?.message ||
-        "Lỗi tải nhật ký hệ thống";
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [actionFilter, limit, page, searchEmail]);
+  const fetchLogs = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await adminApi.getAuditLogs(
+          {
+            action: actionFilter || undefined,
+            search: searchEmail || undefined,
+            page,
+            limit,
+          },
+          signal,
+        );
+        setLogs(res.data || res);
+        setTotal(res.meta?.total ?? (res.data || res).length);
+      } catch (caughtError) {
+        if (isCanceledRequest(caughtError)) return;
+        const message =
+          (caughtError as any)?.response?.data?.message ||
+          "Lỗi tải nhật ký hệ thống";
+        setError(message);
+        toast.error(message);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [actionFilter, limit, page, searchEmail],
+  );
 
   useEffect(() => {
-    void fetchLogs();
+    const controller = new AbortController();
+    void fetchLogs(controller.signal);
+    return () => controller.abort();
   }, [fetchLogs]);
   useEffect(() => {
     setSearchInput(searchEmail);
@@ -227,7 +237,7 @@ export default function AdminAuditLogsPage() {
           <div className="text-center py-16">
             <p className="text-danger mb-4 font-medium">{error}</p>
             <button
-              onClick={fetchLogs}
+              onClick={() => void fetchLogs()}
               className="btn bg-primary text-white px-5 py-2 rounded-xl"
             >
               Thử lại

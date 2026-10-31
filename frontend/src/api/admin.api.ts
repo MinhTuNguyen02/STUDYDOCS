@@ -1,12 +1,23 @@
 import api from "./client";
+import type {
+  GatewayReport,
+  LedgerReportParams,
+  RevenueReport,
+  TaxReport,
+} from "./contracts";
 
 export const adminApi = {
-  getDashboardStats: async (params?: any) => {
+  getDashboardStats: async (
+    params?: Record<string, string | number | undefined>,
+  ) => {
     const res = await api.get("/admin/dashboard", { params });
     return res.data;
   },
-  getApprovals: async (params?: any) => {
-    const res = await api.get("/admin/approvals/documents", { params });
+  getApprovals: async (
+    params?: Record<string, string | number | undefined>,
+    signal?: AbortSignal,
+  ) => {
+    const res = await api.get("/admin/approvals/documents", { params, signal });
     return res.data;
   },
   approveDocument: async (id: number) => {
@@ -24,8 +35,11 @@ export const adminApi = {
     return res.data;
   },
 
-  getUsers: async (params?: any) => {
-    const res = await api.get("/admin/users", { params });
+  getUsers: async (
+    params?: Record<string, string | number | undefined>,
+    signal?: AbortSignal,
+  ) => {
+    const res = await api.get("/admin/users", { params, signal });
     return res.data;
   },
   toggleUserStatus: async (id: number, durationDays: number | null = null) => {
@@ -44,8 +58,11 @@ export const adminApi = {
     return res.data;
   },
 
-  getAllDocuments: async (params?: any) => {
-    const res = await api.get("/admin/documents", { params });
+  getAllDocuments: async (
+    params?: Record<string, string | number | undefined>,
+    signal?: AbortSignal,
+  ) => {
+    const res = await api.get("/admin/documents", { params, signal });
     return res.data;
   },
   softDeleteDocument: async (id: number) => {
@@ -57,7 +74,9 @@ export const adminApi = {
     return res.data;
   },
 
-  getWithdrawals: async (params?: any) => {
+  getWithdrawals: async (
+    params?: Record<string, string | number | undefined>,
+  ) => {
     const res = await api.get("/admin/withdrawals", { params });
     return res.data;
   },
@@ -69,7 +88,7 @@ export const adminApi = {
     return res.data;
   },
 
-  getReports: async (params?: any) => {
+  getReports: async (params?: Record<string, string | number | undefined>) => {
     const res = await api.get("/reports", { params });
     return res.data;
   },
@@ -82,16 +101,25 @@ export const adminApi = {
     const res = await api.get("/admin/reconciliation");
     return res.data;
   },
-  getRevenueReport: async (params?: any) => {
-    const res = await api.get("/admin/reports/revenue", { params });
+  getRevenueReport: async (
+    params: LedgerReportParams & { startDate: string; endDate: string },
+    signal?: AbortSignal,
+  ): Promise<RevenueReport> => {
+    const res = await api.get("/admin/reports/revenue", { params, signal });
     return res.data;
   },
-  getGatewayWallet: async (params?: any) => {
-    const res = await api.get("/admin/wallets/gateway", { params });
+  getGatewayWallet: async (
+    params?: LedgerReportParams,
+    signal?: AbortSignal,
+  ): Promise<GatewayReport> => {
+    const res = await api.get("/admin/wallets/gateway", { params, signal });
     return res.data;
   },
-  getTaxWallet: async (params?: any) => {
-    const res = await api.get("/admin/wallets/tax", { params });
+  getTaxWallet: async (
+    params?: LedgerReportParams,
+    signal?: AbortSignal,
+  ): Promise<TaxReport> => {
+    const res = await api.get("/admin/wallets/tax", { params, signal });
     return res.data;
   },
   payTax: async (data: { amount: number; note: string }) => {
@@ -196,17 +224,25 @@ export const adminApi = {
   },
 
   // ── Audit Logs ──
-  getAuditLogs: async (params?: any) => {
-    const res = await api.get("/admin/audit-logs", { params });
+  getAuditLogs: async (
+    params?: Record<string, string | number | undefined>,
+    signal?: AbortSignal,
+  ) => {
+    const res = await api.get("/admin/audit-logs", { params, signal });
     return res.data;
   },
 
   // ── Gateway Wallet ──
-  getGatewayWalletReport: async (params?: {
-    startDate?: string;
-    endDate?: string;
-  }) => {
-    const res = await api.get("/admin/wallets/gateway", { params });
+  getGatewayWalletReport: async (
+    params?: {
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      limit?: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<GatewayReport> => {
+    const res = await api.get("/admin/wallets/gateway", { params, signal });
     return res.data;
   },
 };

@@ -1,17 +1,15 @@
-import { ReactNode, useEffect, useState, useRef, useCallback } from 'react'
+import { ReactNode, useState, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
-import { useNotificationStore } from '@/store/notificationStore'
 import TopupModal from '@/components/common/TopupModal'
 import PhoneVerificationModal from '@/components/auth/PhoneVerificationModal'
 import { Search, ShoppingCart, User, Menu, LogOut, Mail, Phone, MapPin, Heart, Library, Package, Wallet, ChevronDown, Store, ShieldCheck, Upload } from 'lucide-react'
 import { FiFacebook, FiInstagram, FiYoutube } from 'react-icons/fi'
-import { documentsApi } from '@/api/documents.api'
-import { walletsApi } from '@/api/wallets.api'
 import { formatBalance } from '@/utils/format'
 import NotificationBell from '@/components/common/NotificationBell'
 import { authApi } from '@/api/auth.api'
+import { useMainLayoutData } from '@/hooks/useMainLayoutData'
 
 interface Props {
   children: ReactNode
@@ -19,8 +17,7 @@ interface Props {
 
 export default function MainLayout({ children }: Props) {
   const { user, logout } = useAuthStore()
-  const { count, fetchCart } = useCartStore()
-  const { socket } = useNotificationStore()
+  const count = useCartStore((state) => state.count)
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -29,45 +26,8 @@ export default function MainLayout({ children }: Props) {
   const isSearchHovered = useRef(false)
   const [showTopupModal, setShowTopupModal] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(user?.isPhoneVerified === false)
-  const [footerCategories, setFooterCategories] = useState<any[]>([])
-  const [footerPolicies, setFooterPolicies] = useState<any[]>([])
-  const [wallets, setWallets] = useState<any[]>([])
-
   const isStaff = ['admin', 'mod', 'accountant'].includes(user?.roleNames?.[0]?.toLowerCase() || '');
-
-  useEffect(() => {
-    if (user) {
-      fetchCart()
-    }
-  }, [user, fetchCart])
-
-  useEffect(() => {
-    documentsApi.getCategories().then(res => setFooterCategories(res || []))
-    documentsApi.getPolicies().then(res => setFooterPolicies(res || []))
-  }, [])
-
-  const fetchWallets = useCallback(() => {
-    if (user && !isStaff) {
-      walletsApi.getMyWallets()
-        .then(res => setWallets(res?.data || []))
-        .catch(() => setWallets([]))
-    }
-  }, [isStaff, user])
-
-  useEffect(() => {
-    fetchWallets()
-  }, [fetchWallets])
-
-  useEffect(() => {
-    if (socket) {
-      socket.on('wallet_updated', () => {
-        fetchWallets()
-      })
-      return () => {
-        socket.off('wallet_updated')
-      }
-    }
-  }, [fetchWallets, socket])
+  const { footerCategories, footerPolicies, wallets } = useMainLayoutData(user, isStaff)
 
   const paymentWallet = wallets.find(w => w.wallet_type === 'PAYMENT' || w.walletType === 'PAYMENT')
   const revenueWallet = wallets.find(w => w.wallet_type === 'REVENUE' || w.walletType === 'REVENUE')

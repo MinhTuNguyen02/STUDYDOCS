@@ -1,95 +1,116 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { documentsApi } from '@/api/documents.api'
-import DocumentCard from '@/components/common/DocumentCard'
-import { Search, Filter, SlidersHorizontal, ChevronLeft, ChevronRight, ChevronDown, XCircle } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { documentsApi } from "@/api/documents.api";
+import DocumentCard from "@/components/common/DocumentCard";
+import {
+  Search,
+  Filter,
+  SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  XCircle,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { isCanceledRequest } from "@/api/request";
 
 export default function DocumentsListPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [documents, setDocuments] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [meta, setMeta] = useState({ page: 1, limit: 12, total: 0 })
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [meta, setMeta] = useState({ page: 1, limit: 12, total: 0 });
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
 
-  const keyword = searchParams.get('keyword') || ''
-  const categoryId = searchParams.get('categoryId') || ''
-  const sortBy = searchParams.get('sortBy') || 'popular'
-  const page = Number.parseInt(searchParams.get('page') || '1', 10)
+  const keyword = searchParams.get("keyword") || "";
+  const categoryId = searchParams.get("categoryId") || "";
+  const sortBy = searchParams.get("sortBy") || "popular";
+  const page = Number.parseInt(searchParams.get("page") || "1", 10);
 
-  const [localKeyword, setLocalKeyword] = useState(keyword)
+  const [localKeyword, setLocalKeyword] = useState(keyword);
 
-  const handleFilterChange = useCallback((key: string, value: string, scroll = true) => {
-    const newParams = new URLSearchParams(searchParams)
-    if (value) newParams.set(key, value)
-    else newParams.delete(key)
+  const handleFilterChange = useCallback(
+    (key: string, value: string, scroll = true) => {
+      const newParams = new URLSearchParams(searchParams);
+      if (value) newParams.set(key, value);
+      else newParams.delete(key);
 
-    if (key !== 'page') newParams.set('page', '1')
-    setSearchParams(newParams)
-    if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [searchParams, setSearchParams])
+      if (key !== "page") newParams.set("page", "1");
+      setSearchParams(newParams);
+      if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [searchParams, setSearchParams],
+  );
 
-  const fetchDocs = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const params = {
-        keyword,
-        categoryId: categoryId === 'ALL' ? '' : categoryId,
-        sortBy,
-        page,
-        limit: 9,
+  const fetchDocs = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params: Record<string, any> = {
+          page,
+          limit: 9,
+        };
+        if (keyword) params.keyword = keyword;
+        if (sortBy) params.sortBy = sortBy;
+        if (categoryId && categoryId !== "ALL") params.categoryId = Number(categoryId);
+        const res = await documentsApi.getDocuments(params, signal);
+        setDocuments(res.data || []);
+        setMeta(res.meta || { page, limit: 9, total: 0 });
+      } catch (err: any) {
+        if (isCanceledRequest(err)) return;
+        const message =
+          err?.response?.data?.message || "Không thể tải danh sách tài liệu";
+        setError(message);
+        toast.error(message);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-      const res = await documentsApi.getDocuments(params)
-      setDocuments(res.data || [])
-      setMeta(res.meta || { page, limit: 9, total: 0 })
-    } catch (err: any) {
-      const message = err?.response?.data?.message || 'Không thể tải danh sách tài liệu'
-      setError(message)
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
-  }, [categoryId, keyword, page, sortBy])
+    },
+    [categoryId, keyword, page, sortBy],
+  );
 
   useEffect(() => {
-    setLocalKeyword(keyword)
-  }, [keyword])
+    setLocalKeyword(keyword);
+  }, [keyword]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       if (localKeyword !== keyword) {
-        handleFilterChange('keyword', localKeyword, false)
+        handleFilterChange("keyword", localKeyword, false);
       }
-    }, 500)
-    return () => clearTimeout(t)
-  }, [handleFilterChange, keyword, localKeyword])
+    }, 500);
+    return () => clearTimeout(t);
+  }, [handleFilterChange, keyword, localKeyword]);
 
   useEffect(() => {
-    documentsApi.getCategories().then(res => setCategories(res || []))
-  }, [])
+    documentsApi.getCategories().then((res) => setCategories(res || []));
+  }, []);
 
-  useEffect(() => { void fetchDocs() }, [fetchDocs])
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchDocs(controller.signal);
+    return () => controller.abort();
+  }, [fetchDocs]);
 
   const clearFilters = () => {
-    setSearchParams(new URLSearchParams())
-    setLocalKeyword('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+    setSearchParams(new URLSearchParams());
+    setLocalKeyword("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const toggleCategory = (id: string) => {
-    setExpandedCats(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
+    setExpandedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
-  const isFiltered = keyword || categoryId || (sortBy && sortBy !== 'popular')
+  const isFiltered = keyword || categoryId || (sortBy && sortBy !== "popular");
 
   return (
     <div className="flex flex-col lg:flex-row gap-8">
@@ -112,7 +133,9 @@ export default function DocumentsListPage() {
           </div>
 
           <div className="mb-6">
-            <label className="block font-medium text-sm text-foreground mb-2">Tìm kiếm</label>
+            <label className="block font-medium text-sm text-foreground mb-2">
+              Tìm kiếm
+            </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
@@ -126,10 +149,12 @@ export default function DocumentsListPage() {
           </div>
 
           <div className="mb-6">
-            <label className="block font-medium text-sm text-foreground mb-2">Sắp xếp theo</label>
+            <label className="block font-medium text-sm text-foreground mb-2">
+              Sắp xếp theo
+            </label>
             <select
               value={sortBy}
-              onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+              onChange={(e) => handleFilterChange("sortBy", e.target.value)}
               className="w-full px-4 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             >
               <option value="popular">Phổ biến nhất</option>
@@ -149,64 +174,85 @@ export default function DocumentsListPage() {
                   type="radio"
                   name="category"
                   checked={!categoryId}
-                  onChange={() => handleFilterChange('categoryId', '')}
+                  onChange={() => handleFilterChange("categoryId", "")}
                   className="w-4 h-4 text-primary bg-background border-border focus:ring-primary/20 accent-primary"
                 />
-                <span className="text-sm font-medium group-hover:text-primary transition-colors">Tất cả danh mục</span>
+                <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                  Tất cả danh mục
+                </span>
               </label>
-              {categories.filter(c => !c.parent_id).map(parent => {
-                const pId = String(parent.id || parent.category_id);
-                const children = categories.filter(c => String(c.parent_id) === pId);
-                const isExpanded = expandedCats.has(pId);
+              {categories
+                .filter((c) => !c.parent_id)
+                .map((parent) => {
+                  const pId = String(parent.id || parent.category_id);
+                  const children = categories.filter(
+                    (c) => String(c.parent_id) === pId,
+                  );
+                  const isExpanded = expandedCats.has(pId);
 
-                return (
-                  <div key={pId} className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 group">
-                      {children.length > 0 ? (
-                        <button
-                          onClick={() => toggleCategory(pId)}
-                          className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors outline-none shrink-0"
-                        >
-                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        </button>
-                      ) : (
-                        <div className="w-6 shrink-0" />
-                      )}
+                  return (
+                    <div key={pId} className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 group">
+                        {children.length > 0 ? (
+                          <button
+                            onClick={() => toggleCategory(pId)}
+                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors outline-none shrink-0"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </button>
+                        ) : (
+                          <div className="w-6 shrink-0" />
+                        )}
 
-                      <label className="flex items-center gap-2 cursor-pointer flex-1">
-                        <input
-                          type="radio"
-                          name="category"
-                          checked={categoryId === pId}
-                          onChange={() => handleFilterChange('categoryId', pId)}
-                          className="w-4 h-4 text-primary bg-background border-border focus:ring-primary/20 accent-primary"
-                        />
-                        <span className="text-sm font-medium group-hover:text-primary transition-colors">{parent.name}</span>
-                      </label>
-                    </div>
-
-                    {children.length > 0 && isExpanded && (
-                      <div className="flex flex-col gap-2 ml-8 pl-2 border-l-2 border-border/50 animate-in slide-in-from-top-2 duration-200">
-                        {children.map(child => {
-                          const cId = String(child.id || child.category_id);
-                          return (
-                            <label key={cId} className="flex items-center gap-2 cursor-pointer group">
-                              <input
-                                type="radio"
-                                name="category"
-                                checked={categoryId === cId}
-                                onChange={() => handleFilterChange('categoryId', cId)}
-                                className="w-3.5 h-3.5 text-primary bg-background border-border focus:ring-primary/20 accent-primary"
-                              />
-                              <span className="text-sm font-normal group-hover:text-primary transition-colors text-muted-foreground">{child.name}</span>
-                            </label>
-                          )
-                        })}
+                        <label className="flex items-center gap-2 cursor-pointer flex-1">
+                          <input
+                            type="radio"
+                            name="category"
+                            checked={categoryId === pId}
+                            onChange={() =>
+                              handleFilterChange("categoryId", pId)
+                            }
+                            className="w-4 h-4 text-primary bg-background border-border focus:ring-primary/20 accent-primary"
+                          />
+                          <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                            {parent.name}
+                          </span>
+                        </label>
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+
+                      {children.length > 0 && isExpanded && (
+                        <div className="flex flex-col gap-2 ml-8 pl-2 border-l-2 border-border/50 animate-in slide-in-from-top-2 duration-200">
+                          {children.map((child) => {
+                            const cId = String(child.id || child.category_id);
+                            return (
+                              <label
+                                key={cId}
+                                className="flex items-center gap-2 cursor-pointer group"
+                              >
+                                <input
+                                  type="radio"
+                                  name="category"
+                                  checked={categoryId === cId}
+                                  onChange={() =>
+                                    handleFilterChange("categoryId", cId)
+                                  }
+                                  className="w-3.5 h-3.5 text-primary bg-background border-border focus:ring-primary/20 accent-primary"
+                                />
+                                <span className="text-sm font-normal group-hover:text-primary transition-colors text-muted-foreground">
+                                  {child.name}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </div>
@@ -216,7 +262,7 @@ export default function DocumentsListPage() {
       <div className="flex-1 min-w-0">
         <div className="flex items-end justify-between mb-6 pb-4 border-b border-border/50">
           <h2 className="text-2xl font-bold text-foreground">
-            {keyword ? `Kết quả cho "${keyword}"` : 'Tất cả tài liệu'}
+            {keyword ? `Kết quả cho "${keyword}"` : "Tất cả tài liệu"}
             <span className="text-sm text-muted-foreground ml-3 font-normal">
               ({meta.total} tài liệu)
             </span>
@@ -225,12 +271,20 @@ export default function DocumentsListPage() {
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array(12).fill(0).map((_, i) => (
-              <div key={i} className="h-80 bg-muted rounded-xl animate-pulse" />
-            ))}
+            {Array(12)
+              .fill(0)
+              .map((_, i) => (
+                <div
+                  key={i}
+                  className="h-80 bg-muted rounded-xl animate-pulse"
+                />
+              ))}
           </div>
         ) : error ? (
-          <div className="text-center py-24 bg-card border border-danger/30 rounded-xl mt-4" role="alert">
+          <div
+            className="text-center py-24 bg-card border border-danger/30 rounded-xl mt-4"
+            role="alert"
+          >
             <XCircle className="w-16 h-16 text-danger mx-auto mb-4 opacity-60" />
             <h3 className="text-xl font-bold mb-2">Không thể tải tài liệu</h3>
             <p className="text-muted-foreground mb-6">{error}</p>
@@ -244,7 +298,9 @@ export default function DocumentsListPage() {
         ) : documents.length > 0 ? (
           <div className="flex flex-col gap-10">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {documents.map(doc => <DocumentCard key={doc.id} document={doc} />)}
+              {documents.map((doc) => (
+                <DocumentCard key={doc.id} document={doc} />
+              ))}
             </div>
 
             {/* Pagination Controls */}
@@ -252,7 +308,9 @@ export default function DocumentsListPage() {
               <div className="flex justify-center items-center gap-2 mt-4">
                 <button
                   disabled={meta.page <= 1}
-                  onClick={() => handleFilterChange('page', String(meta.page - 1))}
+                  onClick={() =>
+                    handleFilterChange("page", String(meta.page - 1))
+                  }
                   className="p-2 border border-border rounded-lg bg-card hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -262,7 +320,9 @@ export default function DocumentsListPage() {
                 </div>
                 <button
                   disabled={meta.page * meta.limit >= meta.total}
-                  onClick={() => handleFilterChange('page', String(meta.page + 1))}
+                  onClick={() =>
+                    handleFilterChange("page", String(meta.page + 1))
+                  }
                   className="p-2 border border-border rounded-lg bg-card hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -273,8 +333,12 @@ export default function DocumentsListPage() {
         ) : (
           <div className="text-center py-24 bg-card border border-border rounded-xl mt-4">
             <Filter className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-20" />
-            <h3 className="text-xl font-bold mb-2">Không tìm thấy tài liệu phù hợp</h3>
-            <p className="text-muted-foreground mb-6">Thử thay đổi từ khóa hoặc bộ lọc của bạn.</p>
+            <h3 className="text-xl font-bold mb-2">
+              Không tìm thấy tài liệu phù hợp
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Thử thay đổi từ khóa hoặc bộ lọc của bạn.
+            </p>
             <button
               className="bg-primary text-white font-medium px-6 py-2.5 rounded-lg hover:bg-primary-hover transition-colors shadow-sm"
               onClick={() => setSearchParams(new URLSearchParams())}
@@ -285,5 +349,5 @@ export default function DocumentsListPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
