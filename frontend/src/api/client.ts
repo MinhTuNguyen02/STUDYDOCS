@@ -2,8 +2,11 @@ import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 import { unwrapApiEnvelope } from './request'
 
+const rawBaseUrl = (import.meta.env.VITE_API_URL || '/api').trim().replace(/\/+$/, '')
+export const API_BASE_URL = rawBaseUrl.endsWith('/api') ? rawBaseUrl : `${rawBaseUrl}/api`
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: API_BASE_URL,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -27,7 +30,7 @@ export async function refreshAuthSession(): Promise<{ accessToken: string; user?
 
   refreshPromise = (async () => {
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || '/api'
+      const baseUrl = API_BASE_URL
       const csrf = await axios.get(`${baseUrl}/auth/csrf`, { withCredentials: true })
       const csrfPayload = unwrapApiEnvelope(csrf.data) as { csrfToken: string }
       const csrfToken = csrfPayload?.csrfToken || (csrf.data as any)?.csrfToken

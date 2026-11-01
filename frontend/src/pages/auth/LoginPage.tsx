@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import { authApi } from "@/api/auth.api";
+import { API_BASE_URL } from "@/api/client";
 import toast from "react-hot-toast";
 import { Eye, EyeOff, Mail, Lock, ShieldCheck, ArrowLeft } from "lucide-react";
 import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal";
@@ -263,7 +264,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() =>
-                  (window.location.href = `${import.meta.env.VITE_API_URL || "/api"}/auth/google`)
+                  (window.location.href = `${API_BASE_URL}/auth/google`)
                 }
                 className="flex items-center justify-center gap-3 py-3.5 border border-border rounded-xl hover:bg-accent hover:shadow-sm transition-all font-medium text-foreground bg-background"
               >
