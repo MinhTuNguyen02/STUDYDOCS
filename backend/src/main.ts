@@ -19,7 +19,7 @@ async function bootstrap() {
   const allowedOrigins = config
     .getOrThrow<string>('FRONTEND_URL')
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
     .filter(Boolean);
 
   // Kích hoạt Shutdown Hooks để giải phóng connection Prisma khi reload BE
@@ -44,7 +44,7 @@ async function bootstrap() {
     origin: allowedOrigins,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: 'Content-Type, Accept, Authorization, X-CSRF-Token'
+    allowedHeaders: 'Content-Type, Accept, Authorization, X-CSRF-Token, X-Request-ID'
   });
   app.useWebSocketAdapter(new ConfiguredIoAdapter(app, allowedOrigins));
 
