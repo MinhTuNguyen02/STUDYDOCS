@@ -14,7 +14,7 @@ import { validationExceptionFactory } from './common/validation/validation-error
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
-  const port = config.get<number>('PORT', 4000);
+  const port = Number(process.env.PORT || config.get('PORT', 4000));
   const nodeEnv = config.get<string>('NODE_ENV', 'development');
   const allowedOrigins = config
     .getOrThrow<string>('FRONTEND_URL')
