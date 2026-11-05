@@ -4,7 +4,15 @@
 
 **🔗 Live Demo:** [https://studydocs-lac.vercel.app/](https://studydocs-lac.vercel.app/)
 
-**⚙️ API Base URL:** [https://studydocs-backend-minhtu.fly.dev](https://studydocs-backend-minhtu.fly.dev)
+**⚙️ API Base URL:** [https://studydocs.onrender.com](https://studydocs.onrender.com)
+
+**📄 Gotenberg Service:** [https://studydocs-gotenberg.onrender.com](https://studydocs-gotenberg.onrender.com)
+
+> [!IMPORTANT]
+> **Service Wake-up Notice (Render Free Tier):**
+> The Backend API and Gotenberg service are hosted on **Render (Singapore)** *(originally deployed on Fly.io)*. Due to the 15-minute inactivity spin-down on Render's free tier, **please ensure both services are awake before testing or browsing the application** (especially when uploading/converting documents or processing checkout):
+> - 🟢 **Wake up Backend:** [https://studydocs.onrender.com/api/health/live](https://studydocs.onrender.com/api/health/live) *(wait ~30–50s if spinning up)*
+> - 🟢 **Wake up Gotenberg:** [https://studydocs-gotenberg.onrender.com/health](https://studydocs-gotenberg.onrender.com/health)
 
 Students can **buy, sell, download, and review** academic documents through a transparent, commission-based platform with real-time notifications and financial audit trails.
 
@@ -51,13 +59,13 @@ Students can **buy, sell, download, and review** academic documents through a tr
 
 ```mermaid
 flowchart LR
-    FE["React 19 + Vite Frontend\n(Vercel)"] -->|REST API| API["NestJS Backend API\n(Fly.io)"]
+    FE["React 19 + Vite Frontend\n(Vercel)"] -->|REST API| API["NestJS Backend API\n(Render / ex-Fly.io)"]
     FE <-->|WebSocket| WS["Socket.IO Gateway\n(NestJS)"]
     WS --> API
 
     API --> DB[(PostgreSQL\nSupabase Cloud)]
     API --> Storage["Supabase Storage\nS3-compatible"]
-    API --> Gotenberg["Gotenberg 8\nFile Conversion\nFly.io / Docker"]
+    API --> Gotenberg["Gotenberg 8\nFile Conversion\n(Render / ex-Fly.io)"]
     API --> VNPay["VNPay\nPayment Gateway"]
     API --> Mail["Gmail SMTP\nEmail Service"]
 ```
@@ -76,8 +84,8 @@ STUDYDOCS/
 │   │   ├── database/               # PrismaModule + PrismaService
 │   │   └── modules/                # 23 business modules
 │   ├── test/                       # 4 E2E test suites
-│   ├── Dockerfile                  # Multi-stage production build
-│   └── fly.toml                    # Fly.io deployment config
+│   ├── Dockerfile                  # Multi-stage production build (Render / Docker)
+│   └── fly.toml                    # Fly.io deployment config (preserved deployment profile)
 ├── frontend/                       # React 19 + Vite 8 + TailwindCSS 4
 │   └── src/
 │       ├── api/                    # 14 Axios API clients
@@ -187,7 +195,7 @@ Customer clicks "Top Up"
 | **Email** | Nodemailer (Gmail SMTP) |
 | **Security** | Helmet, Throttler (rate limiting), bcryptjs |
 | **Testing** | Jest, Supertest (4 E2E suites) |
-| **DevOps** | Docker (multi-stage), Fly.io, Vercel |
+| **DevOps** | Docker (multi-stage), Render, Vercel *(previously Fly.io)* |
 
 ---
 
@@ -196,10 +204,14 @@ Customer clicks "Top Up"
 | Service | Platform | Region | Link |
 |---------|----------|--------|------|
 | Frontend | [Vercel](https://vercel.com) | Auto (Edge) | [https://studydocs-lac.vercel.app/](https://studydocs-lac.vercel.app/) |
-| Backend API | [Fly.io](https://fly.io) | Singapore (`sin`) | [https://studydocs-backend-minhtu.fly.dev](https://studydocs-backend-minhtu.fly.dev) |
+| Backend API | [Render](https://render.com) *(formerly Fly.io)* | Singapore (`sin`) | [https://studydocs.onrender.com](https://studydocs.onrender.com) |
 | Database | [Supabase](https://supabase.com) | AP Southeast 1 | — |
 | File Storage | Supabase Storage | S3-compatible | — |
-| Gotenberg | Fly.io / Docker local | — | — |
+| Gotenberg | [Render](https://render.com) *(formerly Fly.io)* | Singapore (`sin`) | [https://studydocs-gotenberg.onrender.com](https://studydocs-gotenberg.onrender.com) |
+
+> 💡 **Deployment History Note:** The Backend API and Gotenberg conversion service were originally configured and deployed on **Fly.io** (deployment specification preserved in `backend/fly.toml`), and were subsequently migrated to **Render** to consolidate container and web service management on a single cloud platform.
+> 
+> ⚠️ **Service Spin-up Notice:** Because Render free tier instances automatically spin down after 15 minutes of inactivity, please ensure both the Backend and Gotenberg services are awake using the links above prior to testing live demo workflows.
 
 ---
 
@@ -431,21 +443,22 @@ docker compose logs -f    # Stream logs
 
 ## ⚠️ Important Notes
 
-1. **Docker Desktop must be running** before `docker compose up -d` (for Gotenberg).
-2. **Startup order:** Docker → Backend → Frontend.
-3. **Schema changes** — after editing `prisma/schema.prisma`, use a disposable local database:
+1. **Live Cloud Services (Render):** When testing on the live Vercel demo, ensure both the **Backend API** (`https://studydocs.onrender.com`) and **Gotenberg** (`https://studydocs-gotenberg.onrender.com`) are awake from their free-tier sleep state before testing file conversion or payment flows.
+2. **Docker Desktop must be running** before `docker compose up -d` (for Gotenberg when testing locally).
+3. **Startup order:** Docker → Backend → Frontend.
+4. **Schema changes** — after editing `prisma/schema.prisma`, use a disposable local database:
    ```bash
    npx prisma generate && npm run prisma:migrate:dev
    ```
    Review generated SQL and back up the target before running `npm run prisma:migrate:deploy` on staging/production.
-4. **VNPay testing** — configure `VNPAY_TMN_CODE` and `VNPAY_HASH_SECRET` in `.env` from [VNPay Sandbox](https://sandbox.vnpayment.vn).
-5. **VNPay IPN webhook** — to receive automatic payment confirmations, expose the backend via **ngrok**:
+5. **VNPay testing** — configure `VNPAY_TMN_CODE` and `VNPAY_HASH_SECRET` in `.env` from [VNPay Sandbox](https://sandbox.vnpayment.vn).
+6. **VNPay IPN webhook** — to receive automatic payment confirmations, expose the backend via **ngrok**:
    ```bash
    ngrok http 4000
    ```
    Then update the IPN URL in your VNPay Sandbox merchant dashboard.
-6. **Never commit `.env` files** — they contain secret keys. Only `.env.example` should be in version control.
-7. **Supabase setup** — this project requires a configured Supabase project. See `backend/prisma/schema.prisma` for the database schema and `backend/prisma/seed.ts` for initial data.
+7. **Never commit `.env` files** — they contain secret keys. Only `.env.example` should be in version control.
+8. **Supabase setup** — this project requires a configured Supabase project. See `backend/prisma/schema.prisma` for the database schema and `backend/prisma/seed.ts` for initial data.
 
 ---
 
