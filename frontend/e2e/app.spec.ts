@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
       localStorage.clear();
     }
   });
-  await page.route("http://127.0.0.1:4173/api/**", async (route) => {
+  await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === "/api/categories") {
       await route.fulfill({
@@ -85,7 +85,7 @@ async function loginAs(
   };
   for (const endpoint of ["login", "refresh"]) {
     await page.route(
-      `http://127.0.0.1:4173/api/auth/${endpoint}`,
+      `**/api/auth/${endpoint}`,
       async (route) => {
         await route.fulfill({
           status: 200,
@@ -95,7 +95,7 @@ async function loginAs(
       },
     );
   }
-  await page.route("http://127.0.0.1:4173/api/auth/csrf", async (route) => {
+  await page.route("**/api/auth/csrf", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",

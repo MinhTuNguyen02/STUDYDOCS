@@ -26,4 +26,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = requiredTestEnv('TEST_SUPABASE_SERVICE_R
 process.env.SUPABASE_STORAGE_BUCKET = requiredTestEnv('TEST_SUPABASE_STORAGE_BUCKET');
 process.env.FRONTEND_URL ||= 'http://localhost:5173';
 process.env.JWT_ACCESS_SECRET ||= 'test-only-jwt-secret-with-at-least-32-characters';
+process.env.VNPAY_TMN_CODE ||= 'B2PAZD38';
+process.env.VNPAY_HASH_SECRET ||= 'test-vnpay-hash-secret-32-characters-long';
+process.env.GOTENBERG_URL ||= 'http://localhost:3000';
 process.env.ENABLE_MOCK_OTP = 'true';
