@@ -18,6 +18,37 @@ Students can **buy, sell, download, and review** academic documents through a tr
 
 ---
 
+## 🔑 Demo Accounts & Test Credentials
+
+For evaluators and reviewers testing the application (both on the live demo and locally), pre-configured staff accounts and sandbox payment information are provided below:
+
+### 👤 Staff Credentials (Admin & Staff Portal)
+
+Login at `/login` with any of the following accounts:
+
+| Role | Email | Password | Full Name | Access & Permissions |
+|------|-------|----------|-----------|----------------------|
+| **Admin** | `admin@studydocs.vn` | `admin123` | Quản trị viên | Full system control: configuration, commission rates, staff management, audit logs, system wallets |
+| **Moderator (MOD)** | `mod@studydocs.vn` | `mod123` | NV Kiểm duyệt | Content moderation queue, document reviews/approvals, reports handling, soft-delete |
+| **Accountant** | `accountant@studydocs.vn` | `accountant123` | NV Kế toán | Financial reporting, revenue reconciliation, tax withholding, gateway pool oversight |
+
+> [!NOTE]
+> Regular customer accounts can be created at `/register` or via Google OAuth.
+
+### 💳 VNPay Sandbox Test Card Details
+
+When testing wallet top-up or checkout with the **VNPay Sandbox Gateway**, select **Thẻ ATM / Tài khoản nội địa** (Domestic ATM Card) and enter the following sandbox credentials:
+
+| Parameter | Test Value |
+|-----------|------------|
+| **Bank (Ngân hàng)** | `NCB` (Ngân hàng Quốc Dân) |
+| **Card Number (Số thẻ)** | `9704198526191432198` |
+| **Cardholder Name (Tên chủ thẻ)** | `NGUYEN VAN A` |
+| **Issue Date (Ngày phát hành)** | `07/15` |
+| **OTP Code (Mật khẩu OTP)** | `123456` |
+
+---
+
 ## ✨ Key Features
 
 - **Multi-Role System** — 4 roles (Customer, Moderator, Accountant, Admin) with granular RBAC on both backend and frontend
@@ -451,7 +482,7 @@ docker compose logs -f    # Stream logs
    npx prisma generate && npm run prisma:migrate:dev
    ```
    Review generated SQL and back up the target before running `npm run prisma:migrate:deploy` on staging/production.
-5. **VNPay testing** — configure `VNPAY_TMN_CODE` and `VNPAY_HASH_SECRET` in `.env` from [VNPay Sandbox](https://sandbox.vnpayment.vn).
+5. **VNPay testing** — configure `VNPAY_TMN_CODE` and `VNPAY_HASH_SECRET` in `.env` from [VNPay Sandbox](https://sandbox.vnpayment.vn). See [Demo Accounts & Test Credentials](#-demo-accounts--test-credentials) above for sandbox test card details.
 6. **VNPay IPN webhook** — to receive automatic payment confirmations, expose the backend via **ngrok**:
    ```bash
    ngrok http 4000

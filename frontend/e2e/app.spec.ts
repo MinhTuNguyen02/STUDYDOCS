@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!window.sessionStorage.getItem("__test_initialized__")) {
+      window.sessionStorage.setItem("__test_initialized__", "true");
+      localStorage.clear();
+    }
+  });
   await page.route("http://127.0.0.1:4173/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === "/api/categories") {
